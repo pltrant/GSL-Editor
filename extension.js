@@ -224,7 +224,10 @@ function downloadScript(receivedMsg) {
     } else if (/Edt:$/.test(receivedMsg)) {
         gslEditor.getScript = 0;
         sendMsg('Q\n');
-        let extPath = vscode.extensions.getExtension('patricktrant.gsl').extensionPath;
+        let extPath = vscode.workspace.getConfiguration('gsl').get('downloadPath');      
+        if (!extPath) {
+          extPath = vscode.extensions.getExtension('patricktrant.gsl').extensionPath;
+        }
         return __awaiter(this, void 0, void 0, function* () {
             let newFile = vscode.Uri.parse('untitled:' + extPath + '\\' + gslEditor.scriptNum);
             vscode.workspace.openTextDocument(newFile).then(document => {
