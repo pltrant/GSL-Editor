@@ -1,0 +1,103 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "GSL",
+	"patterns": [
+		{
+			"include": "#keywords"
+		},
+		{
+			"include": "#strings"
+		},
+		{
+			"include": "#numbers"
+		},
+		{
+			"include": "#comments"
+		},
+		{
+			"include": "#variables"
+		},
+		{
+			"include": "#nodes"
+		}
+	],
+	"repository": {
+		"keywords": {
+			"patterns": [
+				{
+					"name": "keyword.control.gsl",
+					"match": "\\b(?i:if|ifnot|else_if|else_ifnot|else|when|while)\\b"
+				},
+				{
+					"name": "keyword.operator.gsl",
+					"match": "!="
+				},
+				{
+					"name": "keyword.gsl",
+					"match": "\\$(?i:x)\\d(?i:f|g|h|i)"
+				},
+				{
+					"name": "keyword.gsl",
+					"match": "\\$(?i:p)\\d(?i:a|b|f|g|h|i|l|m|p|r|s|u)"
+				},
+				{
+					"name": "keyword.gsl",
+					"match": "\\$(?i:a|b|d|v|l|s|k|t|p|x)\\d"
+				},
+				{
+					"name": "keyword.gsl",
+					"match": "\\$(?i:q|r|ze)"
+				},
+				{
+					"name": "keyword.gsl",
+					"match": "\\$(?i:c)\\d(?i:a|j|n|d|s|t|u|m)"
+				},
+				{
+					"name": "keyword.gsl",
+					"match": "\\$(?i:o)\\d(?i:a|j|n|d|s|c|t|m)"
+				},
+				{
+					"name": "keyword.gsl",
+					"match": "\\$(?i:e)\\d(?i:a|j|n|d|s|t|m)"
+				},
+				{
+					"name": "keyword.gsl",
+					"match": "\\$(\\$|\\\\|\\^|'|\\*|\\+)"
+				},
+				{
+					"name": "keyword.gsl",
+					"match": "\\$(?i:break|callback|calledby|descmode|donematch|error|match|maxtextchanges|maxuobjs|stime|time|systime|thisscript|users|inttable|strtable)"
+				}
+			]
+		},
+		"strings": {
+			"name": "string.quoted.double.gsl",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [{"include": "#keywords"}]
+		},
+		"numbers": {
+			"name": "constant.numeric.gsl",
+			"match": "\\b\\d+\\b",
+			"patterns": []
+		},
+		"comments": {
+			"name": "comment.line.gsl",
+			"begin": "!",
+			"end": "$",
+			"patterns": []
+		},
+		"variables": {
+			"name": "variable.gsl",
+			"match": "\\b(?i:a|b|s|t|v)\\d\\b",
+			"patterns": []
+		}
+		,
+		"nodes": {
+			"name": "entity.name.type.gsl",
+			"match": "\\b(?i:np|nc|nr|no|ne)\\d\\b",
+			"patterns": []
+		}
+	},
+	"scopeName": "source.gsl"
+}
