@@ -97,7 +97,14 @@
           ],
           "default": "",
           "description": "Play.net character to log into."
-        }
+        },
+        "gsl.downloadPath": {
+					"type": [
+						"string"
+					],
+					"default": "",
+					"description": "Path to save downloaded scripts."
+				}
       }
     },
     "configurationDefaults": {
