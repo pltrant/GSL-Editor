@@ -52,7 +52,6 @@ function getGameChannel() {
 function outGameChannel(message) {
     message = message.replace(/\n$/, ''); //Remove ending newline.
     getGameChannel().appendLine(`${message}`);
-    //getGameChannel().show();
 }
 
 function getScriptNumFromFile(doc) {
@@ -89,23 +88,23 @@ function activate(context) {
     if (!this._ULstatusBarItem) {
         this._ULstatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
     }
-    let editor = vscode.window.activeTextEditor;
-    if (!editor) {
-        this._DLstatusBarItem.hide();
-        this._ULstatusBarItem.hide();
-        return;
-    }
-    let doc = editor.document;
-    if (doc.languageId === "gsl") {
-        this._DLstatusBarItem.text = '↓ Download';
-        this._DLstatusBarItem.command = 'extension.gslDownload';
-        this._DLstatusBarItem.show();
-        this._ULstatusBarItem.text = '↑ Upload';
-        this._ULstatusBarItem.command = 'extension.gslUpload';
-        this._ULstatusBarItem.show();
+    let self = this;
+    if (vscode.workspace.getConfiguration('gsl').get('alwaysEnabled')) {
+        showGSLStatusBarItems(self);
     } else {
-        this._DLstatusBarItem.hide();
-        this._ULstatusBarItem.hide();
+        let editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            this._DLstatusBarItem.hide();
+            this._ULstatusBarItem.hide();
+            return;
+        }
+        let doc = editor.document;
+        if (doc.languageId === "gsl") {
+            showGSLStatusBarItems(self);
+        } else {
+            this._DLstatusBarItem.hide();
+            this._ULstatusBarItem.hide();
+        }
     }
     var disposable = vscode.commands.registerCommand('extension.gslDownload', () => {
         gslDownload(context);
@@ -113,9 +112,21 @@ function activate(context) {
     var disposable = vscode.commands.registerCommand('extension.gslUpload', () => {
         gslUpload(context);
     });
+    if (vscode.workspace.getConfiguration('gsl').get('displayGameChannel')) {
+        getGameChannel().show(true);
+    }
     context.subscriptions.push(disposable);
 }
 exports.activate = activate;
+
+function showGSLStatusBarItems(context) {
+    context._DLstatusBarItem.text = '↓ Download';
+    context._DLstatusBarItem.command = 'extension.gslDownload';
+    context._DLstatusBarItem.show();
+    context._ULstatusBarItem.text = '↑ Upload';
+    context._ULstatusBarItem.command = 'extension.gslUpload';
+    context._ULstatusBarItem.show();
+}
 
 function gslUpload(context) {
     let editor = vscode.window.activeTextEditor;
@@ -165,7 +176,7 @@ function uploadScript(receivedMsg) {
         sendMsg('Q\n');
         gslEditor.sendScript = 0;
         gslEditor.scriptTxt = '';
-        getGameChannel().show();
+        getGameChannel().show(true);
      } else if (/Compile OK\./.test(receivedMsg)) {
         sendMsg('Q\n');
         gslEditor.sendScript = 0;
@@ -228,7 +239,7 @@ function downloadScript(receivedMsg) {
         if (!extPath) {
           extPath = vscode.extensions.getExtension('patricktrant.gsl').extensionPath;
         }
-        return __awaiter(this, void 0, void 0, function* () {
+         return __awaiter(this, void 0, void 0, function* () {
             let newFile = vscode.Uri.parse('untitled:' + extPath + '\\' + gslEditor.scriptNum);
             vscode.workspace.openTextDocument(newFile).then(document => {
                 if (document.isUntitled && (document.lineCount == 1)) {
@@ -389,5 +400,5 @@ function onConnError(err) {
         gameClient.connected = false;
     }
     vscode.window.showErrorMessage('Connect error: ' + err.message);
-    getGameChannel().show();
+    getGameChannel().show(true);
 }

@@ -1,121 +1,137 @@
 {
-  "name": "gsl",
-  "displayName": "GSL",
-  "description": "GSL Editor",
-  "version": "0.0.1",
-  "publisher": "patricktrant",
-  "author": {
-    "name": "Patrick Trant",
-    "email": "estild@gmail.com"
-  },
-  "engines": {
-    "vscode": "^1.10.0"
-  },
-  "categories": [
-    "Languages"
-  ],
-  "activationEvents": [
-    "onLanguage:gsl"
-  ],
-  "main": "extension",
-  "contributes": {
-    "commands": [
-      {
-        "command": "extension.gslDownload",
-        "title": "Download",
-        "category": "GSL"
-      },
-      {
-        "command": "extension.gslUpload",
-        "title": "Upload",
-        "category": "GSL"
-      }
-    ],
-    "languages": [
-      {
-        "id": "gsl",
-        "aliases": [
-          "GSL",
-          "gsl"
-        ],
-        "filenamePatterns": [
-          "S[0-9][0-9][0-9][0-9][0-9]"
-        ],
-        "extensions": [
-          ".gsl"
-        ],
-        "configuration": "./language-configuration.json"
-      }
-    ],
-    "grammars": [
-      {
-        "language": "gsl",
-        "scopeName": "source.gsl",
-        "path": "./syntaxes/gsl.tmLanguage.json"
-      }
-    ],
-    "configuration": {
-      "type": "object",
-      "title": "GSL",
-      "properties": {
-        "gsl.account": {
-          "type": [
-            "string"
-          ],
-          "default": "",
-          "description": "Play.net account name."
-        },
-        "gsl.password": {
-          "type": [
-            "string"
-          ],
-          "default": "",
-          "description": "Play.net account password."
-        },
-        "gsl.game": {
-          "type": [
-            "string"
-          ],
-          "enum": [
-            "GemStone IV Development",
-            "GemStone IV",
-            "GemStone IV Platinum",
-            "GemStone IV Shattered",
-            "GemStone IV Prime Test",
-            "DragonRealms Development",
-            "DragonRealms",
-            "DragonRealms Platinum",
-            "DragonRealms The Fallen",
-            "DragonRealms Prime Test"
-          ],
-          "default": "GemStone IV Development",
-          "description": "Play.net game to log into."
-        },
-        "gsl.character": {
-          "type": [
-            "string"
-          ],
-          "default": "",
-          "description": "Play.net character to log into."
-        },
-        "gsl.downloadPath": {
-					"type": [
-						"string"
-					],
-					"default": "",
-					"description": "Path to save downloaded scripts."
-				}
-      }
+    "name": "gsl",
+    "displayName": "GSL",
+    "description": "GSL Editor",
+    "version": "0.0.2",
+    "publisher": "patricktrant",
+    "author": {
+        "name": "Patrick Trant",
+        "email": "estild@gmail.com"
     },
-    "configurationDefaults": {
-      "[gsl]": {
-        "editor.insertSpaces": true,
-        "editor.tabSize": 2,
-        "editor.wordWrap": "wordWrapColumn",
-        "editor.wordWrapColumn": 120,
-        "editor.rulers": [120],
-        "editor.scrollBeyondLastLine": false
-      }
+    "engines": {
+        "vscode": "^1.10.0"
+    },
+    "categories": [
+        "Languages"
+    ],
+    "activationEvents": [
+        "*"
+    ],
+    "main": "extension",
+    "contributes": {
+        "commands": [
+            {
+                "command": "extension.gslDownload",
+                "title": "Download",
+                "category": "GSL"
+            },
+            {
+                "command": "extension.gslUpload",
+                "title": "Upload",
+                "category": "GSL"
+            }
+        ],
+        "languages": [
+            {
+                "id": "gsl",
+                "aliases": [
+                    "GSL",
+                    "gsl"
+                ],
+                "filenamePatterns": [
+                    "S[0-9][0-9][0-9][0-9][0-9]"
+                ],
+                "extensions": [
+                    ".gsl"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "gsl",
+                "scopeName": "source.gsl",
+                "path": "./syntaxes/gsl.tmLanguage.json"
+            }
+        ],
+        "configuration": {
+            "type": "object",
+            "title": "GSL",
+            "properties": {
+                "gsl.account": {
+                    "type": [
+                        "string"
+                    ],
+                    "default": "",
+                    "description": "Play.net account name."
+                },
+                "gsl.password": {
+                    "type": [
+                        "string"
+                    ],
+                    "default": "",
+                    "description": "Play.net account password."
+                },
+                "gsl.game": {
+                    "type": [
+                        "string"
+                    ],
+                    "enum": [
+                        "GemStone IV Development",
+                        "GemStone IV",
+                        "GemStone IV Platinum",
+                        "GemStone IV Shattered",
+                        "GemStone IV Prime Test",
+                        "DragonRealms Development",
+                        "DragonRealms",
+                        "DragonRealms Platinum",
+                        "DragonRealms The Fallen",
+                        "DragonRealms Prime Test"
+                    ],
+                    "default": "GemStone IV Development",
+                    "description": "Play.net game to log into."
+                },
+                "gsl.character": {
+                    "type": [
+                        "string"
+                    ],
+                    "default": "",
+                    "description": "Play.net character to log into."
+                },
+                "gsl.alwaysEnabled": {
+                    "type": [
+                        "boolean"
+                    ],
+                    "default": true,
+                    "description": "Enable to always have the Download/Upload buttons."
+                },
+                "gsl.displayGameChannel": {
+                    "type": [
+                        "boolean"
+                    ],
+                    "default": false,
+                    "description": "Enable to display the Game channel when the editor starts."
+                },
+                "gsl.downloadPath": {
+                    "type": [
+                        "string"
+                    ],
+                    "default": "",
+                    "description": "Path to save downloaded scripts."
+                }
+            }
+        },
+        "configurationDefaults": {
+            "[gsl]": {
+                "editor.insertSpaces": true,
+                "editor.tabSize": 2,
+                "editor.wordWrap": "wordWrapColumn",
+                "editor.wordWrapColumn": 120,
+                "editor.rulers": [
+                    120
+                ],
+                "editor.scrollBeyondLastLine": false
+            }
+        }
     }
-  }
 }
