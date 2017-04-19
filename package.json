@@ -17,6 +17,11 @@
     "activationEvents": [
         "*"
     ],
+    "private": true,
+    "repository": {
+        "type": "git",
+        "url": "https://gitlab.com/GSIV/GSL-Editor.git"
+    },
     "main": "extension",
     "contributes": {
         "commands": [
@@ -127,9 +132,7 @@
                 "editor.tabSize": 2,
                 "editor.wordWrap": "wordWrapColumn",
                 "editor.wordWrapColumn": 120,
-                "editor.rulers": [
-                    120
-                ],
+                "editor.rulers": [120],
                 "editor.scrollBeyondLastLine": false
             }
         }

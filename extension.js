@@ -2,6 +2,7 @@
 
 const vscode = require("vscode");
 const net = require('net');
+const fs = require('fs');
 
 const sgeClient = new net.Socket();
 const gameClient = new net.Socket();
@@ -68,15 +69,15 @@ function LogIntoGame() {
     return __awaiter(this, void 0, void 0, function* () {     
         if (!gameClient.connected) {
             sgeClient.connect(7900, 'eaccess.play.net', function() {
-                sgeClient.on('close', onConnSGEClose);
-                sgeClient.on('data', onConnSGEData);
-                sgeClient.on('error', onConnError);
-                sgeClient.setNoDelay(true);
                 sgeClient.connected = true;
-                outGameChannel('SGE connection established.');
                 gslEditor.msgCount = 0;
+                outGameChannel('SGE connection established.');
                 sendMsg('K\n');
             });
+            sgeClient.on('close', onConnSGEClose);
+            sgeClient.on('data', onConnSGEData);
+            sgeClient.on('error', onConnError);
+            sgeClient.setNoDelay(true);
         }
     });
 }
@@ -137,27 +138,31 @@ function gslUpload(context) {
     if (!doc) {
         return vscode.window.showErrorMessage('You must have a script open before you can upload it.');
     }
-    gslEditor.scriptNum = getScriptNumFromFile(doc);
+    let scriptNum = getScriptNumFromFile(doc);
+    if (!/\d\d\d\d\d/.test(scriptNum)) {
+        return vscode.window.showErrorMessage('Invalid script # to upload.  The script # is derived from the filename and must be in the S##### format.');
+    }
+    gslEditor.scriptNum = scriptNum;
     gslEditor.scriptTxt = doc.getText();
     gslEditor.sendScript = 1;
     gslEditor.getScript = 0;
     LogIntoGame().then(function() {
         if (gameClient.connected) {
             sendMsg('/ms ' + gslEditor.scriptNum + '\n');
-        } else {
-            setTimeout(function(){sendMsg('/ms ' + gslEditor.scriptNum + '\n')}, 3000);
         }
     });
 }
 
 function uploadScript(receivedMsg) {
-     if (/^Error: Script #(.*) is a verb. Please use \/mv (.*) instead\.\s/.test(receivedMsg)) {
+    if (/^\s\nWelcome to.*\s\n.*\s\nAll Rights Reserved\s.*/.test(receivedMsg)) {
+        sendMsg('/ms ' + gslEditor.scriptNum + '\n');
+    } else if (/^Error: Script #(.*) is a verb. Please use \/mv (.*) instead\.\s/.test(receivedMsg)) {
         let myRegexp = /^Error: Script #(.*) is a verb. Please use \/mv (.*) instead\.\s/;
         let match = myRegexp.exec(receivedMsg);
         sendMsg('/mv ' + match[2] + '\n');
-     } else if ((/Edt:$/.test(receivedMsg)) && (gslEditor.sendScript == 1)) {
+    } else if ((/Edt:$/.test(receivedMsg)) && (gslEditor.sendScript == 1)) {
         sendMsg('Z\n');
-     } else if (/^\s\nZAP!  All lines deleted\./.test(receivedMsg)) {
+    } else if (/^\s\nZAP!  All lines deleted\./.test(receivedMsg)) {
         let scriptArray = gslEditor.scriptTxt.split('\n');
         let delay = 0;
         for (let index = 0; index < scriptArray.length; index++) {
@@ -166,10 +171,10 @@ function uploadScript(receivedMsg) {
         }
         setTimeout(function(){gameClient.write('\n');gameClient.uncork();}, delay);
         gslEditor.sendScript = 2;
-     } else if ((/Edt:$/.test(receivedMsg)) && (gslEditor.sendScript == 2)) {
+    } else if ((/Edt:$/.test(receivedMsg)) && (gslEditor.sendScript == 2)) {
         sendMsg('G\n');
         gslEditor.sendScript = 3;
-     } else if (/Compile Failed w\/(.*) errors and (.*) warnings\./.test(receivedMsg)) {
+    } else if (/Compile Failed w\/(.*) errors and (.*) warnings\./.test(receivedMsg)) {
         let myRegexp = /(Compile Failed w\/(.*) errors and (.*) warnings\.)/;
         let match = myRegexp.exec(receivedMsg);
         vscode.window.showErrorMessage(match[1]);
@@ -177,12 +182,12 @@ function uploadScript(receivedMsg) {
         gslEditor.sendScript = 0;
         gslEditor.scriptTxt = '';
         getGameChannel().show(true);
-     } else if (/Compile OK\./.test(receivedMsg)) {
+    } else if (/Compile OK\./.test(receivedMsg)) {
         sendMsg('Q\n');
         gslEditor.sendScript = 0;
         gslEditor.scriptTxt = '';
         vscode.window.setStatusBarMessage('Upload successful.', 5000);
-     }
+    }
 }
 
 function gslDownload(context) {
@@ -200,14 +205,6 @@ function gslDownload(context) {
                 } else {
                     sendMsg('/ms ' + gslEditor.input + '\n');
                 }
-            } else {
-                setTimeout(function(){
-                    if (isNaN(gslEditor.input)) {
-                        sendMsg('/mv ' + gslEditor.input + '\n');
-                    } else {
-                        sendMsg('/ms ' + gslEditor.input + '\n');
-                    }
-                }, 3000);
             }
         });
     });
@@ -239,24 +236,25 @@ function downloadScript(receivedMsg) {
         if (!extPath) {
           extPath = vscode.extensions.getExtension('patricktrant.gsl').extensionPath;
         }
-         return __awaiter(this, void 0, void 0, function* () {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (fs.existsSync(extPath + '\\' + gslEditor.scriptNum)) {
+                fs.unlinkSync(extPath + '\\' + gslEditor.scriptNum)
+            }
             let newFile = vscode.Uri.parse('untitled:' + extPath + '\\' + gslEditor.scriptNum);
             vscode.workspace.openTextDocument(newFile).then(document => {
-                if (document.isUntitled && (document.lineCount == 1)) {
-                    const edit = new vscode.WorkspaceEdit();
-                    edit.insert(newFile, new vscode.Position(0, 0), gslEditor.scriptTxt);
-                    vscode.workspace.applyEdit(edit).then(success => {
-                        vscode.window.showTextDocument(document).then(function() {
-                            let lineCnt = (document.lineCount - 1);
-                            vscode.commands.executeCommand("cursorMove", {
-                                to: "up",
-                                by: "line",
-                                select: false,
-                                value: lineCnt
-                            })}
-                        )
+                vscode.window.showTextDocument(document).then(editor => {
+                    editor.edit((builder) => {
+                        builder.insert(new vscode.Position(0, 0), gslEditor.scriptTxt)
+                    }).then(success => {
+                        let lineCnt = (document.lineCount - 1);
+                        vscode.commands.executeCommand("cursorMove", {
+                            to: "up",
+                            by: "line",
+                            select: false,
+                            value: lineCnt
+                        });
                     });
-                }
+                });
             });
         });
     }
@@ -340,14 +338,14 @@ function onConnSGEData(data) {
         }
         sgeClient.destroy();
         gameClient.connect(gslEditor.gamePort, gslEditor.gameHost, function() {
-            gameClient.on('close', onConnGameClose);
-            gameClient.on('data', onConnGameData);
-            gameClient.on('error', onConnError);
-            gameClient.setNoDelay(true);
             gameClient.connected = true;
             outGameChannel('Game connection established.');
             sendMsg(gslEditor.gameKey + '\n');
         });
+        gameClient.on('close', onConnGameClose);
+        gameClient.on('data', onConnGameData);
+        gameClient.on('error', onConnError);
+        gameClient.setNoDelay(true);
     }
 }
 
@@ -399,6 +397,10 @@ function onConnError(err) {
         gameClient.removeAllListeners();
         gameClient.connected = false;
     }
-    vscode.window.showErrorMessage('Connect error: ' + err.message);
+    showError(err);
+}
+
+function showError(err) {
+    vscode.window.showErrorMessage('Error: ' + err.message);
     getGameChannel().show(true);
 }
