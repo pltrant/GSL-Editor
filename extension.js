@@ -8,21 +8,21 @@ const sgeClient = new net.Socket();
 const gameClient = new net.Socket();
 var gameChannel;
 var gslEditor = {
-    hashKey:'',
-    pwHash:'',
-    gameCode:'',
-    characterID:'',
-    gameHost:'',
-    gamePort:'',
-    gameKey:'',
-    msgCount:0,
-    getScript:0,
-    sendScript:0,
-    scriptNum:0,
-    scriptTxt:'',
-    debug:'',
-    input:'',
-    lastMsg:''
+    hashKey: '',
+    pwHash: '',
+    gameCode: '',
+    characterID: '',
+    gameHost: '',
+    gamePort: '',
+    gameKey: '',
+    msgCount: 0,
+    getScript: 0,
+    sendScript: 0,
+    scriptNum: 0,
+    scriptTxt: '',
+    debug: '',
+    input: '',
+    lastMsg: ''
 }
 
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
@@ -35,12 +35,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 
 function str2ab(str) { //String to Array Buffer
-  var buffer = new ArrayBuffer(str.length);
-  var bufferView = new Uint8Array(buffer);
-  for (let i = 0, strLen = str.length; i < strLen; i++) {
-    bufferView[i] = str.charCodeAt(i);
-  }
-  return buffer;
+    var buffer = new ArrayBuffer(str.length);
+    var bufferView = new Uint8Array(buffer);
+    for (let i = 0, strLen = str.length; i < strLen; i++) {
+        bufferView[i] = str.charCodeAt(i);
+    }
+    return buffer;
 }
 
 function getGameChannel() {
@@ -59,16 +59,16 @@ function getScriptNumFromFile(doc) {
     let fileName = doc.fileName;
     let nameLength = doc.fileName.length;
     if (fileName.toLowerCase().substr(nameLength - 3) == "gsl") { // Ends with *.gsl
-        return doc.fileName.substr(nameLength - 9).substr(0,5);
+        return doc.fileName.substr(nameLength - 9).substr(0, 5);
     } else { // No file extension
         return doc.fileName.substr(nameLength - 5)
     }
 }
 
 function LogIntoGame() {
-    return __awaiter(this, void 0, void 0, function* () {     
+    return __awaiter(this, void 0, void 0, function* () {
         if (!gameClient.connected) {
-            sgeClient.connect(7900, 'eaccess.play.net', function() {
+            sgeClient.connect(7900, 'eaccess.play.net', function () {
                 sgeClient.connected = true;
                 gslEditor.msgCount = 0;
                 outGameChannel('SGE connection established.');
@@ -146,9 +146,10 @@ function gslUpload(context) {
     gslEditor.scriptTxt = doc.getText();
     gslEditor.sendScript = 1;
     gslEditor.getScript = 0;
-    LogIntoGame().then(function() {
+    vscode.window.setStatusBarMessage('Uploading script ' + scriptNum + '...', 5000);
+    LogIntoGame().then(function () {
         if (gameClient.connected) {
-            sendMsg('/ms ' + gslEditor.scriptNum + '\n');
+            uploadScript(' \nWelcome to \n \nAll Rights Reserved '); //Simulate initial login text
         }
     });
 }
@@ -166,10 +167,10 @@ function uploadScript(receivedMsg) {
         let scriptArray = gslEditor.scriptTxt.split('\n');
         let delay = 0;
         for (let index = 0; index < scriptArray.length; index++) {
-            setTimeout(function(){gameClient.write(scriptArray[index] + '\n');gameClient.uncork();}, delay);
+            setTimeout(function () { gameClient.write(scriptArray[index] + '\n'); gameClient.uncork(); }, delay);
             delay += 1;
         }
-        setTimeout(function(){gameClient.write('\n');gameClient.uncork();}, delay);
+        setTimeout(function () { gameClient.write('\n'); gameClient.uncork(); }, delay);
         gslEditor.sendScript = 2;
     } else if ((/Edt:$/.test(receivedMsg)) && (gslEditor.sendScript == 2)) {
         sendMsg('G\n');
@@ -191,34 +192,43 @@ function uploadScript(receivedMsg) {
 }
 
 function gslDownload(context) {
-    vscode.window.showInputBox({prompt: 'Script number or verb name to download?'}).then(input => {
+    vscode.window.showInputBox({ prompt: 'Script number or verb name to download?' }).then(input => {
         if ((input == null) | (input == '')) {
             return vscode.window.showInformationMessage('Not input provided. Script download aborted.');
         }
         gslEditor.getScript = 1;
         gslEditor.scriptTxt = '';
         gslEditor.input = input;
-        LogIntoGame().then(function() {
+        let type = '';
+        if (isNaN(gslEditor.input)) {
+            type = 'verb';
+        } else {
+            type = 'script';
+        }
+        vscode.window.setStatusBarMessage('Downloading ' + type + ' ' + gslEditor.input + '...', 5000);
+        LogIntoGame().then(function () {
             if (gameClient.connected) {
-                if (isNaN(gslEditor.input)) {
-                    sendMsg('/mv ' + gslEditor.input + '\n');
-                } else {
-                    sendMsg('/ms ' + gslEditor.input + '\n');
-                }
+                downloadScript(' \nWelcome to \n \nAll Rights Reserved '); //Simulate initial login text
             }
         });
     });
 }
 
 function downloadScript(receivedMsg) {
-     if (/^\s\nWelcome to.*\s\n.*\s\nAll Rights Reserved\s.*/.test(receivedMsg)) {
+    if (/^\s\nWelcome to.*\s\n.*\s\nAll Rights Reserved\s.*/.test(receivedMsg)) {
         if (isNaN(gslEditor.input)) {
+            vscode.window.setStatusBarMessage('Downloading verb ' + gslEditor.input + '...', 5000);
             sendMsg('/mv ' + gslEditor.input + '\n');
         } else {
+            vscode.window.setStatusBarMessage('Downloading script ' + gslEditor.input + '...', 5000);
             sendMsg('/ms ' + gslEditor.input + '\n');
         }
         gslEditor.getScript = 1;
         gslEditor.scriptTxt = '';
+    } else if (/^Error: Script #(.*) is a verb. Please use \/mv (.*) instead\.\s/.test(receivedMsg)) {
+        let myRegexp = /^Error: Script #(.*) is a verb. Please use \/mv (.*) instead\.\s/;
+        let match = myRegexp.exec(receivedMsg);
+        sendMsg('/mv ' + match[2] + '\n');
     } else if (/^Error: Script #\d\d\d\d\d has not been created yet\.\s/.test(receivedMsg)) {
         return vscode.window.showErrorMessage('Script #' + gslEditor.input + ' has not been created yet.');
     } else if (/^Verb not found.\s/.test(receivedMsg)) {
@@ -232,30 +242,23 @@ function downloadScript(receivedMsg) {
     } else if (/Edt:$/.test(receivedMsg)) {
         gslEditor.getScript = 0;
         sendMsg('Q\n');
-        let extPath = vscode.workspace.getConfiguration('gsl').get('downloadPath');      
+        let extPath = vscode.workspace.getConfiguration('gsl').get('downloadPath');
         if (!extPath) {
-          extPath = vscode.extensions.getExtension('patricktrant.gsl').extensionPath;
+            extPath = vscode.extensions.getExtension('patricktrant.gsl').extensionPath + '\\scripts';
+        }
+        if (!fs.existsSync(extPath)) { //Directory doesn't exist
+            fs.mkdirSync(extPath); //Create directory
         }
         return __awaiter(this, void 0, void 0, function* () {
-            if (fs.existsSync(extPath + '\\' + gslEditor.scriptNum)) {
-                fs.unlinkSync(extPath + '\\' + gslEditor.scriptNum)
+            let fileName = extPath + '\\' + gslEditor.scriptNum;
+            if (fs.existsSync(fileName)) { //Check for existing file
+                fs.unlinkSync(fileName); //Already exists, delete it
             }
-            let newFile = vscode.Uri.parse('untitled:' + extPath + '\\' + gslEditor.scriptNum);
-            vscode.workspace.openTextDocument(newFile).then(document => {
-                vscode.window.showTextDocument(document).then(editor => {
-                    editor.edit((builder) => {
-                        builder.insert(new vscode.Position(0, 0), gslEditor.scriptTxt)
-                    }).then(success => {
-                        let lineCnt = (document.lineCount - 1);
-                        vscode.commands.executeCommand("cursorMove", {
-                            to: "up",
-                            by: "line",
-                            select: false,
-                            value: lineCnt
-                        });
-                    });
-                });
+            fs.writeFileSync(fileName, gslEditor.scriptTxt); //Create new file with script text
+            vscode.workspace.openTextDocument(fileName).then(document => {
+                vscode.window.showTextDocument(document)
             });
+            vscode.window.setStatusBarMessage('Download successful.', 5000);
         });
     }
 }
@@ -271,12 +274,12 @@ function sendMsg(msg) {
 
 function onConnSGEData(data) {
     let receivedMsg = data.toString();
-    receivedMsg = receivedMsg.replace(/\n$/, ''); //Remove ending newline.
+    receivedMsg = receivedMsg.replace(/\n$/, ''); //Remove ending newline
     let msgArray = receivedMsg.split('\t');
     outGameChannel(receivedMsg);
     gslEditor.lastMsg = receivedMsg;
     gslEditor.msgCount++;
-    
+
     if (/^.{32}$/gu.test(receivedMsg) && (gslEditor.msgCount == 1)) {
         gslEditor.hashKey = receivedMsg;
         let pw = vscode.workspace.getConfiguration('gsl').get('password');
@@ -284,7 +287,7 @@ function onConnSGEData(data) {
             return vscode.window.showErrorMessage('Please use File > Preferences > Settings, then input your password in the GSL section.');
         }
         gslEditor.pwHash = '';
-        for (let i = 0; i < pw.length; i++) { 
+        for (let i = 0; i < pw.length; i++) {
             gslEditor.pwHash += String.fromCharCode(((pw.charCodeAt(i) - 32) ^ gslEditor.hashKey.charCodeAt(i)) + 32);
         }
         let account = vscode.workspace.getConfiguration('gsl').get('account');
@@ -316,7 +319,7 @@ function onConnSGEData(data) {
     } else if (/^P\t.*/.test(receivedMsg)) {
         sendMsg('C\n');
     } else if (/^C\t([0-9]+\t){4}.*/.test(receivedMsg)) {
-        let lowerCaseMsgArray = msgArray.map(function(value) {
+        let lowerCaseMsgArray = msgArray.map(function (value) {
             return value.toLowerCase();
         });
         let character = vscode.workspace.getConfiguration('gsl').get('character');
@@ -337,7 +340,7 @@ function onConnSGEData(data) {
             }
         }
         sgeClient.destroy();
-        gameClient.connect(gslEditor.gamePort, gslEditor.gameHost, function() {
+        gameClient.connect(gslEditor.gamePort, gslEditor.gameHost, function () {
             gameClient.connected = true;
             outGameChannel('Game connection established.');
             sendMsg(gslEditor.gameKey + '\n');
@@ -351,24 +354,37 @@ function onConnSGEData(data) {
 
 function onConnGameData(data) {
     let receivedMsg = data.toString();
-    receivedMsg = receivedMsg.replace(/\n$/, ''); //Remove ending newline.
+    receivedMsg = receivedMsg.replace(/\n$/, ''); //Remove ending newline
     let msgArray = receivedMsg.split('\t');
     outGameChannel(receivedMsg);
     gslEditor.lastMsg = receivedMsg;
     gslEditor.msgCount++;
 
+    if (receivedMsg.includes('Edt:')) { //Editing a script
+        setTimeout(function () { checkState(receivedMsg, gslEditor.msgCount) }, 5000);
+    }
+
     if (gslEditor.getScript == 2) { //Downloading script now, may span multiple messages
         gslEditor.scriptTxt += receivedMsg;
         gslEditor.scriptTxt = gslEditor.scriptTxt.replace(/Edt:$/, ''); //Remove ending Edit:
     }
-    
+
     if (/^<mode id="GAME"\/>$/.test(receivedMsg)) {
-        setTimeout(function(){sendMsg('<c>\n')}, 300);
-        setTimeout(function(){sendMsg('<c>\n')}, 600);
+        setTimeout(function () { sendMsg('<c>\n') }, 300);
+        setTimeout(function () { sendMsg('<c>\n') }, 600);
     } else if (gslEditor.getScript) {
         downloadScript(receivedMsg);
     } else if (gslEditor.sendScript) {
         uploadScript(receivedMsg);
+    }
+}
+
+function checkState(msg, count) {
+    if ((msg == gslEditor.lastMsg) && (count == gslEditor.msgCount)) { //Stuck on same last message after 5 seconds
+        sendMsg('\n');
+        setTimeout(function () { sendMsg('V\n') }, 200);
+        setTimeout(function () { sendMsg('Y\n') }, 400);
+        setTimeout(function () { sendMsg('Q\n') }, 600);
     }
 }
 

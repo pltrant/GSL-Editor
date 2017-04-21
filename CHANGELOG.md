@@ -1,6 +1,10 @@
 # Change Log
 All notable changes to the GSL Editor ("gsl") extension will be documented in this file.
 
+## [0.0.4] - 2017-04-21
+### Fixed
+- Downloaded files are now locally saved before opened (which gets rid of the unsaved status and prevents 'undo' from removing all text)
+
 ## [0.0.3] - 2017-04-19
 ### Added
 - Added error validation on invalid script names when trying to upload.

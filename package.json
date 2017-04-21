@@ -2,7 +2,7 @@
     "name": "gsl",
     "displayName": "GSL",
     "description": "GSL Editor",
-    "version": "0.0.2",
+    "version": "0.0.4",
     "publisher": "patricktrant",
     "author": {
         "name": "Patrick Trant",
@@ -132,7 +132,9 @@
                 "editor.tabSize": 2,
                 "editor.wordWrap": "wordWrapColumn",
                 "editor.wordWrapColumn": 120,
-                "editor.rulers": [120],
+                "editor.rulers": [
+                    120
+                ],
                 "editor.scrollBeyondLastLine": false
             }
         }
