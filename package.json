@@ -2,7 +2,7 @@
     "name": "gsl",
     "displayName": "GSL",
     "description": "GSL Editor",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "publisher": "patricktrant",
     "author": {
         "name": "Patrick Trant",
@@ -57,6 +57,12 @@
                 "language": "gsl",
                 "scopeName": "source.gsl",
                 "path": "./syntaxes/gsl.tmLanguage.json"
+            }
+        ],
+        "snippets": [
+            {
+                "language": "gsl",
+                "path": "./snippets/gsl.json"
             }
         ],
         "configuration": {
@@ -131,11 +137,12 @@
                 "editor.insertSpaces": true,
                 "editor.tabSize": 2,
                 "editor.wordWrap": "wordWrapColumn",
-                "editor.wordWrapColumn": 120,
+                "editor.wordWrapColumn": 118,
                 "editor.rulers": [
-                    120
+                    118
                 ],
-                "editor.scrollBeyondLastLine": false
+                "editor.scrollBeyondLastLine": false,
+                "editor.wordBasedSuggestions": false
             }
         }
     }

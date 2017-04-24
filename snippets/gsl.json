@@ -1,0 +1,112 @@
+{
+	"else statement": {
+		"prefix": "else",
+		"body": [
+			"else",
+			"	$1",
+			"."
+		],
+		"description": "else statement"
+	},
+	"else_if statement": {
+		"prefix": "else_if",
+		"body": [
+			"else_if ($1) then",
+			"	$2",
+			"."
+		],
+		"description": "else_if statement"
+	},
+	"if statement": {
+		"prefix": "if",
+		"body": [
+			"if ($1) then",
+			"  $2",
+			"."
+		],
+		"description": "if statement"
+	},
+	"ifnot statement": {
+		"prefix": "if",
+		"body": [
+			"ifnot ($1) then",
+			"  $2",
+			"."
+		],
+		"description": "ifnot statement"
+	},
+	"if/else statement": {
+		"prefix": "if",
+		"body": [
+			"if ($1) then",
+			"  $2",
+			"else",
+			"  $3",
+			"."
+		],
+		"description": "if/else statement"
+	},
+	"if/else_if statement": {
+		"prefix": "if",
+		"body": [
+			"if ($1) then",
+			"  $2",
+			"else_if ($3) then",
+			"  $4",
+			"."
+		],
+		"description": "if/else_if statement"
+	},
+	"Matchmarker": {
+		"prefix": "mm",
+		"body": [
+			"!*********************************************************************************************************************",
+			": \"$1\"",
+			"!*********************************************************************************************************************",
+			"  $2",
+			"."
+		],
+		"description": "new matchmarker"
+	},
+	"Script Header": {
+		"prefix": "new",
+		"body": [
+			"!*********************************************************************************************************************",
+			"!",
+			"! s$1",
+			"! Description",
+			"!",
+			"! Keywords: $2",
+			"!",
+			"! Modification History:",
+			"! $3/$4/$5 - $6 - Initial script creation/code.",
+			"!",
+			"!*********************************************************************************************************************",
+			"!"
+		],
+		"description": "new script header"
+	},
+	"When statement": {
+		"prefix": "when",
+		"body": [
+			"when $1",
+			"  is $2",
+			"    $3",
+			"  .",
+			"  default",
+			"    $4",
+			"  .",
+			"."
+		],
+		"description": "when statement"
+	},
+	"While loop": {
+		"prefix": "while",
+		"body": [
+			"while ($1)",
+			"  $2",
+			"."
+		],
+		"description": "while loop"
+	}
+}

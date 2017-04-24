@@ -175,6 +175,13 @@ function uploadScript(receivedMsg) {
     } else if ((/Edt:$/.test(receivedMsg)) && (gslEditor.sendScript == 2)) {
         sendMsg('G\n');
         gslEditor.sendScript = 3;
+    } else if (/Edt:Inserting before line: 0/.test(receivedMsg)) {
+        vscode.window.showErrorMessage("Upload error.  Please check to ensure you haven't gone past 118 characters on a single line.");
+        sendMsg('Q\n');
+        gslEditor.sendScript = 0;
+        gslEditor.scriptTxt = '';
+        vscode.window.setStatusBarMessage('Upload failed.', 5000);
+        getGameChannel().show(true);
     } else if (/Compile Failed w\/(.*) errors and (.*) warnings\./.test(receivedMsg)) {
         let myRegexp = /(Compile Failed w\/(.*) errors and (.*) warnings\.)/;
         let match = myRegexp.exec(receivedMsg);
@@ -182,6 +189,7 @@ function uploadScript(receivedMsg) {
         sendMsg('Q\n');
         gslEditor.sendScript = 0;
         gslEditor.scriptTxt = '';
+        vscode.window.setStatusBarMessage('Upload failed.', 5000);
         getGameChannel().show(true);
     } else if (/Compile OK\./.test(receivedMsg)) {
         sendMsg('Q\n');
