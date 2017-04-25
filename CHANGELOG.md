@@ -1,6 +1,10 @@
 # Change Log
 All notable changes to the GSL Editor ("gsl") extension will be documented in this file.
 
+## [0.0.6] - 2017-04-24
+### Changed
+- Repackaged extension to remove some unnecessary files.
+
 ## [0.0.5] - 2017-04-24
 ### Added
 - Snippets for if, ifnot, if/else, if/else_if, else, else_if, when, while, mm (new matchmarker), and new (new script header).  Try it out by just typing "if", "else", "when", "while", "mm", or "new", then hit TAB.
