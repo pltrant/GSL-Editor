@@ -2,7 +2,7 @@
     "name": "gsl",
     "displayName": "GSL",
     "description": "GSL Editor",
-    "version": "0.0.6",
+    "version": "0.0.8",
     "publisher": "patricktrant",
     "author": {
         "name": "Patrick Trant",
@@ -63,6 +63,25 @@
             {
                 "language": "gsl",
                 "path": "./snippets/gsl.json"
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "extension.gslDownload",
+                "key": "ctrl+d",
+                "mac": "cmd+d"
+            },
+            {
+                "command": "extension.gslUpload",
+                "key": "ctrl+u",
+                "mac": "cmd+u",
+                "when": "editorTextFocus"
+            },
+            {
+                "command": "extension.showMatchmarkers",
+                "key": "ctrl+m",
+                "mac": "cmd+m",
+                "when": "editorTextFocus"
             }
         ],
         "configuration": {

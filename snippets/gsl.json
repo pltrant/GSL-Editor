@@ -17,24 +17,6 @@
 		],
 		"description": "else_if statement"
 	},
-	"if statement": {
-		"prefix": "if",
-		"body": [
-			"if ($1) then",
-			"  $2",
-			"."
-		],
-		"description": "if statement"
-	},
-	"ifnot statement": {
-		"prefix": "if",
-		"body": [
-			"ifnot ($1) then",
-			"  $2",
-			"."
-		],
-		"description": "ifnot statement"
-	},
 	"if/else statement": {
 		"prefix": "if",
 		"body": [
@@ -57,7 +39,47 @@
 		],
 		"description": "if/else_if statement"
 	},
-	"Matchmarker": {
+	"if/else_if/else statement": {
+		"prefix": "if",
+		"body": [
+			"if ($1) then",
+			"  $2",
+			"else_if ($3) then",
+			"  $4",
+			"else ($5) then",
+			"  $6",
+			"."
+		],
+		"description": "if/else_if/else statement"
+	},
+	"ifnot statement": {
+		"prefix": "if",
+		"body": [
+			"ifnot ($1) then",
+			"  $2",
+			"."
+		],
+		"description": "ifnot statement"
+	},
+	"if statement": {
+		"prefix": "if",
+		"body": [
+			"if ($1) then",
+			"  $2",
+			"."
+		],
+		"description": "if statement"
+	},
+	"loop": {
+		"prefix": "loop",
+		"body": [
+			"loop ($1)",
+			"  $2",
+			"."
+		],
+		"description": "loop"
+	},
+	"matchmarker": {
 		"prefix": "mm",
 		"body": [
 			"!*********************************************************************************************************************",
@@ -68,7 +90,7 @@
 		],
 		"description": "new matchmarker"
 	},
-	"Script Header": {
+	"script header": {
 		"prefix": "new",
 		"body": [
 			"!*********************************************************************************************************************",
@@ -86,7 +108,7 @@
 		],
 		"description": "new script header"
 	},
-	"When statement": {
+	"when statement": {
 		"prefix": "when",
 		"body": [
 			"when $1",
@@ -99,14 +121,5 @@
 			"."
 		],
 		"description": "when statement"
-	},
-	"While loop": {
-		"prefix": "while",
-		"body": [
-			"while ($1)",
-			"  $2",
-			"."
-		],
-		"description": "while loop"
 	}
 }

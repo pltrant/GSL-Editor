@@ -89,6 +89,9 @@ function activate(context) {
     if (!this._ULstatusBarItem) {
         this._ULstatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
     }
+    if (!this._MMstatusBarItem) {
+        this._MMstatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
+    }
     let self = this;
     if (vscode.workspace.getConfiguration('gsl').get('alwaysEnabled')) {
         showGSLStatusBarItems(self);
@@ -97,6 +100,7 @@ function activate(context) {
         if (!editor) {
             this._DLstatusBarItem.hide();
             this._ULstatusBarItem.hide();
+            this._MMstatusBarItem.hide();
             return;
         }
         let doc = editor.document;
@@ -105,6 +109,7 @@ function activate(context) {
         } else {
             this._DLstatusBarItem.hide();
             this._ULstatusBarItem.hide();
+            this._MMstatusBarItem.hide();
         }
     }
     var disposable = vscode.commands.registerCommand('extension.gslDownload', () => {
@@ -112,6 +117,9 @@ function activate(context) {
     });
     var disposable = vscode.commands.registerCommand('extension.gslUpload', () => {
         gslUpload(context);
+    });
+    var disposable = vscode.commands.registerCommand('extension.showMatchmarkers', () => {
+        showMatchmarkers(context);
     });
     if (vscode.workspace.getConfiguration('gsl').get('displayGameChannel')) {
         getGameChannel().show(true);
@@ -127,6 +135,55 @@ function showGSLStatusBarItems(context) {
     context._ULstatusBarItem.text = '↑ Upload';
     context._ULstatusBarItem.command = 'extension.gslUpload';
     context._ULstatusBarItem.show();
+    context._MMstatusBarItem.text = 'Matchmarkers';
+    context._MMstatusBarItem.command = 'extension.showMatchmarkers';
+    context._MMstatusBarItem.show();
+}
+
+function showMatchmarkers(context) {
+    let editor = vscode.window.activeTextEditor;
+    if (!editor) {
+        return vscode.window.showErrorMessage('You must have a script open before you can list its matchmarkers.');
+    }
+    let doc = editor.document;
+    if (!doc) {
+        return vscode.window.showErrorMessage('You must have a script open before you can list its matchmarkers.');
+    }
+    let matchmarkers = [];
+    for (let index = 1; index < doc.lineCount; index++) {
+        let text = doc.lineAt(index).text;
+        if (/^: "(.*)"/.test(text)) {
+            let myRegexp = /^: "(.*)"/;
+            let match = myRegexp.exec(text);
+            matchmarkers[matchmarkers.length] = match[1]
+        }
+    }
+    vscode.window.showQuickPick(matchmarkers).then(val => {
+        for (let index = 1; index < doc.lineCount; index++) {
+            let text = doc.lineAt(index).text;
+            if (/^: "(.*)"/.test(text)) {
+                let myRegexp = /^: "(.*)"/;
+                let match = myRegexp.exec(text);
+                if (val == match[1]) {
+                    let lineCnt = (doc.lineCount - 1);
+                    vscode.commands.executeCommand("cursorMove", {
+                        to: "down",
+                        by: "line",
+                        select: false,
+                        value: lineCnt
+                    }).then(function () {
+                        let gotoLine = (lineCnt - index);
+                        vscode.commands.executeCommand("cursorMove", {
+                            to: "up",
+                            by: "line",
+                            select: false,
+                            value: gotoLine
+                        })
+                    })
+                }
+            }
+        }
+    });
 }
 
 function gslUpload(context) {

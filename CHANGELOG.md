@@ -1,13 +1,21 @@
 # Change Log
 All notable changes to the GSL Editor ("gsl") extension will be documented in this file.
 
+## [0.0.8] - 2017-05-12
+### Added
+- Show Matchmarkers function: click the Matchmarkers button in the status bar to get a list of all matchmarkers in the script, then click on any of them to go to that matchmarker.
+- Keybindings to Download (Ctrl+D), Upload (Ctrl+U), and show Matchmarkers (Ctrl+M).
+
+## [0.0.7] - 2017-05-12
+No change.
+
 ## [0.0.6] - 2017-04-24
 ### Changed
 - Repackaged extension to remove some unnecessary files.
 
 ## [0.0.5] - 2017-04-24
 ### Added
-- Snippets for if, ifnot, if/else, if/else_if, else, else_if, when, while, mm (new matchmarker), and new (new script header).  Try it out by just typing "if", "else", "when", "while", "mm", or "new", then hit TAB.
+- Snippets for if, ifnot, if/else, if/else_if, if/else_if/else, else, else_if, when, loop, mm (new matchmarker), and new (new script header).  Try it out by just typing "if", "else", "when", "loop", "mm", or "new", then hit TAB.  You can then TAB through multiple points in the snippet to enter relevant code.  Finally, hit ENTER when you're done editing it.
 
 ### Changed
 - Temporarily disabled intellisense until its formally supported for GSL.
