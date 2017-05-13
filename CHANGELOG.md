@@ -1,6 +1,10 @@
 # Change Log
 All notable changes to the GSL Editor ("gsl") extension will be documented in this file.
 
+## [0.0.9] - 2017-05-12
+### Changed
+- Revised logic for going to a clicked matchmarker line.
+
 ## [0.0.8] - 2017-05-12
 ### Added
 - Show Matchmarkers function: click the Matchmarkers button in the status bar to get a list of all matchmarkers in the script, then click on any of them to go to that matchmarker.

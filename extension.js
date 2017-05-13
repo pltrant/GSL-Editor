@@ -165,21 +165,10 @@ function showMatchmarkers(context) {
                 let myRegexp = /^: "(.*)"/;
                 let match = myRegexp.exec(text);
                 if (val == match[1]) {
-                    let lineCnt = (doc.lineCount - 1);
-                    vscode.commands.executeCommand("cursorMove", {
-                        to: "down",
-                        by: "line",
-                        select: false,
-                        value: lineCnt
-                    }).then(function () {
-                        let gotoLine = (lineCnt - index);
-                        vscode.commands.executeCommand("cursorMove", {
-                            to: "up",
-                            by: "line",
-                            select: false,
-                            value: gotoLine
-                        })
-                    })
+                    let range = editor.document.lineAt(doc.lineCount - 1).range;
+                    editor.revealRange(range);
+                    range = editor.document.lineAt(index - 1).range;
+                    editor.revealRange(range);
                 }
             }
         }
