@@ -25,6 +25,10 @@ Use the below instructions to setup and use the GSL Editor.
 
 * If you're wanting to create an entirely new script file to work with, use the filename format of S##### (e.g. S18070 for script # 18070).  A .gsl extension is optional.  This is required to use the Upload functionality.
 * Use different color themes to customize the look of VSCode - a light background with dark text, a dark background with light text, etc.  File > Preferences > Color Theme (Ctrl+K Ctrl+T).
-* Review the Interactive Playground from the "Quick links" section on the Welcome page (Help > Welcome) to learn useful functionality like multi-cursor editing, code folding, line actions, and snippets!
+* Review the Interactive Playground from the "Quick links" section on the Welcome page (Help > Welcome) to learn useful functionality like multi-cursor editing, code folding, and line actions!
+* Learn to use snippets.  Start typing any GSL command, such as "add" and as you type in the word, you will see menu pop-up for options such as: addeffect, addexp, addgroup, and addmenuitem.  Use the arrows then TAB to select any entry or just click on it, and it will type out the rest of the syntax for you and prompt you to enter any needed values.  Then just TAB between input values, then ENTER or ESC once done.
+
+    ![](https://radiantglyph.com/gsiv/gsleditor/snippets.gif)
+
 * Review the entire list of 100+ settings (File > Preferences > Settings (Ctrl+Comma)) that are built into VSCode.  You can customize settings such as auto-save, font size, drag and drop text selections, auto update extensions (recommended), and more!
 * For advanced users, setup a local git repository of the Dev script archive from https://gitlab.com/GSIV/Dev.git, allowing you to use the built in Search functionality of VSCode.  You can then easily keep your local repository in sync (git pull) and quickly search all script files using keywords or regex with a useful graphical user interface to review the results.

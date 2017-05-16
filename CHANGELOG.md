@@ -1,6 +1,10 @@
 # Change Log
 All notable changes to the GSL Editor ("gsl") extension will be documented in this file.
 
+## [0.0.10] - 2017-05-16
+### Added
+- Added snippets for almost every GSL syntax commands.  Start typing any command and use the intellisense window to finish the code for you!
+
 ## [0.0.9] - 2017-05-12
 ### Changed
 - Revised logic for going to a clicked matchmarker line.

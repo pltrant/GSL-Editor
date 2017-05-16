@@ -1,9 +1,247 @@
 {
+	"addeffect": {
+		"prefix": "addeffect",
+		"body": [
+			"addeffect code $1 value1 $2 value2 $3 flags $4 with $5 in $6 script $7"
+		],
+		"description": "addeffect code {effect-code} value1 {value1} value2 {value2} flags {flags} with {target-node} in {time} script {script}\n\nAdd an effect resource to a node.\n\n"
+	},
+	"addexp": {
+		"prefix": "addexp",
+		"body": [
+			"addexp $1 to $2"
+		],
+		"description": "addexp {value expression} to {node}\n\nAdd field experience to player."
+	},
+	"addgroup": {
+		"prefix": "addgroup",
+		"body": [
+			"addgroup \"$1\" to $2"
+		],
+		"description": "addgroup \"{group}\" to {node}\n\nAdd a variable group to the target node."
+	},
+	"addmenuitem": {
+		"prefix": "addmenuitem",
+		"body": [
+			"addmenuitem \"$1\" target \"$2\""
+		],
+		"description": "addmenuitem {string} target {string}\n\nAdds options to a point and click menu."
+	},
+	"assert": {
+		"prefix": "assert",
+		"body": [
+			"assert $1 or_yell \"$2\""
+		],
+		"description": "assert {expression} or_yell {text message}\n\nAsserts something's true and if not, halts execution and generates a script error."
+	},
+	"bitget": {
+		"prefix": "bitget",
+		"body": [
+			"bitget $1 from $2 to $3 for $4"
+		],
+		"description": "bitget {source} from {startBit} to {endBit} for {target}\n\nRead selected bits from an integer."
+	},
+	"bitset": {
+		"prefix": "bitset",
+		"body": [
+			"bitset $1 from $2 to $3 for $4"
+		],
+		"description": "bitset {value} from {startBit} to {endBit} for {target}\n\nSet selected bits in an integer."
+	},
+	"boldon": {
+		"prefix": "boldon",
+		"body": [
+			"boldon $1"
+		],
+		"description": "boldon {node}\n\nTurn off text bolding."
+	},
+	"boldoff": {
+		"prefix": "boldoff",
+		"body": [
+			"boldoff $1"
+		],
+		"description": "boldoff {node}\n\nTurn on text bolding."
+	},
+	"bugreport": {
+		"prefix": "bugreport",
+		"body": [
+			"bugreport $1 \"$2\" \"$3\""
+		],
+		"description": "bugreport {type} {bug title} {address list}\n\nSend an email bug report."
+	},
+	"call": {
+		"prefix": "call",
+		"body": [
+			"call $1"
+		],
+		"description": "call {value expression}\n\nExecute another script."
+	},
+	"callmatch must_match": {
+		"prefix": "callmatch must_match",
+		"body": [
+			"callmatch must_match \"$1\" in $2"
+		],
+		"description": "callmatch must_match {match_marker} in {script_number}\n\nCall a script with a matchmarker."
+	},
+	"callmatch may_match": {
+		"prefix": "callmatch may_match",
+		"body": [
+			"callmatch may_match \"$1\" in $2"
+		],
+		"description": "callmatch may_match {match_marker} in {script_number}\n\nChecks for a matchmarker in a script, then calls it if it exists."
+	},
+	"callmatch check": {
+		"prefix": "callmatch check",
+		"body": [
+			"callmatch check \"$1\" in $2"
+		],
+		"description": "callmatch check {match_marker} in {script_number}\n\nChecks for a matchmarker in a script."
+	},
+	"cando": {
+		"prefix": "cando",
+		"body": [
+			"cando $1 action $2 for $3"
+		],
+		"description": "cando {node} action {value expression} for {value variable}\n\nCheck how well an action can be performed by creature/player given injuries."
+	},
+	"checkffect": {
+		"prefix": "checkeffect",
+		"body": [
+			"checkeffect $1 code $2"
+		],
+		"description": "checkeffect {node} code {value expression}\n\nCheck for the existence of a specific effect on a node."
+	},
+	"clear": {
+		"prefix": "clear",
+		"body": [
+			"clear $1"
+		],
+		"description": "clear {variable}\n\nSets variable to 0 or \"\"."
+	},
+	"clearmenu": {
+		"prefix": "clearmenu",
+		"body": [
+			"clearmenu"
+		],
+		"description": "clearmenu\n\nClear all menu options from the point and click menu table."
+	},
+	"cleartable": {
+		"prefix": "cleartable",
+		"body": [
+			"cleartable $1"
+		],
+		"description": "cleartable {value}\n\nClears the contents of a table."
+	},
+	"closelocker": {
+		"prefix": "closelocker",
+		"body": [
+			"closelocker $1 using $2"
+		],
+		"description": "closelocker {node} using {node}\n\nCloses a player's locker."
+	},
+	"compareitem": {
+		"prefix": "compareitem",
+		"body": [
+			"compareitem $1 to $1"
+		],
+		"description": "compareitem {node} to {node}\n\nDoes a binary comparison of two exists to determine if they are identical."
+	},
+	"contribute": {
+		"prefix": "contribute",
+		"body": [
+			"contribute $1 towards $2 by $3"
+		],
+		"description": "contribute {node} towards {node} by {value expression}.\n\nAugment experience tracker for player vs. creature by amount."
+	},
+	"copy": {
+		"prefix": "copy",
+		"body": [
+			"copy $1 for $2"
+		],
+		"description": "copy {node} for {node}\n\nCopy an existence."
+	},
+	"create": {
+		"prefix": "create",
+		"body": [
+			"create $1 mode $2 for $3"
+		],
+		"description": "create {value expression} mode {value expression} for {node}\n\nCreate a new existence based on profile."
+	},
+	"createitem": {
+		"prefix": "createitem",
+		"body": [
+			"createitem $1 for $2"
+		],
+		"description": "createitem {value register} for {Nx#}\n\nCreates items from the snapshot specified by {value register} and sticks them in Nx#."
+	},
+	"createroom": {
+		"prefix": "createroom",
+		"body": [
+			"createroom $1 for $2"
+		],
+		"description": "createroom {room#} for {room-node}\n\nCreate a new room."
+	},
+	"createtable": {
+		"prefix": "createtable",
+		"body": [
+			"createtable type $1 size $2 $3 $4 for $5"
+		],
+		"description": "createtable type {datatype} size {xsize} {ysize} {zsize} for {TableID}\n\nCreates a volatile table."
+	},
+	"createtext": {
+		"prefix": "createtext",
+		"body": [
+			"createtext $1 for $2"
+		],
+		"description": "createtext {text variable} for {TextID#}\n\nCreate a new Text ID."
+	},
+	"decodeattack": {
+		"prefix": "decodeattack",
+		"body": [
+			"decodeattack $1 field $2 for $3"
+		],
+		"description": "decodeattack {node} field {field name} for {value variable}\n\nDecode creature attack data."
+	},
+	"deletetable": {
+		"prefix": "deletetable",
+		"body": [
+			"deletetable $1"
+		],
+		"description": "deletetable {value expression}\n\nDeletes a volatile table."
+	},
+	"diradd": {
+		"prefix": "diradd",
+		"body": [
+			"diradd $1"
+		],
+		"description": "diradd {value expression}\n\nAdd a direction to the FE direction display."
+	},
+	"dirsend": {
+		"prefix": "dirsend",
+		"body": [
+			"dirsend $1"
+		],
+		"description": "dirsend {node}\n\nUpdate FE direction display."
+	},
+	"docreate": {
+		"prefix": "docreate",
+		"body": [
+			"docreate $1 for $2"
+		],
+		"description": "docreate {text expression} for {node variable}\n\nCreate existence using command line text."
+	},
+	"dolook": {
+		"prefix": "dolook",
+		"body": [
+			"dolook"
+		],
+		"description": "dolook\n\nGenerate room 'look' output."
+	},
 	"else statement": {
 		"prefix": "else",
 		"body": [
 			"else",
-			"	$1",
+			"  $1",
 			"."
 		],
 		"description": "else statement"
@@ -12,10 +250,164 @@
 		"prefix": "else_if",
 		"body": [
 			"else_if ($1) then",
-			"	$2",
+			"  $2",
 			"."
 		],
 		"description": "else_if statement"
+	},
+	"encodeattack": {
+		"prefix": "encodeattack",
+		"body": [
+			"encodeattack $1 field $2 to $3"
+		],
+		"description": "encodeattack {node} field {field name} to {value expression}\n\nEncode creature attack data."
+	},
+	"end2effect": {
+		"prefix": "end2effect",
+		"body": [
+			"end2effect code $1 value2 $2 from $3"
+		],
+		"description": "end2effect code {value expression} value2 {value expression} from {node}\n\nTerminate an effect from a node."
+	},
+	"endeffect": {
+		"prefix": "endeffect",
+		"body": [
+			"endeffect code $1 from $2"
+		],
+		"description": "endeffect code {value expression} from {node}\n\nTerminate an effect from a node."
+	},
+	"endneffect": {
+		"prefix": "endneffect",
+		"body": [
+			"endneffect $1"
+		],
+		"description": "endneffect {variable}\n\nTerminate next effect on a node."
+	},
+	"expand": {
+		"prefix": "expand",
+		"body": [
+			"expand $1"
+		],
+		"description": "expand {variable}\n\nExpands the contents of a text variable."
+	},
+	"fastpop": {
+		"prefix": "fastpop",
+		"body": [
+			"fastpop"
+		],
+		"description": "fastpop\n\nPull all but T variables from stack."
+	},
+	"fastpush": {
+		"prefix": "fastpush",
+		"body": [
+			"fastpush"
+		],
+		"description": "fastpush\n\nPush all but T variables onto stack."
+	},
+	"filltable": {
+		"prefix": "filltable",
+		"body": [
+			"filltable $1 with $2"
+		],
+		"description": "filltable {value expression} with {value expression}\n\nSet all elements in a table to a single value."
+	},
+	"gather": {
+		"prefix": "gather",
+		"body": [
+			"gather $1 $2 for $3 $4"
+		],
+		"description": "gather {type} {source-node} for {target-node} {option}\n\nLoop through nodes."
+	},
+	"gatherfirst": {
+		"prefix": "gatherfirst",
+		"body": [
+			"gatherfirst $1 for $2"
+		],
+		"description": "gatherfirst {node} for {node}\n\nEstablish a gather list."
+	},
+	"gathernext": {
+		"prefix": "gathernext",
+		"body": [
+			"gathernext $1 for $2"
+		],
+		"description": "gathernext {node} for {node}\n\nGet next node from a gather list."
+	},
+	"gatherplayer": {
+		"prefix": "gatherplayer",
+		"body": [
+			"gatherplayer $1 for $2"
+		],
+		"description": "gatherplayer {node} for {node}\n\nLoop through players."
+	},
+	"getcontributors": {
+		"prefix": "getcontributors",
+		"body": [
+			"getcontributors NC$1"
+		],
+		"description": "getcontributors NCx\n\nReturns information about the contribution made via the contribute command."
+	},
+	"getnameof": {
+		"prefix": "getnameof",
+		"body": [
+			"getnameof $1"
+		],
+		"description": "getnameof {value expression}\n\nGet first and last name of a player, using their index."
+	},
+	"getps": {
+		"prefix": "getps",
+		"body": [
+			"getps NP$1"
+		],
+		"description": "getps {node}\n\nGet numbers of scripts on a player."
+	},
+	"getwatch": {
+		"prefix": "getwatch",
+		"body": [
+			"getwatch $1 for $2"
+		],
+		"description": "getwatch {node} for {variable}\n\nGet watchroom information."
+	},
+	"glue": {
+		"prefix": "glue",
+		"body": [
+			"glue $1 to $2"
+		],
+		"description": "glue {value expression} to {node}\n\nAttach script to existence/player."
+	},
+	"hash1": {
+		"prefix": "hash1",
+		"body": [
+			"hash1 $1 for $2"
+		],
+		"description": "hash1 {text} for {variable}\n\nGenerate Hash value."
+	},
+	"hash2": {
+		"prefix": "hash2",
+		"body": [
+			"hash2 $1 for $2"
+		],
+		"description": "hash2 {text} for {variable}\n\nGenerate Hash value."
+	},
+	"heal": {
+		"prefix": "heal",
+		"body": [
+			"heal $1 area $2 by $3"
+		],
+		"description": "heal {node} area {value expression} by {value expression}\n\nHeal injury on player/creature."
+	},
+	"healp": {
+		"prefix": "healp",
+		"body": [
+			"healp $1 area $2 by $3"
+		],
+		"description": "healp {node} area {value expression} by {value expression}\n\nHeal permanent injury (scar) on player/creature."
+	},
+	"hurt": {
+		"prefix": "hurt",
+		"body": [
+			"hurt $1 hits $2"
+		],
+		"description": "hurt {node} hits {value expression}\n\nInflict health point damage on player/creature."
 	},
 	"if/else statement": {
 		"prefix": "if",
@@ -70,6 +462,83 @@
 		],
 		"description": "if statement"
 	},
+	"index": {
+		"prefix": "index",
+		"body": [
+			"index $1 for $2"
+		],
+		"description": "index {value expression} for {node}\n\nFind player by character index."
+	},
+	"info": {
+		"prefix": "info",
+		"body": [
+			"info $1"
+		],
+		"description": "info {type} {id#}\n\nGet information about a profile, table, profile, or script."
+	},
+	"infoitem": {
+		"prefix": "infoitem",
+		"body": [
+			"infoitem $1"
+		],
+		"description": "infoitem {NOx|NCx|NEx}\n\nPopulate a system table with all varfields and added vargroups for that node."
+	},
+	"injure": {
+		"prefix": "injure",
+		"body": [
+			"injure $1 area $2 by $3"
+		],
+		"description": "injure {node} area {value expression} by {value expression}.\n\nInflict damage on specific area of player/creature."
+	},
+	"inphrase": {
+		"prefix": "inphrase",
+		"body": [
+			"inphrase $1 for $2"
+		],
+		"description": "inphrase {value expression} for {string variable}\n\nGet portal movement phrase."
+	},
+	"isinjured": {
+		"prefix": "isinjured",
+		"body": [
+			"isinjured $1 area $2 for $3"
+		],
+		"description": "isinjured {node} area {value expression} for {value variable}\n\nCheck injury on specific area of creature."
+	},
+	"isnamefree": {
+		"prefix": "isnamefree",
+		"body": [
+			"isnamefree $1"
+		],
+		"description": "isnamefree {string}\n\nChecks to see if a given name is already in use."
+	},
+	"kill": {
+		"prefix": "kill",
+		"body": [
+			"kill $1"
+		],
+		"description": "kill {node}\n\nDelete an existence."
+	},
+	"killallnp": {
+		"prefix": "killallnp",
+		"body": [
+			"killallnp"
+		],
+		"description": "kilallnp {node}\n\nDelete an existence and all other existences attached to it."
+	},
+	"loadchardata": {
+		"prefix": "loadchardata",
+		"body": [
+			"loadchardata $1 for $2 to $3"
+		],
+		"description": "loadchardata {tagfile} for {character-index} to {target-container}\n\nOpen a tagfile."
+	},
+	"log": {
+		"prefix": "log",
+		"body": [
+			"log $1 $2"
+		],
+		"description": "log {option} {data}\n\nBuild and submit log entry."
+	},
 	"loop": {
 		"prefix": "loop",
 		"body": [
@@ -78,6 +547,20 @@
 			"."
 		],
 		"description": "loop"
+	},
+	"lookroom": {
+		"prefix": "lookroom",
+		"body": [
+			"lookroom $1 for $2"
+		],
+		"description": "lookroom {node} for {value expression}\n\nOutputs a room description."
+	},
+	"lowercase": {
+		"prefix": "lowercase",
+		"body": [
+			"lowercase $1"
+		],
+		"description": "lowercase {string variable}\n\nLowercase characters in string."
 	},
 	"matchmarker": {
 		"prefix": "mm",
@@ -89,6 +572,293 @@
 			"."
 		],
 		"description": "new matchmarker"
+	},
+	"matchspell": {
+		"prefix": "matchspell",
+		"body": [
+			"matchspell $1 spell $2"
+		],
+		"description": "matchspell {node variable} spell {string expression}\n\nMatch spell mnemonic."
+	},
+	"move": {
+		"prefix": "move",
+		"body": [
+			"move $1 $2 $3"
+		],
+		"description": "move {node} {value expression} {node}\n\nMove a node to another node."
+	},
+	"msg": {
+		"prefix": "msg",
+		"body": [
+			"msg $1 \"$2\""
+		],
+		"description": "msg {node} {string expression}\n\nMessage to Node (player/room)."
+	},
+	"msgfsys": {
+		"prefix": "msgfsys",
+		"body": [
+			"msgfsys $1 \"$2\""
+		],
+		"description": "msgfsys {flag} {string expression}\n\nMessage to all players with flag set."
+	},
+	"msggm": {
+		"prefix": "msggm",
+		"body": [
+			"msggm \"$1\""
+		],
+		"description": "msggm {string expression}\n\nSend message over GM channel."
+	},
+	"msgp": {
+		"prefix": "msgp",
+		"body": [
+			"msgp \"$1\""
+		],
+		"description": "msgp {string expression}\n\nMessage to Player."
+	},
+	"msgr": {
+		"prefix": "msgr",
+		"body": [
+			"msgr \"$1\""
+		],
+		"description": "msgr {string expression}\n\nMessage to Room."
+	},
+	"msgrgm": {
+		"prefix": "msgrgm",
+		"body": [
+			"msgrgm $1 mode $2 \"$3\""
+		],
+		"description": "msgrgm {node} mode {value}{string expression}\n\nMessage to GMs in room."
+	},
+	"msgrx2": {
+		"prefix": "msgrx2",
+		"body": [
+			"msgrx2 \"$1\""
+		],
+		"description": "msgrx2 {string expression}\n\nMessage Room except NP0 and NP1 players."
+	},
+	"msgrxp": {
+		"prefix": "msgrxp",
+		"body": [
+			"msgrxp \"$1\""
+		],
+		"description": "msgrxp {string expression}\n\nMessage to Room except NP0 Player."
+	},
+	"msgs": {
+		"prefix": "msgs",
+		"body": [
+			"msgs $1 \"$2\""
+		],
+		"description": "msgs {value} {string expression}\n\nMessage to all players in segment."
+	},
+	"msgsgm": {
+		"prefix": "msgsgm",
+		"body": [
+			"msgsgm $1 \"$2\""
+		],
+		"description": "msgsgm {value} {string expression}\n\nMessage to GMs in segment."
+	},
+	"msgsys": {
+		"prefix": "msgsys",
+		"body": [
+			"msgsys \"$1\""
+		],
+		"description": "msgsys {string expression}\n\nMessage to System."
+	},
+	"msgw": {
+		"prefix": "msgw",
+		"body": [
+			"msgw $1 $2 \"$3\""
+		],
+		"description": "msgw {player or room node} {window id} {string expression}\n\nMessage to specified room window."
+	},
+	"nexteffect": {
+		"prefix": "nexteffect",
+		"body": [
+			"nexteffect $1 $2 for $3"
+		],
+		"description": "nexteffect {effcode} {node} for {pointer}\n\nLoop through effects."
+	},
+	"nextnode": {
+		"prefix": "nextnode",
+		"body": [
+			"nextnode $1 $2 for $3"
+		],
+		"description": "nextnode {value expression} {node} for {node}\n\nIterate over nodes by criteria."
+	},
+	"openlocker": {
+		"prefix": "openlocker",
+		"body": [
+			"openlocker $1 using $2"
+		],
+		"description": "openlocker {node} using {node}\n\nOpen a player's locker."
+	},
+	"outphrase": {
+		"prefix": "outphrase",
+		"body": [
+			"outphrase $1 for $2"
+		],
+		"description": "outphrase {value} for {variable}\n\nGet portal movement phrase."
+	},
+	"parse": {
+		"prefix": "parse",
+		"body": [
+			"parse $1"
+		],
+		"description": "parse {value expression}\n\nReparse user command."
+	},
+	"pauseeffects": {
+		"prefix": "pauseeffects",
+		"body": [
+			"pauseeffects $1"
+		],
+		"description": "pauseeffects {node}\n\nPause effects associated with a node."
+	},
+	"pid": {
+		"prefix": "pid",
+		"body": [
+			"pid $1"
+		],
+		"description": "pid {node}\n\nGenerate a PID number for specified node."
+	},
+	"pop": {
+		"prefix": "pop",
+		"body": [
+			"pop"
+		],
+		"description": "pop\n\nPop variables off stack."
+	},
+	"prempt": {
+		"prefix": "prempt",
+		"body": [
+			"prempt NP$1 \"$2\""
+		],
+		"description": "prempt {NPx} {string expression}\n\nSend a string via the preemptive message stack, used for Storm Front XML."
+	},
+	"push": {
+		"prefix": "push",
+		"body": [
+			"push"
+		],
+		"description": "push\n\nPush variables onto stack."
+	},
+	"random": {
+		"prefix": "random",
+		"body": [
+			"random $1 to $2 for $3"
+		],
+		"description": "random {value expression} to {value expression} for {value variable}\n\nReturn random number."
+	},
+	"rem2effect": {
+		"prefix": "rem2effect",
+		"body": [
+			"rem2effect code $1 value2 from $2"
+		],
+		"description": "rem2effect code {value expression} value2 {value expression} from {node}\n\nRemove an effect from a node with no script execution."
+	},
+	"remeffect": {
+		"prefix": "remeffect",
+		"body": [
+			"remeffect code $1 from $2"
+		],
+		"description": "remeffect code {value expression} from {node}\n\nRemove an effect from a node with no script execution."
+	},
+	"remmenuitem": {
+		"prefix": "removemenuitem",
+		"body": [
+			"removemenuitem \"$1\""
+		],
+		"description": "removemenuitem {string}\n\nRemoves menu options from the menu structure."
+	},
+	"remneffect": {
+		"prefix": "remneffect",
+		"body": [
+			"remneffect $1"
+		],
+		"description": "remneffect {variable}\n\nRemove next effect."
+	},
+	"removevarfield": {
+		"prefix": "removevarfield",
+		"body": [
+			"removevarfield \"$1\" from $2"
+		],
+		"description": "removevarfield {field} from {node}\n\nRemove a variable field."
+	},
+	"removevargroup": {
+		"prefix": "removevargroup",
+		"body": [
+			"removevargroup \"$1\" from $2"
+		],
+		"description": "removevargroup {group} from {node}\n\nRemove all variable fields in a group."
+	},
+	"resizetable": {
+		"prefix": "resizetable",
+		"body": [
+			"resizetable $1 x $2 y $3 z $4"
+		],
+		"description": "resizetable {value expression} x {value expression} y {value expression} z {value expression}\n\nModify the size of a table."
+	},
+	"resumeeffects": {
+		"prefix": "resumeeffects",
+		"body": [
+			"resumeeffects $1"
+		],
+		"description": "resumeeffects {node}\n\nResume effects processing for the node."
+	},
+	"rmcall": {
+		"prefix": "rmcall",
+		"body": [
+			"rmcall $1 call $2 callback $3 donematch $4"
+		],
+		"description": "rmcall {entity} call {procedure} callback {script} donematch {match}\n\nCall a remote procedure."
+	},
+	"rnddir": {
+		"prefix": "rnddir",
+		"body": [
+			"rnddir"
+		],
+		"description": "rnddir\n\nSelect a random direction from a room."
+	},
+	"rndexit": {
+		"prefix": "rndexit",
+		"body": [
+			"rndexit"
+		],
+		"description": "rndexit\n\nSelect a random exit from room (ignores NOCRTR flag)."
+	},
+	"rndplyr": {
+		"prefix": "rndplyr",
+		"body": [
+			"rndplyr"
+		],
+		"description": "rndplyr\n\nSelect a random player in a room."
+	},
+	"rootexistof": {
+		"prefix": "rootexistof",
+		"body": [
+			"rootexistof $1 for $2"
+		],
+		"description": "rootexistof {object} for {root}\n\nFind the root node that an object is attached to."
+	},
+	"roundtime": {
+		"prefix": "roundtime",
+		"body": [
+			"roundtime NP$1 $2"
+		],
+		"description": "roundtime {node} {value expression}\n\nApply roundtime to a player."
+	},
+	"scan": {
+		"prefix": "scan",
+		"body": [
+			"scan $1 match $2 for $3"
+		],
+		"description": "scan {string expression} match {string expression} for {value variable}\n\nScan string for specific match."
+	},
+	"scaneffect": {
+		"prefix": "scaneffect",
+		"body": [
+			"scaneffect $1 code $2 value2 $3"
+		],
+		"description": "scaneffect {node} code {value expression} value2 {value expression}\n\nCheck for the existence of a specific effect on a node."
 	},
 	"script header": {
 		"prefix": "new",
@@ -108,6 +878,125 @@
 		],
 		"description": "new script header"
 	},
+	"set": {
+		"prefix": "set",
+		"body": [
+			"set $1 to $2"
+		],
+		"description": "set {variable} to {expression}\n\nSet a variable to a value."
+	},
+	"sparse": {
+		"prefix": "sparse",
+		"body": [
+			"sparse S$1"
+		],
+		"description": "sparse {value expression}\n\nParse a string made with S-variables."
+	},
+	"stop": {
+		"prefix": "stop",
+		"body": [
+			"stop"
+		],
+		"description": "stop\n\nStop script execution."
+	},
+	"storechardata": {
+		"prefix": "storechardata",
+		"body": [
+			"storechardata $1 for $2 from $3"
+		],
+		"description": "storechardata {tagfile} for {character-index} from {source-container}\n\nSave a tagfile."
+	},
+	"stov": {
+		"prefix": "stov",
+		"body": [
+			"stov $1 for $2"
+		],
+		"description": "stov {string expression} for {value variable}\n\nConvert string to value."
+	},
+	"substring": {
+		"prefix": "substring",
+		"body": [
+			"substring $1 from $2 to $3 for $4"
+		],
+		"description": "substring {string expression} from {value expression} to {value expression} for {string variable}\n\nExtracts a string from string."
+	},
+	"tableinfo": {
+		"prefix": "tableinfo",
+		"body": [
+			"tableinfo $1"
+		],
+		"description": "tableinfo (value expression}\n\nGet header info about a table."
+	},
+	"test_assert": {
+		"prefix": "test_assert",
+		"body": [
+			"test_assert $1 or_yell \"$2\" to $3"
+		],
+		"description": "test_assert {condition} or_yellL {message} to {room or player node}\n\nA GSL variable dump with stack tracing."
+	},
+	"test2effect": {
+		"prefix": "test2effect",
+		"body": [
+			"test2effect $1 code $2 value2 $3"
+		],
+		"description": "test2effect {node} code {value expression} value2 {value expression}\n\nTest for an effect."
+	},
+	"testeffect": {
+		"prefix": "testeffect",
+		"body": [
+			"testeffect $1 code $2"
+		],
+		"description": "testeffect {node} code {value expression}\n\nTest for an effect."
+	},
+	"tparse": {
+		"prefix": "tparse",
+		"body": [
+			"tparse T$1"
+		],
+		"description": "tparse {text expression} {parse code}\n\nParse a string composed of T-variables."
+	},
+	"underoff": {
+		"prefix": "underoff",
+		"body": [
+			"underoff $1"
+		],
+		"description": "underoff\n\nStop underlining text."
+	},
+	"underon": {
+		"prefix": "underon",
+		"body": [
+			"underon $1"
+		],
+		"description": "underon\n\nStart underlining text."
+	},
+	"unload": {
+		"prefix": "unload",
+		"body": [
+			"unload $1"
+		],
+		"description": "unload {value expression}\n\nTouch a segment."
+	},
+	"updatetable": {
+		"prefix": "updatetable",
+		"body": [
+			"updatetable $1"
+		],
+		"description": "updatetable {value expression}\n\nUpdate disk copy of a table."
+	},
+	"vtos": {
+		"prefix": "vtos",
+		"body": [
+			"vtos $1 for $2"
+		],
+		"description": "vtos {value expression} for {string variable}\n\nConvert value to string."
+	},
+	"watch": {
+		"prefix": "watch",
+		"body": [
+			"watch room $1 for $2"
+		],
+		"description": "watch room {node} for {node}\n\nSet watchroom value."
+	},
 	"when statement": {
 		"prefix": "when",
 		"body": [
@@ -121,5 +1010,26 @@
 			"."
 		],
 		"description": "when statement"
+	},
+	"where": {
+		"prefix": "where",
+		"body": [
+			"where $1 for $2"
+		],
+		"description": "where {node} for {node variable}\n\nFind the location of a node."
+	},
+	"whereat": {
+		"prefix": "whereat",
+		"body": [
+			"whereat $1 for $2"
+		],
+		"description": "whereat {node} for {node variable}\n\nDetermine exact location of node."
+	},
+	"whereitem": {
+		"prefix": "whereitem",
+		"body": [
+			"whereitem $1 for $2"
+		],
+		"description": "whereitem {node} for {node variable}\n\nFind the type of a node's location."
 	}
 }
