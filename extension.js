@@ -112,19 +112,25 @@ function activate(context) {
             this._MMstatusBarItem.hide();
         }
     }
-    var disposable = vscode.commands.registerCommand('extension.gslDownload', () => {
+    var disposable1 = vscode.commands.registerCommand('extension.gslDownload', () => {
         gslDownload(context);
     });
-    var disposable = vscode.commands.registerCommand('extension.gslUpload', () => {
+    context.subscriptions.push(disposable1);
+    var disposable2 = vscode.commands.registerCommand('extension.gslUpload', () => {
         gslUpload(context);
     });
-    var disposable = vscode.commands.registerCommand('extension.showMatchmarkers', () => {
-        showMatchmarkers(context);
+    context.subscriptions.push(disposable2);
+    var disposable3 = vscode.commands.registerCommand('extension.gslMatchmarkers', () => {
+        gslMatchmarkers(context);
     });
+    context.subscriptions.push(disposable3);
+    var disposable4 = vscode.commands.registerCommand('extension.gslSendGameCommand', () => {
+        gslSendGameCommand(context);
+    });
+    context.subscriptions.push(disposable4);
     if (vscode.workspace.getConfiguration('gsl').get('displayGameChannel')) {
         getGameChannel().show(true);
     }
-    context.subscriptions.push(disposable);
 }
 exports.activate = activate;
 
@@ -136,11 +142,11 @@ function showGSLStatusBarItems(context) {
     context._ULstatusBarItem.command = 'extension.gslUpload';
     context._ULstatusBarItem.show();
     context._MMstatusBarItem.text = 'Matchmarkers';
-    context._MMstatusBarItem.command = 'extension.showMatchmarkers';
+    context._MMstatusBarItem.command = 'extension.gslMatchmarkers';
     context._MMstatusBarItem.show();
 }
 
-function showMatchmarkers(context) {
+function gslMatchmarkers(context) {
     let editor = vscode.window.activeTextEditor;
     if (!editor) {
         return vscode.window.showErrorMessage('You must have a script open before you can list its matchmarkers.');
@@ -173,6 +179,29 @@ function showMatchmarkers(context) {
             }
         }
     });
+}
+
+function gslSendGameCommand(context) {
+    vscode.window.showInputBox({ ignoreFocusOut: true, prompt: 'Command to send to game?' }).then(input => {
+        if ((input == null) | (input == '')) {
+            return vscode.window.showInformationMessage('Not input provided. Command aborted.');
+        }
+        LogIntoGame().then(function () {
+            vscode.window.setStatusBarMessage('Sending game command...', 2000);
+            if (gameClient.connected) {
+                delayedGameCommand(input);
+            } else {
+                setTimeout(function () { delayedGameCommand(input) }, 2500)
+            }
+        });
+    });
+}
+
+function delayedGameCommand(command) {
+    if (gameClient.connected) {
+        getGameChannel().show(true);
+        sendMsg(command + '\n');
+    }
 }
 
 function gslUpload(context) {
@@ -246,7 +275,7 @@ function uploadScript(receivedMsg) {
 }
 
 function gslDownload(context) {
-    vscode.window.showInputBox({ prompt: 'Script number or verb name to download?' }).then(input => {
+    vscode.window.showInputBox({ ignoreFocusOut: true, prompt: 'Script number or verb name to download?' }).then(input => {
         if ((input == null) | (input == '')) {
             return vscode.window.showInformationMessage('Not input provided. Script download aborted.');
         }

@@ -1,6 +1,10 @@
 # Change Log
 All notable changes to the GSL Editor ("gsl") extension will be documented in this file.
 
+## [0.0.11] - 2017-05-17
+### Added
+- Added Send Game Command option, available by hitting F1, then type in GSL and select the Send Game Command option or use Ctrl+Alt+G.  Once prompted, input the command you wish to send to the game.
+
 ## [0.0.10] - 2017-05-16
 ### Added
 - Added snippets for almost every GSL syntax commands.  Start typing any command and use the intellisense window to finish the code for you!
