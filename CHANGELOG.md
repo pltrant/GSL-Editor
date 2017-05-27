@@ -1,6 +1,10 @@
 # Change Log
 All notable changes to the GSL Editor ("gsl") extension will be documented in this file.
 
+## [0.0.13] - 2017-05-27
+### Fixed
+- Visibility snippets issue.
+
 ## [0.0.12] - 2017-05-27
 ### Added
 - Added (ifnot) visibility snippets.
