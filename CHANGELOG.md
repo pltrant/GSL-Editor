@@ -1,6 +1,13 @@
 # Change Log
 All notable changes to the GSL Editor ("gsl") extension will be documented in this file.
 
+## [0.0.12] - 2017-05-27
+### Added
+- Added (ifnot) visibility snippets.
+
+## Fixed
+- Downloading verbs while under certain conditions.
+
 ## [0.0.11] - 2017-05-17
 ### Added
 - Added Send Game Command option, available by hitting F1, then type in GSL and select the Send Game Command option or use Ctrl+Alt+G.  Once prompted, input the command you wish to send to the game.

@@ -230,15 +230,15 @@ function gslUpload(context) {
 }
 
 function uploadScript(receivedMsg) {
-    if (/^\s\nWelcome to.*\s\n.*\s\nAll Rights Reserved\s.*/.test(receivedMsg)) {
+    if (/Welcome to.*\s\n.*\s\nAll Rights Reserved/.test(receivedMsg)) {
         sendMsg('/ms ' + gslEditor.scriptNum + '\n');
-    } else if (/^Error: Script #(.*) is a verb. Please use \/mv (.*) instead\.\s/.test(receivedMsg)) {
-        let myRegexp = /^Error: Script #(.*) is a verb. Please use \/mv (.*) instead\.\s/;
+    } else if (/Error: Script #(.*) is a verb. Please use \/mv (.*) instead\./.test(receivedMsg)) {
+        let myRegexp = /Error: Script #(.*) is a verb. Please use \/mv (.*) instead\./;
         let match = myRegexp.exec(receivedMsg);
         sendMsg('/mv ' + match[2] + '\n');
     } else if ((/Edt:$/.test(receivedMsg)) && (gslEditor.sendScript == 1)) {
         sendMsg('Z\n');
-    } else if (/^\s\nZAP!  All lines deleted\./.test(receivedMsg)) {
+    } else if (/ZAP!  All lines deleted\./.test(receivedMsg)) {
         let scriptArray = gslEditor.scriptTxt.split('\n');
         let delay = 0;
         for (let index = 0; index < scriptArray.length; index++) {
@@ -298,7 +298,7 @@ function gslDownload(context) {
 }
 
 function downloadScript(receivedMsg) {
-    if (/^\s\nWelcome to.*\s\n.*\s\nAll Rights Reserved\s.*/.test(receivedMsg)) {
+    if (/Welcome to.*\s\n.*\s\nAll Rights Reserved/.test(receivedMsg)) {
         if (isNaN(gslEditor.input)) {
             vscode.window.setStatusBarMessage('Downloading verb ' + gslEditor.input + '...', 5000);
             sendMsg('/mv ' + gslEditor.input + '\n');
@@ -308,16 +308,16 @@ function downloadScript(receivedMsg) {
         }
         gslEditor.getScript = 1;
         gslEditor.scriptTxt = '';
-    } else if (/^Error: Script #(.*) is a verb. Please use \/mv (.*) instead\.\s/.test(receivedMsg)) {
-        let myRegexp = /^Error: Script #(.*) is a verb. Please use \/mv (.*) instead\.\s/;
+    } else if (/Error: Script #(.*) is a verb. Please use \/mv (.*) instead\./.test(receivedMsg)) {
+        let myRegexp = /Error: Script #(.*) is a verb. Please use \/mv (.*) instead\./;
         let match = myRegexp.exec(receivedMsg);
         sendMsg('/mv ' + match[2] + '\n');
-    } else if (/^Error: Script #\d\d\d\d\d has not been created yet\.\s/.test(receivedMsg)) {
+    } else if (/Error: Script #\d\d\d\d\d has not been created yet/.test(receivedMsg)) {
         return vscode.window.showErrorMessage('Script #' + gslEditor.input + ' has not been created yet.');
-    } else if (/^Verb not found.\s/.test(receivedMsg)) {
+    } else if (/Verb not found/.test(receivedMsg)) {
         return vscode.window.showErrorMessage('Verb name ' + gslEditor.input + ' has not been created yet.');
-    } else if (/LineEditor.*/.test(receivedMsg)) {
-        let myRegexp = /.*File:\s\.\.\/scripts\/(S\d\d\d\d\d),\s.*/;
+    } else if (/LineEditor/.test(receivedMsg)) {
+        let myRegexp = /File:\s\.\.\/scripts\/(S\d\d\d\d\d)/;
         let match = myRegexp.exec(receivedMsg);
         gslEditor.scriptNum = match[1];
         sendMsg('P\n');

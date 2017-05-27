@@ -25,7 +25,10 @@ Use the below instructions to setup and use the GSL Editor.
 
 * If you're wanting to create an entirely new script file to work with, use the filename format of S##### (e.g. S18070 for script # 18070).  A .gsl extension is optional.  This is required to use the Upload functionality.
 * Use different color themes to customize the look of VSCode - a light background with dark text, a dark background with light text, etc.  File > Preferences > Color Theme (Ctrl+K Ctrl+T).
-* Review the Interactive Playground from the "Quick links" section on the Welcome page (Help > Welcome) to learn useful functionality like multi-cursor editing, code folding, and line actions!
+* Review the Interactive Playground from the "Quick links" section on the Welcome page (Help > Welcome) to learn useful functionality like multi-cursor editing, code folding, and line actions!  Also:
+    * Indent any block of selected text with Tab.  Unindent with Shift+Tab.
+    * Comment or uncomment any block of selected text with Ctrl+/.
+    * Goto any specific line in a script with Ctrl+G.
 * Learn to use snippets.  Start typing any GSL command, such as "add" and as you type in the word, you will see menu pop-up for options such as: addeffect, addexp, addgroup, and addmenuitem.  Use the arrows then TAB to select any entry or just click on it, and it will type out the rest of the syntax for you and prompt you to enter any needed values.  Then just TAB between input values, then ENTER or ESC once done.
 
     ![](https://radiantglyph.com/gsiv/gsleditor/snippets.gif)

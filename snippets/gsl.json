@@ -453,6 +453,33 @@
 		],
 		"description": "ifnot statement"
 	},
+	"ifnot NC0 visibility check": {
+		"prefix": "if",
+		"body": [
+			"ifnot (NC0:hidden | NC0:invisible) then",
+			"  $2",
+			"."
+		],
+		"description": "ifnot NC0 visibility check"
+	},
+	"ifnot NP0 visibility check": {
+		"prefix": "if",
+		"body": [
+			"ifnot (NP0:hidden | NP0:invisible | NP0:nonexist) then",
+			"  $2",
+			"."
+		],
+		"description": "ifnot NP0 visibility check"
+	},
+	"ifnot NP0/NC0 visibility check": {
+		"prefix": "if",
+		"body": [
+			"ifnot (NP0:hidden | NP0:invisible | NP0:nonexist | NC0:hidden | NC0:invisible) then",
+			"  $2",
+			"."
+		],
+		"description": "ifnot NP0/NC0 visibility check"
+	},
 	"if statement": {
 		"prefix": "if",
 		"body": [
