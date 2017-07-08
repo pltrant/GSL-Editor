@@ -1,6 +1,13 @@
 # Change Log
 All notable changes to the GSL Editor ("gsl") extension will be documented in this file.
 
+## [0.0.14] - 2017-07-07
+### Added
+- Disabled minimap by default.
+
+### Fixed
+- value2 tab stop for rem2effect snippet.
+
 ## [0.0.13] - 2017-05-27
 ### Fixed
 - Visibility snippets issue.

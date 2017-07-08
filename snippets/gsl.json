@@ -778,7 +778,7 @@
 	"rem2effect": {
 		"prefix": "rem2effect",
 		"body": [
-			"rem2effect code $1 value2 from $2"
+			"rem2effect code $1 value2 $2 from $3"
 		],
 		"description": "rem2effect code {value expression} value2 {value expression} from {node}\n\nRemove an effect from a node with no script execution."
 	},

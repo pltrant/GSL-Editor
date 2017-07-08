@@ -2,14 +2,14 @@
     "name": "gsl",
     "displayName": "GSL",
     "description": "GSL Editor",
-    "version": "0.0.13",
+    "version": "0.0.14",
     "publisher": "patricktrant",
     "author": {
         "name": "Patrick Trant",
         "email": "estild@gmail.com"
     },
     "engines": {
-        "vscode": "^1.10.0"
+        "vscode": "^1.13.0"
     },
     "categories": [
         "Languages"
@@ -44,59 +44,6 @@
                 "command": "extension.gslSendGameCommand",
                 "title": "Send Game Command",
                 "category": "GSL"
-            }
-        ],
-        "languages": [
-            {
-                "id": "gsl",
-                "aliases": [
-                    "GSL",
-                    "gsl"
-                ],
-                "filenamePatterns": [
-                    "S[0-9][0-9][0-9][0-9][0-9]"
-                ],
-                "extensions": [
-                    ".gsl"
-                ],
-                "configuration": "./language-configuration.json"
-            }
-        ],
-        "grammars": [
-            {
-                "language": "gsl",
-                "scopeName": "source.gsl",
-                "path": "./syntaxes/gsl.tmLanguage.json"
-            }
-        ],
-        "snippets": [
-            {
-                "language": "gsl",
-                "path": "./snippets/gsl.json"
-            }
-        ],
-        "keybindings": [
-            {
-                "command": "extension.gslDownload",
-                "key": "ctrl+d",
-                "mac": "cmd+d"
-            },
-            {
-                "command": "extension.gslUpload",
-                "key": "ctrl+u",
-                "mac": "cmd+u",
-                "when": "editorTextFocus"
-            },
-            {
-                "command": "extension.gslMatchmarkers",
-                "key": "ctrl+m",
-                "mac": "cmd+m",
-                "when": "editorTextFocus"
-            },
-            {
-                "command": "extension.gslSendGameCommand",
-                "key": "ctrl+alt+g",
-                "mac": "cmd+alt+g"
             }
         ],
         "configuration": {
@@ -162,22 +109,84 @@
                         "string"
                     ],
                     "default": "",
-                    "description": "Path to save downloaded scripts."
+                    "description": "Path to save downloaded scripts.  Use double slashes when specifying, e.g. C:\\GemStone\\Scripts"
                 }
             }
         },
         "configurationDefaults": {
             "[gsl]": {
                 "editor.insertSpaces": true,
-                "editor.tabSize": 2,
-                "editor.wordWrap": "wordWrapColumn",
-                "editor.wordWrapColumn": 118,
+                "editor.minimap.enabled": false,
                 "editor.rulers": [
                     118
                 ],
                 "editor.scrollBeyondLastLine": false,
-                "editor.wordBasedSuggestions": false
+                "editor.tabSize": 2,
+                "editor.wordBasedSuggestions": false,
+                "editor.wordWrap": "wordWrapColumn",
+                "editor.wordWrapColumn": 118
             }
+        },
+        "grammars": [
+            {
+                "language": "gsl",
+                "scopeName": "source.gsl",
+                "path": "./syntaxes/gsl.tmLanguage.json"
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "extension.gslDownload",
+                "key": "ctrl+d",
+                "mac": "cmd+d"
+            },
+            {
+                "command": "extension.gslUpload",
+                "key": "ctrl+u",
+                "mac": "cmd+u",
+                "when": "editorTextFocus"
+            },
+            {
+                "command": "extension.gslMatchmarkers",
+                "key": "ctrl+m",
+                "mac": "cmd+m",
+                "when": "editorTextFocus"
+            },
+            {
+                "command": "extension.gslSendGameCommand",
+                "key": "ctrl+alt+g",
+                "mac": "cmd+alt+g"
+            }
+        ],
+        "languages": [
+            {
+                "id": "gsl",
+                "aliases": [
+                    "GSL",
+                    "gsl"
+                ],
+                "filenamePatterns": [
+                    "S[0-9][0-9][0-9][0-9][0-9]"
+                ],
+                "extensions": [
+                    ".gsl"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "snippets": [
+            {
+                "language": "gsl",
+                "path": "./snippets/gsl.json"
+            }
+        ],
+        "views": {
+            "explorer": [
+                {
+                    "id": "matchmarkers",
+                    "name": "Matchmarkers"
+                }
+            ]
         }
     }
 }
