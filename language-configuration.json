@@ -1,26 +1,26 @@
 {
     "comments": {
-        // symbol used for single line comment. Remove this entry if your language does not support line comments
         "lineComment": "!"
     },
-    // symbols used as brackets
-    "brackets": [
-        ["{", "}"],
-        ["[", "]"],
-        ["(", ")"]
-    ],
-    // symbols that are auto closed when typing
     "autoClosingPairs": [
         ["{", "}"],
         ["[", "]"],
         ["(", ")"],
         ["\"", "\""]
     ],
-    // symbols that that can be used to surround a selection
+    "brackets": [
+        ["{", "}"],
+        ["[", "]"],
+        ["(", ")"]
+    ],
     "surroundingPairs": [
         ["{", "}"],
         ["[", "]"],
         ["(", ")"],
         ["\"", "\""]
-    ]
+    ],
+    "indentationRules": {
+        "increaseIndentPattern": "^\\s*(if|ifnot|else|else_if|loop|when|is|default|fastpush|push|boldon|underon)\\b.*$",
+        "decreaseIndentPattern": "^\\s*(\\.|(fastpop|pop|boldoff|underoff)\\b)"
+    }
 }

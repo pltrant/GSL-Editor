@@ -3,6 +3,7 @@
 const vscode = require("vscode");
 const net = require('net');
 const fs = require('fs');
+const path = require("path");
 
 const sgeClient = new net.Socket();
 const gameClient = new net.Socket();
@@ -112,27 +113,50 @@ function activate(context) {
             this._MMstatusBarItem.hide();
         }
     }
-    var disposable1 = vscode.commands.registerCommand('extension.gslDownload', () => {
+    context.subscriptions.push(vscode.commands.registerCommand('extension.gslDownload', () => {
         gslDownload(context);
-    });
-    context.subscriptions.push(disposable1);
-    var disposable2 = vscode.commands.registerCommand('extension.gslUpload', () => {
+    }));
+    context.subscriptions.push(vscode.commands.registerCommand('extension.gslUpload', () => {
         gslUpload(context);
-    });
-    context.subscriptions.push(disposable2);
-    var disposable3 = vscode.commands.registerCommand('extension.gslMatchmarkers', () => {
+    }));
+    context.subscriptions.push(vscode.commands.registerCommand('extension.gslMatchmarkers', () => {
         gslMatchmarkers(context);
-    });
-    context.subscriptions.push(disposable3);
-    var disposable4 = vscode.commands.registerCommand('extension.gslSendGameCommand', () => {
+    }));
+    context.subscriptions.push(vscode.commands.registerCommand('extension.gslSendGameCommand', () => {
         gslSendGameCommand(context);
-    });
-    context.subscriptions.push(disposable4);
+    }));
+
     if (vscode.workspace.getConfiguration('gsl').get('displayGameChannel')) {
         getGameChannel().show(true);
     }
+
+    checkForUpdatedVersion(context);
 }
 exports.activate = activate;
+
+function checkForUpdatedVersion(context) {
+    const showReleaseNotes = "Show Release Notes";
+    const gslExtensionVersionKey = 'gslExtensionVersion';
+    var extensionVersion = vscode
+        .extensions
+        .getExtension("patricktrant.gsl")
+        .packageJSON
+        .version;
+    var storedVersion = context.globalState.get(gslExtensionVersionKey);
+    if (!storedVersion) {
+    }
+    else if (extensionVersion !== storedVersion) {
+        vscode
+            .window
+            .showInformationMessage(`The GSL Editor extension has been updated to version ${extensionVersion}!`, showReleaseNotes)
+            .then(choice => {
+            if (choice === showReleaseNotes) {
+                vscode.commands.executeCommand('markdown.showPreview', vscode.Uri.file(path.resolve(__dirname, "./CHANGELOG.md")));
+            }
+        });
+    }
+    context.globalState.update(gslExtensionVersionKey, extensionVersion);
+}
 
 function showGSLStatusBarItems(context) {
     context._DLstatusBarItem.text = '↓ Download';
@@ -327,7 +351,11 @@ function downloadScript(receivedMsg) {
         sendMsg('Q\n');
         let extPath = vscode.workspace.getConfiguration('gsl').get('downloadPath');
         if (!extPath) {
-            extPath = vscode.extensions.getExtension('patricktrant.gsl').extensionPath + '\\scripts';
+            let rootPath = path.resolve(__dirname, '../gsl');
+            if (!fs.existsSync(rootPath)) { //Directory doesn't exist
+                fs.mkdirSync(rootPath); //Create directory
+            }
+            extPath = path.resolve(__dirname, '../gsl/scripts');
         }
         if (!fs.existsSync(extPath)) { //Directory doesn't exist
             fs.mkdirSync(extPath); //Create directory

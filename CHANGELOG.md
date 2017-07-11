@@ -1,6 +1,17 @@
 # Change Log
 All notable changes to the GSL Editor ("gsl") extension will be documented in this file.
 
+## [0.0.17] - 2017-07-11
+### Added
+- Auto indentation of code
+- Prompt to display Release Notes on new releases.
+
+### Changed
+- Default location of downloaded scripts to avoid losing them on extension updates.
+
+## [0.0.15 & 16] - 2017-07-11
+- Updated rolled to 0.0.17.
+
 ## [0.0.14] - 2017-07-07
 ### Added
 - Disabled minimap by default.
