@@ -2,7 +2,7 @@
     "name": "gsl",
     "displayName": "GSL",
     "description": "GSL Editor",
-    "version": "0.0.17",
+    "version": "0.0.18",
     "publisher": "patricktrant",
     "author": {
         "name": "Patrick Trant",
@@ -184,8 +184,9 @@
         "views": {
             "explorer": [
                 {
-                    "id": "matchmarkers",
-                    "name": "Matchmarkers"
+                    "id": "matchMarkers",
+                    "name": "Matchmarkers",
+                    "when": "resourceLangId == 'gsl'"
                 }
             ]
         }

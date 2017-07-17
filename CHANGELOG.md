@@ -1,6 +1,10 @@
 # Change Log
 All notable changes to the GSL Editor ("gsl") extension will be documented in this file.
 
+## [0.0.18] - 2017-07-17
+### Changed
+- Re-implemented the script upload function so it should be significantly more reliable now.  Thanks for the help, Oliver!
+
 ## [0.0.17] - 2017-07-11
 ### Added
 - Auto indentation of code

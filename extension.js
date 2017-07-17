@@ -75,6 +75,7 @@ function LogIntoGame() {
                 outGameChannel('SGE connection established.');
                 sendMsg('K\n');
             });
+            sgeClient.setEncoding('ascii');
             sgeClient.on('close', onConnSGEClose);
             sgeClient.on('data', onConnSGEData);
             sgeClient.on('error', onConnError);
@@ -129,6 +130,9 @@ function activate(context) {
     if (vscode.workspace.getConfiguration('gsl').get('displayGameChannel')) {
         getGameChannel().show(true);
     }
+
+    // const matchMarkersProvider1 = new matchMarkersProvider(context);
+    // vscode.window.registerTreeDataProvider('matchMarkers', matchMarkersProvider1);
 
     checkForUpdatedVersion(context);
 }
@@ -263,13 +267,8 @@ function uploadScript(receivedMsg) {
     } else if ((/Edt:$/.test(receivedMsg)) && (gslEditor.sendScript == 1)) {
         sendMsg('Z\n');
     } else if (/ZAP!  All lines deleted\./.test(receivedMsg)) {
-        let scriptArray = gslEditor.scriptTxt.split('\n');
-        let delay = 0;
-        for (let index = 0; index < scriptArray.length; index++) {
-            setTimeout(function () { gameClient.write(scriptArray[index] + '\n'); gameClient.uncork(); }, delay);
-            delay += 1;
-        }
-        setTimeout(function () { gameClient.write('\n'); gameClient.uncork(); }, delay);
+        let scriptText = gslEditor.scriptTxt.replace(/\r/g,'\n').replace(/\n\n/g,'\n');
+        gameClient.write(scriptText + '\n')
         gslEditor.sendScript = 2;
     } else if ((/Edt:$/.test(receivedMsg)) && (gslEditor.sendScript == 2)) {
         sendMsg('G\n');
@@ -456,6 +455,7 @@ function onConnSGEData(data) {
             outGameChannel('Game connection established.');
             sendMsg(gslEditor.gameKey + '\n');
         });
+        gameClient.setEncoding('ascii');
         gameClient.on('close', onConnGameClose);
         gameClient.on('data', onConnGameData);
         gameClient.on('error', onConnError);
