@@ -1,5 +1,9 @@
 # Change Log
-All notable changes to the GSL Editor ("gsl") extension will be documented in this file.
+All notable changes to the GSL Editor extension will be documented in this file.
+
+## [0.0.22-30] - 2017-07-19
+## Fixed
+- Upload error with scripts that didn't end with a blank line.
 
 ## [0.0.20 & 21] - 2017-07-19
 ## Changed

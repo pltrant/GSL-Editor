@@ -1,34 +1,23 @@
 # gsl README
 
-Editor used for GSL.
+The GSL Editor is an extension for a custom scripting language.  If you're unfamiliar with GSL, you probably do not need this extension.
 
 ## Features
 
-TBD
+* Function to automatically download or upload scripts.
+* Syntax highlighting
+* Auto Indentation
+* Snippets for every GSL command
+* Matchmarkers view to see every matchmarker within a script and ability to click to go to directly to that line.
 
-## Requirements
+## Setup
 
-None.
-
-## Extension Settings
-
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: enable/disable this extension
-* `myExtension.thing`: set to `blah` to do something
+Setup instructions can be found at https:/radiantglyph.com/gsiv/gsleditor/setup.html.
 
 ## Known Issues
 
-None.
+A Google Group has been created for anyone to submit bugs, enhancements, or general feedback. You can request to join at [here](https://groups.google.com/forum/#!forum/gsl-editor/join).
 
 ## Release Notes
 
-GSL Editor's creation.
-
-### 1.0.0
-
-Initial release of the GSL Editor.
+All notable changes will be documented in the [changelog](https://marketplace.visualstudio.com/items/patricktrant.gsl/changelog).

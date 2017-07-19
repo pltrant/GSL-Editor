@@ -278,7 +278,12 @@ function uploadScript(receivedMsg) {
         sendMsg('Z\n');
     } else if (/ZAP!  All lines deleted\./.test(receivedMsg)) {
         let scriptText = gslEditor.scriptTxt.replace(/\r/g,'\n').replace(/\n\n/g,'\n');
-        gameClient.write(scriptText + '\n')
+        if (scriptText.endsWith('\n')) {
+            gameClient.write(scriptText + '\n');
+        } else {
+            gameClient.write(scriptText + '\n\n');
+        }
+        outGameChannel(scriptText);
         gslEditor.sendScript = 2;
     } else if ((/Edt:$/.test(receivedMsg)) && (gslEditor.sendScript == 2)) {
         sendMsg('G\n');
