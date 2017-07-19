@@ -46,7 +46,11 @@ class matchMarkersProvider {
     }
     getMatchMarkers() {
         this.tree = [];
-        let doc = vscode.window.activeTextEditor.document;
+        let editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            return;
+        }
+        let doc = editor.document;
         if (doc.languageId != "gsl") {
             return;
         }

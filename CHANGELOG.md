@@ -1,7 +1,7 @@
 # Change Log
 All notable changes to the GSL Editor ("gsl") extension will be documented in this file.
 
-## [0.0.20] - 2017-07-18
+## [0.0.20 & 21] - 2017-07-19
 ## Changed
 - The Matchmarkers view will now always be displayed.  There appears to be a bug in Microsoft's logic to conditionally display it.
 
