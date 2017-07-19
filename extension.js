@@ -26,6 +26,57 @@ var gslEditor = {
     lastMsg: ''
 }
 
+class matchMarkersProvider {
+    constructor(context) {
+        this.context = context;
+        this._onDidChangeTreeData = new vscode.EventEmitter();
+        this.onDidChangeTreeData = this._onDidChangeTreeData.event;
+        vscode.window.onDidChangeActiveTextEditor((editor) => {
+            this.refresh();
+        });
+        vscode.workspace.onDidChangeTextDocument((e) => {
+            this.refresh();
+        });
+        this.dict = {}; // key value of matchmarkers and the line number each can be found at.
+        this.refresh();
+    }
+    refresh() {
+        this.getMatchMarkers();
+        this._onDidChangeTreeData.fire();
+    }
+    getMatchMarkers() {
+        this.tree = [];
+        let doc = vscode.window.activeTextEditor.document;
+        if (doc.languageId != "gsl") {
+            return;
+        }
+        for (let index = 1; index < doc.lineCount; index++) {
+            let text = doc.lineAt(index).text;
+            if (/^: "(.*)"/.test(text)) {
+                let myRegexp = /^: "(.*)"/;
+                let match = myRegexp.exec(text);
+                this.tree.push(match[1]);
+                this.dict[match[1]] = index; //Store line number found at.
+            }
+        }
+    }
+    getChildren(element) {
+        const nodes = this.tree.map(node => new vscode.TreeItem(node));
+        return nodes;
+    }
+    getTreeItem(element) {
+        element.command = {
+            command: "revealLine",
+            title: "",
+            arguments: [{
+                lineNumber: this.dict[element.label],
+                at: "top"
+            }]
+        }
+        return element;
+    }
+}
+
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
@@ -91,9 +142,6 @@ function activate(context) {
     if (!this._ULstatusBarItem) {
         this._ULstatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
     }
-    if (!this._MMstatusBarItem) {
-        this._MMstatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
-    }
     let self = this;
     if (vscode.workspace.getConfiguration('gsl').get('alwaysEnabled')) {
         showGSLStatusBarItems(self);
@@ -102,7 +150,6 @@ function activate(context) {
         if (!editor) {
             this._DLstatusBarItem.hide();
             this._ULstatusBarItem.hide();
-            this._MMstatusBarItem.hide();
             return;
         }
         let doc = editor.document;
@@ -111,7 +158,6 @@ function activate(context) {
         } else {
             this._DLstatusBarItem.hide();
             this._ULstatusBarItem.hide();
-            this._MMstatusBarItem.hide();
         }
     }
     context.subscriptions.push(vscode.commands.registerCommand('extension.gslDownload', () => {
@@ -119,9 +165,6 @@ function activate(context) {
     }));
     context.subscriptions.push(vscode.commands.registerCommand('extension.gslUpload', () => {
         gslUpload(context);
-    }));
-    context.subscriptions.push(vscode.commands.registerCommand('extension.gslMatchmarkers', () => {
-        gslMatchmarkers(context);
     }));
     context.subscriptions.push(vscode.commands.registerCommand('extension.gslSendGameCommand', () => {
         gslSendGameCommand(context);
@@ -131,8 +174,8 @@ function activate(context) {
         getGameChannel().show(true);
     }
 
-    // const matchMarkersProvider1 = new matchMarkersProvider(context);
-    // vscode.window.registerTreeDataProvider('matchMarkers', matchMarkersProvider1);
+    const matchMarkersProvider1 = new matchMarkersProvider(context);
+    vscode.window.registerTreeDataProvider('matchMarkers', matchMarkersProvider1);
 
     checkForUpdatedVersion(context);
 }
@@ -169,44 +212,6 @@ function showGSLStatusBarItems(context) {
     context._ULstatusBarItem.text = '↑ Upload';
     context._ULstatusBarItem.command = 'extension.gslUpload';
     context._ULstatusBarItem.show();
-    context._MMstatusBarItem.text = 'Matchmarkers';
-    context._MMstatusBarItem.command = 'extension.gslMatchmarkers';
-    context._MMstatusBarItem.show();
-}
-
-function gslMatchmarkers(context) {
-    let editor = vscode.window.activeTextEditor;
-    if (!editor) {
-        return vscode.window.showErrorMessage('You must have a script open before you can list its matchmarkers.');
-    }
-    let doc = editor.document;
-    if (!doc) {
-        return vscode.window.showErrorMessage('You must have a script open before you can list its matchmarkers.');
-    }
-    let matchmarkers = [];
-    for (let index = 1; index < doc.lineCount; index++) {
-        let text = doc.lineAt(index).text;
-        if (/^: "(.*)"/.test(text)) {
-            let myRegexp = /^: "(.*)"/;
-            let match = myRegexp.exec(text);
-            matchmarkers[matchmarkers.length] = match[1]
-        }
-    }
-    vscode.window.showQuickPick(matchmarkers).then(val => {
-        for (let index = 1; index < doc.lineCount; index++) {
-            let text = doc.lineAt(index).text;
-            if (/^: "(.*)"/.test(text)) {
-                let myRegexp = /^: "(.*)"/;
-                let match = myRegexp.exec(text);
-                if (val == match[1]) {
-                    let range = editor.document.lineAt(doc.lineCount - 1).range;
-                    editor.revealRange(range);
-                    range = editor.document.lineAt(index - 1).range;
-                    editor.revealRange(range);
-                }
-            }
-        }
-    });
 }
 
 function gslSendGameCommand(context) {
@@ -245,6 +250,7 @@ function gslUpload(context) {
     if (!/\d\d\d\d\d/.test(scriptNum)) {
         return vscode.window.showErrorMessage('Invalid script # to upload.  The script # is derived from the filename and must be in the S##### format.');
     }
+    doc.save();
     gslEditor.scriptNum = scriptNum;
     gslEditor.scriptTxt = doc.getText();
     gslEditor.sendScript = 1;

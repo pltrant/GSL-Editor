@@ -20,9 +20,11 @@ Use the below instructions to setup and use the GSL Editor.
 
     ![](https://radiantglyph.com/gsiv/gsleditor/buttons.jpg)
 
+5. A Google Group has been created for anyone to submit bugs, enhancements, or general feedback.  You can request to join at [https://groups.google.com/forum/#!forum/gsl-editor/join](https://groups.google.com/forum/#!forum/gsl-editor/join).
 
 ## Tips
 
+* Use the Matchmarkers view available in the Explorer panel (top icon in the left navigation menu or Ctrl+Shift+E).  It will list all matchmarkers found in a script and clicking on one of them will take you to that matchmarker.
 * If you're wanting to create an entirely new script file to work with, use the filename format of S##### (e.g. S18070 for script # 18070).  A .gsl extension is optional.  This is required to use the Upload functionality.
 * Use different color themes to customize the look of VSCode - a light background with dark text, a dark background with light text, etc.  File > Preferences > Color Theme (Ctrl+K Ctrl+T).
 * Review the Interactive Playground from the "Quick links" section on the Welcome page (Help > Welcome) to learn useful functionality like multi-cursor editing, code folding, and line actions!  Also:
@@ -33,5 +35,5 @@ Use the below instructions to setup and use the GSL Editor.
 
     ![](https://radiantglyph.com/gsiv/gsleditor/snippets.gif)
 
-* Review the entire list of 100+ settings (File > Preferences > Settings (Ctrl+Comma)) that are built into VSCode.  You can customize settings such as auto-save, font size, drag and drop text selections, auto update extensions (recommended), and more!
+* Review the entire list of 100+ settings (File > Preferences > Settings (Ctrl+Comma)) that are built into VSCode.  You can customize settings such as auto-save, font size, drag and drop text selections, and more!
 * For advanced users, setup a local git repository of the Dev script archive from https://gitlab.com/GSIV/Dev.git, allowing you to use the built in Search functionality of VSCode.  You can then easily keep your local repository in sync (git pull) and quickly search all script files using keywords or regex with a useful graphical user interface to review the results.

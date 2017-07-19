@@ -2,7 +2,7 @@
     "name": "gsl",
     "displayName": "GSL",
     "description": "GSL Editor",
-    "version": "0.0.18",
+    "version": "0.0.20",
     "publisher": "patricktrant",
     "author": {
         "name": "Patrick Trant",
@@ -33,11 +33,6 @@
             {
                 "command": "extension.gslUpload",
                 "title": "Upload",
-                "category": "GSL"
-            },
-            {
-                "command": "extension.gslMatchmarkers",
-                "title": "Matchmarkers",
                 "category": "GSL"
             },
             {
@@ -148,12 +143,6 @@
                 "when": "editorTextFocus"
             },
             {
-                "command": "extension.gslMatchmarkers",
-                "key": "ctrl+m",
-                "mac": "cmd+m",
-                "when": "editorTextFocus"
-            },
-            {
                 "command": "extension.gslSendGameCommand",
                 "key": "ctrl+alt+g",
                 "mac": "cmd+alt+g"
@@ -185,8 +174,7 @@
             "explorer": [
                 {
                     "id": "matchMarkers",
-                    "name": "Matchmarkers",
-                    "when": "resourceLangId == 'gsl'"
+                    "name": "Matchmarkers"
                 }
             ]
         }

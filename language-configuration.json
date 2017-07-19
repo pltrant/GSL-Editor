@@ -20,7 +20,7 @@
         ["\"", "\""]
     ],
     "indentationRules": {
-        "increaseIndentPattern": "^\\s*(if|ifnot|else|else_if|loop|when|is|default|fastpush|push)\\b.*$",
+        "increaseIndentPattern": "^\\s*(:|(if|ifnot|else|else_if|loop|when|is|default|fastpush|push)\\b).*$",
         "decreaseIndentPattern": "^\\s*(\\.|(fastpop|pop)\\b).*$"
     }
 }
