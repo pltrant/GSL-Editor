@@ -20,6 +20,7 @@ var gslEditor = {
     getScript: 0,
     sendScript: 0,
     scriptNum: 0,
+    scriptArray: [],
     scriptTxt: '',
     debug: '',
     input: '',
@@ -109,16 +110,6 @@ function getGameChannel() {
 function outGameChannel(message) {
     message = message.replace(/\n$/, ''); //Remove ending newline.
     getGameChannel().appendLine(`${message}`);
-}
-
-function getScriptNumFromFile(doc) {
-    let fileName = doc.fileName;
-    let nameLength = doc.fileName.length;
-    if (fileName.toLowerCase().substr(nameLength - 3) == "gsl") { // Ends with *.gsl
-        return doc.fileName.substr(nameLength - 9).substr(0, 5);
-    } else { // No file extension
-        return doc.fileName.substr(nameLength - 5)
-    }
 }
 
 function LogIntoGame() {
@@ -221,7 +212,7 @@ function showGSLStatusBarItems(context) {
 function gslSendGameCommand(context) {
     vscode.window.showInputBox({ ignoreFocusOut: true, prompt: 'Command to send to game?' }).then(input => {
         if ((input == null) | (input == '')) {
-            return vscode.window.showInformationMessage('Not input provided. Command aborted.');
+            return vscode.window.showInformationMessage('No input provided. Command aborted.');
         }
         LogIntoGame().then(function () {
             vscode.window.setStatusBarMessage('Sending game command...', 2000);
@@ -250,13 +241,25 @@ function gslUpload(context) {
     if (!doc) {
         return vscode.window.showErrorMessage('You must have a script open before you can upload it.');
     }
-    let scriptNum = getScriptNumFromFile(doc);
-    if (!/\d\d\d\d\d/.test(scriptNum)) {
-        return vscode.window.showErrorMessage('Invalid script # to upload.  The script # is derived from the filename and must be in the S##### format.');
-    }
     doc.save();
-    gslEditor.scriptNum = scriptNum;
     gslEditor.scriptTxt = doc.getText();
+    let scriptNum = doc.fileName.replace(/\D+/g, '');
+    if (!/\d\d\d\d\d/.test(scriptNum)) {
+        vscode.window.showInputBox({ ignoreFocusOut: true, prompt: 'Script number to upload?' }).then(input => {
+            if ((input == null) | (input == '')) {
+                return vscode.window.showInformationMessage('No input provided. Script upload aborted.');
+            } else {
+                gslEditor.scriptNum = input;
+                gslUpload2(input)
+            }
+        });
+    } else {
+        gslEditor.scriptNum = scriptNum;
+        gslUpload2(scriptNum)
+    }
+}
+
+function gslUpload2(scriptNum) {
     gslEditor.sendScript = 1;
     gslEditor.getScript = 0;
     vscode.window.setStatusBarMessage('Uploading script ' + scriptNum + '...', 5000);
@@ -274,14 +277,15 @@ function uploadScript(receivedMsg) {
         let myRegexp = /Error: Script #(.*) is a verb. Please use \/mv (.*) instead\./;
         let match = myRegexp.exec(receivedMsg);
         sendMsg('/mv ' + match[2] + '\n');
+    } else if (/Invalid script number./.test(receivedMsg)) {
+        return vscode.window.showErrorMessage(gslEditor.scriptNum + ' is an invalid script #.');
     } else if ((/Edt:$/.test(receivedMsg)) && (gslEditor.sendScript == 1)) {
         sendMsg('Z\n');
     } else if (/ZAP!  All lines deleted\./.test(receivedMsg)) {
         let scriptText = gslEditor.scriptTxt.replace(/\r/g,'\n').replace(/\n\n/g,'\n');
-        if (scriptText.endsWith('\n')) {
-            gameClient.write(scriptText + '\n');
-        } else {
-            gameClient.write(scriptText + '\n\n');
+        gameClient.write(scriptText + '\n');
+        if (!scriptText.endsWith('\n')) {
+            gameClient.write('\n');
         }
         outGameChannel(scriptText);
         gslEditor.sendScript = 2;
@@ -313,25 +317,54 @@ function uploadScript(receivedMsg) {
 }
 
 function gslDownload(context) {
-    vscode.window.showInputBox({ ignoreFocusOut: true, prompt: 'Script number or verb name to download?' }).then(input => {
+    vscode.window.showInputBox({ ignoreFocusOut: true, prompt: 'Script number or verb name to download? Multiple scripts via 12316;profile or 15-19.' }).then(input => {
         if ((input == null) | (input == '')) {
-            return vscode.window.showInformationMessage('Not input provided. Script download aborted.');
+            return vscode.window.showInformationMessage('No input provided. Script download aborted.');
         }
-        gslEditor.getScript = 1;
-        gslEditor.scriptTxt = '';
-        gslEditor.input = input;
-        let type = '';
-        if (isNaN(gslEditor.input)) {
-            type = 'verb';
-        } else {
-            type = 'script';
-        }
-        vscode.window.setStatusBarMessage('Downloading ' + type + ' ' + gslEditor.input + '...', 5000);
-        LogIntoGame().then(function () {
-            if (gameClient.connected) {
-                downloadScript(' \nWelcome to \n \nAll Rights Reserved '); //Simulate initial login text
+        gslEditor.scriptArray = [];
+        let inputArray = input.split(";");
+        let BreakException = {};
+        try {
+            for (let i = 0; i < inputArray.length; i++) {
+                if (inputArray[i].indexOf('-') !== -1) {
+                    let range = inputArray[i].split('-');
+                    range[0] = parseInt(range[0]);
+                    range[1] = parseInt(range[1]);
+                    if (isNaN(range[0]) | isNaN(range[1]) | range[0] >= range[1]) {
+                        BreakException.element = inputArray[i];
+                        throw BreakException;
+                    }
+                    for (let x = 0; range[0] + x <= range[1]; x++) {
+                        gslEditor.scriptArray.push(range[0] + x);
+                    }
+                } else {
+                    gslEditor.scriptArray.push(inputArray[i])
+                }
             }
-        });
+        } catch (e) {
+            if (e == BreakException) {
+                return vscode.window.showErrorMessage('Invalid script range: ' + BreakException.element);
+            }
+        }
+        gslDownload2(gslEditor.scriptArray[0]);
+    });
+}
+
+function gslDownload2(script) {
+    gslEditor.getScript = 1;
+    gslEditor.scriptTxt = '';
+    gslEditor.input = script;
+    let type = '';
+    if (isNaN(gslEditor.input)) {
+        type = 'verb';
+    } else {
+        type = 'script';
+    }
+    vscode.window.setStatusBarMessage('Downloading ' + type + ' ' + gslEditor.input + '...', 5000);
+    LogIntoGame().then(function () {
+        if (gameClient.connected) {
+            downloadScript(' \nWelcome to \n \nAll Rights Reserved '); //Simulate initial login text
+        }
     });
 }
 
@@ -361,7 +394,6 @@ function downloadScript(receivedMsg) {
         sendMsg('P\n');
         gslEditor.getScript = 2;
     } else if (/Edt:$/.test(receivedMsg)) {
-        gslEditor.getScript = 0;
         sendMsg('Q\n');
         let extPath = vscode.workspace.getConfiguration('gsl').get('downloadPath');
         if (!extPath) {
@@ -381,10 +413,17 @@ function downloadScript(receivedMsg) {
             }
             fs.writeFileSync(fileName, gslEditor.scriptTxt); //Create new file with script text
             vscode.workspace.openTextDocument(fileName).then(document => {
-                vscode.window.showTextDocument(document)
+                vscode.window.showTextDocument(document);
             });
             vscode.window.setStatusBarMessage('Download successful.', 5000);
         });
+    } else if (/(Script edit aborted|Modification aborted)/.test(receivedMsg)) {
+        gslEditor.scriptArray.shift();
+        if (gslEditor.scriptArray.length > 0) {
+            gslDownload2(gslEditor.scriptArray[0]);
+        } else {
+            gslEditor.getScript = 0;
+        }
     }
 }
 

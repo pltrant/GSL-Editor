@@ -1,6 +1,13 @@
 # Change Log
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [0.0.31] - 2017-07-27
+## Added
+- You can now download multiple scripts at a time.  Separate them with a ; or specify a range with a -. e.g. 1;2;3;4;5 or 1-5 or 1;2-4;5
+
+## Changed
+- To upload a script, it no requires you follow the strict file name format of S#####.  It will now just pull out all digits from the file name to parse the script number. e.g. "S12345", "S12345.gsl", "S12345 - Test" will all parse to script 12345.  Failing that, it will prompt you for the script number.
+
 ## [0.0.22-30] - 2017-07-19
 ## Fixed
 - Upload error with scripts that didn't end with a blank line.
