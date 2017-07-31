@@ -1,12 +1,16 @@
 # Change Log
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [0.0.32] - 2017-07-31
+## Fixed
+- Resolved issue on script upload where numbers in the file path were also being used. It now only cares about the actual file name.
+
 ## [0.0.31] - 2017-07-27
 ## Added
-- You can now download multiple scripts at a time.  Separate them with a ; or specify a range with a -. e.g. 1;2;3;4;5 or 1-5 or 1;2-4;5
+- You can now download multiple scripts at a time. Separate them with a ; or specify a range with a -. e.g. 1;2;3;4;5 or 1-5 or 1;2-4;5
 
 ## Changed
-- To upload a script, it no requires you follow the strict file name format of S#####.  It will now just pull out all digits from the file name to parse the script number. e.g. "S12345", "S12345.gsl", "S12345 - Test" will all parse to script 12345.  Failing that, it will prompt you for the script number.
+- To upload a script, it no longer requires you follow the strict file name format of S#####. It will now just pull out all digits from the file name to parse the script number. e.g. "S12345", "12345.gsl", "S12345 - Test" will all parse to script 12345. Failing that, it will prompt you for the script number.
 
 ## [0.0.22-30] - 2017-07-19
 ## Fixed
@@ -14,16 +18,16 @@ All notable changes to the GSL Editor extension will be documented in this file.
 
 ## [0.0.20 & 21] - 2017-07-19
 ## Changed
-- The Matchmarkers view will now always be displayed.  There appears to be a bug in Microsoft's logic to conditionally display it.
+- The Matchmarkers view will now always be displayed. There appears to be a bug in Microsoft's logic to conditionally display it.
 
 ## [0.0.19] - 2017-07-18
 ### Added
-- A new custom Matchmarkers view is now available in the Explorer panel (top icon in the left navigation menu or Ctrl+Shift+E).  It will list all matchmarkers found in a script and clicking on one of them will take you to that matchmarker.  The previous Matchmarkers button in the bottom Status Bar has been removed.
+- A new custom Matchmarkers view is now available in the Explorer panel (top icon in the left navigation menu or Ctrl+Shift+E). It will list all matchmarkers found in a script and clicking on one of them will take you to that matchmarker. The previous Matchmarkers button in the bottom Status Bar has been removed.
 - Scripts will now automatically be locally saved before every upload.
 
 ## [0.0.18] - 2017-07-17
 ### Changed
-- Re-implemented the script upload function so it should be significantly more reliable now.  Thanks for the help, Oliver!
+- Re-implemented the script upload function so it should be significantly more reliable now. Thanks for the help, Oliver!
 
 ## [0.0.17] - 2017-07-11
 ### Added
@@ -56,11 +60,11 @@ All notable changes to the GSL Editor extension will be documented in this file.
 
 ## [0.0.11] - 2017-05-17
 ### Added
-- Added Send Game Command option, available by hitting F1, then type in GSL and select the Send Game Command option or use Ctrl+Alt+G.  Once prompted, input the command you wish to send to the game.
+- Added Send Game Command option, available by hitting F1, then type in GSL and select the Send Game Command option or use Ctrl+Alt+G. Once prompted, input the command you wish to send to the game.
 
 ## [0.0.10] - 2017-05-16
 ### Added
-- Added snippets for almost every GSL syntax commands.  Start typing any command and use the intellisense window to finish the code for you!
+- Added snippets for almost every GSL syntax commands. Start typing any command and use the intellisense window to finish the code for you!
 
 ## [0.0.9] - 2017-05-12
 ### Changed
@@ -80,7 +84,7 @@ No change.
 
 ## [0.0.5] - 2017-04-24
 ### Added
-- Snippets for if, ifnot, if/else, if/else_if, if/else_if/else, else, else_if, when, loop, mm (new matchmarker), and new (new script header).  Try it out by just typing "if", "else", "when", "loop", "mm", or "new", then hit TAB.  You can then TAB through multiple points in the snippet to enter relevant code.  Finally, hit ENTER when you're done editing it.
+- Snippets for if, ifnot, if/else, if/else_if, if/else_if/else, else, else_if, when, loop, mm (new matchmarker), and new (new script header). Try it out by just typing "if", "else", "when", "loop", "mm", or "new", then hit TAB. You can then TAB through multiple points in the snippet to enter relevant code. Finally, hit ENTER when you're done editing it.
 
 ### Changed
 - Temporarily disabled intellisense until its formally supported for GSL.

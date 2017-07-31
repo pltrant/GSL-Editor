@@ -212,7 +212,7 @@ function showGSLStatusBarItems(context) {
 function gslSendGameCommand(context) {
     vscode.window.showInputBox({ ignoreFocusOut: true, prompt: 'Command to send to game?' }).then(input => {
         if ((input == null) | (input == '')) {
-            return vscode.window.showInformationMessage('No input provided. Command aborted.');
+            return vscode.window.showErrorMessage('No input provided. Command aborted.');
         }
         LogIntoGame().then(function () {
             vscode.window.setStatusBarMessage('Sending game command...', 2000);
@@ -243,11 +243,11 @@ function gslUpload(context) {
     }
     doc.save();
     gslEditor.scriptTxt = doc.getText();
-    let scriptNum = doc.fileName.replace(/\D+/g, '');
-    if (!/\d\d\d\d\d/.test(scriptNum)) {
-        vscode.window.showInputBox({ ignoreFocusOut: true, prompt: 'Script number to upload?' }).then(input => {
+    let scriptNum = path.basename(doc.fileName).replace(/\D+/g, '');
+    if (!/^\d{1,5}$/.test(scriptNum)) {
+        vscode.window.showInputBox({ ignoreFocusOut: true, prompt: 'Unable to parse script # from file name. Script number to upload?' }).then(input => {
             if ((input == null) | (input == '')) {
-                return vscode.window.showInformationMessage('No input provided. Script upload aborted.');
+                return vscode.window.showErrorMessage('No input provided. Script upload aborted.');
             } else {
                 gslEditor.scriptNum = input;
                 gslUpload2(input)
@@ -293,7 +293,7 @@ function uploadScript(receivedMsg) {
         sendMsg('G\n');
         gslEditor.sendScript = 3;
     } else if (/Edt:Inserting before line: 0/.test(receivedMsg)) {
-        vscode.window.showErrorMessage("Upload error.  Please check to ensure you haven't gone past 118 characters on a single line.");
+        vscode.window.showErrorMessage("Upload error. Please check to ensure you haven't gone past 118 characters on a single line.");
         sendMsg('Q\n');
         gslEditor.sendScript = 0;
         gslEditor.scriptTxt = '';
@@ -319,7 +319,7 @@ function uploadScript(receivedMsg) {
 function gslDownload(context) {
     vscode.window.showInputBox({ ignoreFocusOut: true, prompt: 'Script number or verb name to download? Multiple scripts via 12316;profile or 15-19.' }).then(input => {
         if ((input == null) | (input == '')) {
-            return vscode.window.showInformationMessage('No input provided. Script download aborted.');
+            return vscode.window.showErrorMessage('No input provided. Script download aborted.');
         }
         gslEditor.scriptArray = [];
         let inputArray = input.split(";");
