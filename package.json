@@ -2,7 +2,7 @@
     "name": "gsl",
     "displayName": "GSL",
     "description": "GSL Editor",
-    "version": "0.0.32",
+    "version": "0.0.33",
     "publisher": "patricktrant",
     "author": {
         "name": "Patrick Trant",
@@ -110,7 +110,6 @@
         },
         "configurationDefaults": {
             "[gsl]": {
-                "editor.autoIndent": true,
                 "editor.insertSpaces": true,
                 "editor.minimap.enabled": false,
                 "editor.rulers": [

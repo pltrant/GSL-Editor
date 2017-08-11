@@ -1,6 +1,10 @@
 # Change Log
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [0.0.33] - 2017-08-11
+## Fixed
+- Downloading a script should no longer overwrite the last script downloaded.  It will always open in a new tab.
+
 ## [0.0.32] - 2017-07-31
 ## Fixed
 - Resolved issue on script upload where numbers in the file path were also being used. It now only cares about the actual file name.

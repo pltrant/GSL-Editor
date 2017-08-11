@@ -413,7 +413,7 @@ function downloadScript(receivedMsg) {
             }
             fs.writeFileSync(fileName, gslEditor.scriptTxt); //Create new file with script text
             vscode.workspace.openTextDocument(fileName).then(document => {
-                vscode.window.showTextDocument(document);
+                vscode.window.showTextDocument(document, {preview: false});
             });
             vscode.window.setStatusBarMessage('Download successful.', 5000);
         });
