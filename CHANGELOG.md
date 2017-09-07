@@ -1,6 +1,14 @@
 # Change Log
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.0.0] - 2017-09-06
+## Added
+- The extension now includes 2 default color themes for GSL, aptly named GSL Light and GSL Dark.  **The GSL Dark theme is strongly recommended.  To change your color theme, go to File > Preferences > Color Theme (or Ctrl+K Ctrl+T).**  It should be noted that you color customize any element of code.  If you don't like the red that is used for `kill`, you can change it to any other color you want.
+
+## Changed
+- Thanks to Oliver/Naos' work, the language definition file for GSL was significantly updated and now fully supports almost every element of GSL.  This mostly comes into play for the color customization noted above.
+- Snippets have been updated to provide choices where appropriate.  For example, if you're using `checkeffect`, the first placeholder is always a node, so it will display a dropdown listing all valid nodes (NP#, NC#, NO#, NE#, NR#, where # is 0-9).  You don't have to scroll through the entire list, you can start to type which option you want and it will narrow down the list for you.
+
 ## [0.0.33] - 2017-08-11
 ## Fixed
 - Downloading a script should no longer overwrite the last script downloaded.  It will always open in a new tab.

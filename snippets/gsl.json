@@ -2,119 +2,119 @@
 	"addeffect": {
 		"prefix": "addeffect",
 		"body": [
-			"addeffect code $1 value1 $2 value2 $3 flags $4 with $5 in $6 script $7"
+			"addeffect code ${1:#} value1 ${2:#} value2 ${3:#} flags ${4:#} with ${5|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|} in ${6:# of seconds} script ${7:#}"
 		],
 		"description": "addeffect code {effect-code} value1 {value1} value2 {value2} flags {flags} with {target-node} in {time} script {script}\n\nAdd an effect resource to a node.\n\n"
 	},
 	"addexp": {
 		"prefix": "addexp",
 		"body": [
-			"addexp $1 to $2"
+			"addexp ${1:#} to ${2|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9|}"
 		],
 		"description": "addexp {value expression} to {node}\n\nAdd field experience to player."
 	},
 	"addgroup": {
 		"prefix": "addgroup",
 		"body": [
-			"addgroup \"$1\" to $2"
+			"addgroup \"${1:group}\" to ${2|P0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|}"
 		],
 		"description": "addgroup \"{group}\" to {node}\n\nAdd a variable group to the target node."
 	},
 	"addmenuitem": {
 		"prefix": "addmenuitem",
 		"body": [
-			"addmenuitem \"$1\" target \"$2\""
+			"addmenuitem \"${1:text}\" target \"${2:text}\""
 		],
 		"description": "addmenuitem {string} target {string}\n\nAdds options to a point and click menu."
 	},
 	"assert": {
 		"prefix": "assert",
 		"body": [
-			"assert $1 or_yell \"$2\""
+			"assert ${1:expression} or_yell \"${2:text}\""
 		],
 		"description": "assert {expression} or_yell {text message}\n\nAsserts something's true and if not, halts execution and generates a script error."
 	},
 	"bitget": {
 		"prefix": "bitget",
 		"body": [
-			"bitget $1 from $2 to $3 for $4"
+			"bitget ${1:field|register} from ${2:0} to ${3:31} for ${4:field|register}"
 		],
 		"description": "bitget {source} from {startBit} to {endBit} for {target}\n\nRead selected bits from an integer."
 	},
 	"bitset": {
 		"prefix": "bitset",
 		"body": [
-			"bitset $1 from $2 to $3 for $4"
+			"bitset ${1:#} from ${2:0} to ${3:31} for ${4:field|register}"
 		],
 		"description": "bitset {value} from {startBit} to {endBit} for {target}\n\nSet selected bits in an integer."
-	},
-	"boldon": {
-		"prefix": "boldon",
-		"body": [
-			"boldon $1"
-		],
-		"description": "boldon {node}\n\nTurn off text bolding."
 	},
 	"boldoff": {
 		"prefix": "boldoff",
 		"body": [
-			"boldoff $1"
+			"boldoff ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9|}"
 		],
 		"description": "boldoff {node}\n\nTurn on text bolding."
+	},
+	"boldon": {
+		"prefix": "boldon",
+		"body": [
+			"boldon ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9|}"
+		],
+		"description": "boldon {node}\n\nTurn off text bolding."
 	},
 	"bugreport": {
 		"prefix": "bugreport",
 		"body": [
-			"bugreport $1 \"$2\" \"$3\""
+			"bugreport ${1|message,debug|} \"${2:text}\" \"${3:text}\""
 		],
 		"description": "bugreport {type} {bug title} {address list}\n\nSend an email bug report."
 	},
 	"call": {
 		"prefix": "call",
 		"body": [
-			"call $1"
+			"call ${1:#}"
 		],
 		"description": "call {value expression}\n\nExecute another script."
 	},
 	"callmatch must_match": {
 		"prefix": "callmatch must_match",
 		"body": [
-			"callmatch must_match \"$1\" in $2"
+			"callmatch must_match \"${1:text}\" in ${2:#}"
 		],
 		"description": "callmatch must_match {match_marker} in {script_number}\n\nCall a script with a matchmarker."
 	},
 	"callmatch may_match": {
 		"prefix": "callmatch may_match",
 		"body": [
-			"callmatch may_match \"$1\" in $2"
+			"callmatch may_match \"${1:text}\" in ${2:#}"
 		],
 		"description": "callmatch may_match {match_marker} in {script_number}\n\nChecks for a matchmarker in a script, then calls it if it exists."
 	},
 	"callmatch check": {
 		"prefix": "callmatch check",
 		"body": [
-			"callmatch check \"$1\" in $2"
+			"callmatch check \"${1:text}\" in ${2:#}"
 		],
 		"description": "callmatch check {match_marker} in {script_number}\n\nChecks for a matchmarker in a script."
 	},
 	"cando": {
 		"prefix": "cando",
 		"body": [
-			"cando $1 action $2 for $3"
+			"cando ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|} action ${2|1,2,3,4,5,6,7,8,9,10|} for ${3|A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,V0,V1,V2,V3,V4,V5,V6,V7,V8,V9,B0,B1,B2,B3,B4,B5,B6,B7,B8,B9|}"
 		],
 		"description": "cando {node} action {value expression} for {value variable}\n\nCheck how well an action can be performed by creature/player given injuries."
 	},
 	"checkffect": {
 		"prefix": "checkeffect",
 		"body": [
-			"checkeffect $1 code $2"
+			"checkeffect ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|} code ${2:#}"
 		],
 		"description": "checkeffect {node} code {value expression}\n\nCheck for the existence of a specific effect on a node."
 	},
 	"clear": {
 		"prefix": "clear",
 		"body": [
-			"clear $1"
+			"clear ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9,A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,V0,V1,V2,V3,V4,V5,V6,V7,V8,V9,B0,B1,B2,B3,B4,B5,B6,B7,B8,B9,S0,S1,S2,S3,S4,S5,S6,S7,S8,S9,T0,T1,T2,T3,T4,T5,T6,T7,T8,T9|}"
 		],
 		"description": "clear {variable}\n\nSets variable to 0 or \"\"."
 	},
@@ -128,105 +128,105 @@
 	"cleartable": {
 		"prefix": "cleartable",
 		"body": [
-			"cleartable $1"
+			"cleartable ${1:#}"
 		],
 		"description": "cleartable {value}\n\nClears the contents of a table."
 	},
 	"closelocker": {
 		"prefix": "closelocker",
 		"body": [
-			"closelocker $1 using $2"
+			"closelocker ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9|} using ${2|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9|}"
 		],
 		"description": "closelocker {node} using {node}\n\nCloses a player's locker."
 	},
 	"compareitem": {
 		"prefix": "compareitem",
 		"body": [
-			"compareitem $1 to $1"
+			"compareitem ${1|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|} to ${2|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|}"
 		],
 		"description": "compareitem {node} to {node}\n\nDoes a binary comparison of two exists to determine if they are identical."
 	},
 	"contribute": {
 		"prefix": "contribute",
 		"body": [
-			"contribute $1 towards $2 by $3"
+			"contribute ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9|} towards ${2|NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|} by ${3:#}"
 		],
 		"description": "contribute {node} towards {node} by {value expression}.\n\nAugment experience tracker for player vs. creature by amount."
 	},
 	"copy": {
 		"prefix": "copy",
 		"body": [
-			"copy $1 for $2"
+			"copy ${1|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|} for ${2|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|}"
 		],
 		"description": "copy {node} for {node}\n\nCopy an existence."
 	},
 	"create": {
 		"prefix": "create",
 		"body": [
-			"create $1 mode $2 for $3"
+			"create ${1:#} mode ${2|0,1|} for ${3|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|}"
 		],
 		"description": "create {value expression} mode {value expression} for {node}\n\nCreate a new existence based on profile."
 	},
 	"createitem": {
 		"prefix": "createitem",
 		"body": [
-			"createitem $1 for $2"
+			"createitem ${1:#} for ${2|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|}"
 		],
 		"description": "createitem {value register} for {Nx#}\n\nCreates items from the snapshot specified by {value register} and sticks them in Nx#."
 	},
 	"createroom": {
 		"prefix": "createroom",
 		"body": [
-			"createroom $1 for $2"
+			"createroom ${1:#} for ${2|NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|}"
 		],
 		"description": "createroom {room#} for {room-node}\n\nCreate a new room."
 	},
 	"createtable": {
 		"prefix": "createtable",
 		"body": [
-			"createtable type $1 size $2 $3 $4 for $5"
+			"createtable type ${1|0,1|} size ${2:#} ${3:#} ${4:#} for ${5:#}"
 		],
 		"description": "createtable type {datatype} size {xsize} {ysize} {zsize} for {TableID}\n\nCreates a volatile table."
 	},
 	"createtext": {
 		"prefix": "createtext",
 		"body": [
-			"createtext $1 for $2"
+			"createtext ${1|T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,S0,S1,S2,S3,S4,S5,S6,S7,S8,S9|} for ${2:#}"
 		],
 		"description": "createtext {text variable} for {TextID#}\n\nCreate a new Text ID."
 	},
 	"decodeattack": {
 		"prefix": "decodeattack",
 		"body": [
-			"decodeattack $1 field $2 for $3"
+			"decodeattack ${1|NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|} field ${2|claw1,claw2,claw3,spell,hits,type1,type2,type3,size,arms,cimn1,cimn2,cimn3,db,legs,weapon,kdown,stun,crtt,crth,crtr|} for ${3|A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,V0,V1,V2,V3,V4,V5,V6,V7,V8,V9,B0,B1,B2,B3,B4,B5,B6,B7,B8,B9|}"
 		],
 		"description": "decodeattack {node} field {field name} for {value variable}\n\nDecode creature attack data."
 	},
 	"deletetable": {
 		"prefix": "deletetable",
 		"body": [
-			"deletetable $1"
+			"deletetable {1:#}"
 		],
 		"description": "deletetable {value expression}\n\nDeletes a volatile table."
 	},
 	"diradd": {
 		"prefix": "diradd",
 		"body": [
-			"diradd $1"
+			"diradd ${1|0,1,2,3,4,5,6,7,8,9,10,11,12|}"
 		],
 		"description": "diradd {value expression}\n\nAdd a direction to the FE direction display."
 	},
 	"dirsend": {
 		"prefix": "dirsend",
 		"body": [
-			"dirsend $1"
+			"dirsend ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9|}"
 		],
 		"description": "dirsend {node}\n\nUpdate FE direction display."
 	},
 	"docreate": {
 		"prefix": "docreate",
 		"body": [
-			"docreate $1 for $2"
+			"docreate ${1|T0,T1,T2,T3,T4,T5,T6,T7,T8,T9|} for ${2|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|}"
 		],
 		"description": "docreate {text expression} for {node variable}\n\nCreate existence using command line text."
 	},
@@ -241,7 +241,7 @@
 		"prefix": "else",
 		"body": [
 			"else",
-			"  $1",
+			"  ${1:statement}",
 			"."
 		],
 		"description": "else statement"
@@ -249,8 +249,8 @@
 	"else_if statement": {
 		"prefix": "else_if",
 		"body": [
-			"else_if ($1) then",
-			"  $2",
+			"else_if (${1:expression}) then",
+			"  ${2:statement}",
 			"."
 		],
 		"description": "else_if statement"
@@ -258,35 +258,35 @@
 	"encodeattack": {
 		"prefix": "encodeattack",
 		"body": [
-			"encodeattack $1 field $2 to $3"
+			"encodeattack ${1|NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|} field ${2|claw1,claw2,claw3,spell,hits,type1,type2,type3,size,arms,cimn1,cimn2,cimn3,db,legs,weapon,kdown,stun,crtt,crth,crtr|} to ${3|A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,V0,V1,V2,V3,V4,V5,V6,V7,V8,V9,B0,B1,B2,B3,B4,B5,B6,B7,B8,B9|}"
 		],
 		"description": "encodeattack {node} field {field name} to {value expression}\n\nEncode creature attack data."
 	},
 	"end2effect": {
 		"prefix": "end2effect",
 		"body": [
-			"end2effect code $1 value2 $2 from $3"
+			"end2effect code ${1:#} value2 ${2:#} from ${3|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|}"
 		],
 		"description": "end2effect code {value expression} value2 {value expression} from {node}\n\nTerminate an effect from a node."
 	},
 	"endeffect": {
 		"prefix": "endeffect",
 		"body": [
-			"endeffect code $1 from $2"
+			"endeffect code ${1:#} from ${2|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|}"
 		],
 		"description": "endeffect code {value expression} from {node}\n\nTerminate an effect from a node."
 	},
 	"endneffect": {
 		"prefix": "endneffect",
 		"body": [
-			"endneffect $1"
+			"endneffect ${1|A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,V0,V1,V2,V3,V4,V5,V6,V7,V8,V9,B0,B1,B2,B3,B4,B5,B6,B7,B8,B9|}"
 		],
 		"description": "endneffect {variable}\n\nTerminate next effect on a node."
 	},
 	"expand": {
 		"prefix": "expand",
 		"body": [
-			"expand $1"
+			"expand ${1|S0,S1,S2,S3,S4,S5,S6,S7,S8,S9,T0,T1,T2,T3,T4,T5,T6,T7,T8,T9|}"
 		],
 		"description": "expand {variable}\n\nExpands the contents of a text variable."
 	},
@@ -297,6 +297,15 @@
 		],
 		"description": "fastpop\n\nPull all but T variables from stack."
 	},
+	"fastpush/pop": {
+		"prefix": "fastpush",
+		"body": [
+			"fastpush",
+			"  ${1:statement}",
+			"fastpop"
+		],
+		"description": "fastpush and fastpop template\n\nPush all but T variables onto stack."
+	},
 	"fastpush": {
 		"prefix": "fastpush",
 		"body": [
@@ -304,118 +313,132 @@
 		],
 		"description": "fastpush\n\nPush all but T variables onto stack."
 	},
+	"feupdate": {
+		"prefix": "feupdate",
+		"body": [
+			"feupdate ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9|} ${2|righthand,lefthand,tmpexpr,stance,mana,max_mana,spirit,max_spirit,health,max_health,injuries,scars,wspell|}"
+		],
+		"description": "fastpush\n\nThis command is used in $STATE_CHANGE to cause the game to notify the WIZARD Front_End of a status change with the appropriate WIZARD codes to update to the new status."
+	},
 	"filltable": {
 		"prefix": "filltable",
 		"body": [
-			"filltable $1 with $2"
+			"filltable ${1:#} with ${2:#}"
 		],
 		"description": "filltable {value expression} with {value expression}\n\nSet all elements in a table to a single value."
 	},
 	"gather": {
 		"prefix": "gather",
 		"body": [
-			"gather $1 $2 for $3 $4"
+			"gather ${1|firstobj,nextobj,firstplayer,nextplayer,firstwathc,nextwatch,firstblood,nextblood,nextroom,allplayers|} ${2|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|} for ${3|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|} ${4|exist,nonexist,sametype,all|}"
 		],
 		"description": "gather {type} {source-node} for {target-node} {option}\n\nLoop through nodes."
 	},
 	"gatherfirst": {
 		"prefix": "gatherfirst",
 		"body": [
-			"gatherfirst $1 for $2"
+			"gatherfirst ${1|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|} for ${2|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|}"
 		],
 		"description": "gatherfirst {node} for {node}\n\nEstablish a gather list."
 	},
 	"gathernext": {
 		"prefix": "gathernext",
 		"body": [
-			"gathernext $1 for $2"
+			"gathernext ${1|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|} for ${2|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|}"
 		],
 		"description": "gathernext {node} for {node}\n\nGet next node from a gather list."
 	},
 	"gatherplayer": {
 		"prefix": "gatherplayer",
 		"body": [
-			"gatherplayer $1 for $2"
+			"gatherplayer ${1|NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|} for ${2|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9|}"
 		],
 		"description": "gatherplayer {node} for {node}\n\nLoop through players."
 	},
 	"getcontributors": {
 		"prefix": "getcontributors",
 		"body": [
-			"getcontributors NC$1"
+			"getcontributors ${1|NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|}"
 		],
 		"description": "getcontributors NCx\n\nReturns information about the contribution made via the contribute command."
 	},
 	"getnameof": {
 		"prefix": "getnameof",
 		"body": [
-			"getnameof $1"
+			"getnameof ${1:index}"
 		],
 		"description": "getnameof {value expression}\n\nGet first and last name of a player, using their index."
 	},
 	"getps": {
 		"prefix": "getps",
 		"body": [
-			"getps NP$1"
+			"getps ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9|}"
 		],
 		"description": "getps {node}\n\nGet numbers of scripts on a player."
 	},
 	"getwatch": {
 		"prefix": "getwatch",
 		"body": [
-			"getwatch $1 for $2"
+			"getwatch ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9|} for ${2|A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,V0,V1,V2,V3,V4,V5,V6,V7,V8,V9,B0,B1,B2,B3,B4,B5,B6,B7,B8,B9|}"
 		],
 		"description": "getwatch {node} for {variable}\n\nGet watchroom information."
 	},
 	"glue": {
 		"prefix": "glue",
 		"body": [
-			"glue $1 to $2"
+			"glue ${1:#} to ${2|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|}"
 		],
 		"description": "glue {value expression} to {node}\n\nAttach script to existence/player."
+	},
+	"goto": {
+		"prefix": "goto",
+		"body": [
+			"goto ${1:label}"
+		],
+		"description": "goto {label}\n\nGOTO branches execution of the program to the specified label. Labels are 1 to 20 characters long, and are prefixed by an @ and an optional space in the source code. Branching can be forward or backward. Not all labels need to be used, and a label can be used by more than one GOTO, but there cannot be duplicate labels."
 	},
 	"hash1": {
 		"prefix": "hash1",
 		"body": [
-			"hash1 $1 for $2"
+			"hash1 ${1:text} for ${2|A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,V0,V1,V2,V3,V4,V5,V6,V7,V8,V9,B0,B1,B2,B3,B4,B5,B6,B7,B8,B9|}"
 		],
 		"description": "hash1 {text} for {variable}\n\nGenerate Hash value."
 	},
 	"hash2": {
 		"prefix": "hash2",
 		"body": [
-			"hash2 $1 for $2"
+			"hash2 ${1:text} for ${2|A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,V0,V1,V2,V3,V4,V5,V6,V7,V8,V9,B0,B1,B2,B3,B4,B5,B6,B7,B8,B9|}"
 		],
 		"description": "hash2 {text} for {variable}\n\nGenerate Hash value."
 	},
 	"heal": {
 		"prefix": "heal",
 		"body": [
-			"heal $1 area $2 by $3"
+			"heal ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|} area ${2|1,2,3,4,5,6,7,8,9,10,11,12,13,14|} by ${3|1,2,3|}"
 		],
 		"description": "heal {node} area {value expression} by {value expression}\n\nHeal injury on player/creature."
 	},
 	"healp": {
 		"prefix": "healp",
 		"body": [
-			"healp $1 area $2 by $3"
+			"healp ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9|} area ${2|1,2,3,4,5,6,7,8,9,10,11,12,13,14|} by ${3|1,2,3|}"
 		],
 		"description": "healp {node} area {value expression} by {value expression}\n\nHeal permanent injury (scar) on player/creature."
 	},
 	"hurt": {
 		"prefix": "hurt",
 		"body": [
-			"hurt $1 hits $2"
+			"hurt ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|} hits ${2:#}"
 		],
 		"description": "hurt {node} hits {value expression}\n\nInflict health point damage on player/creature."
 	},
 	"if/else statement": {
 		"prefix": "if",
 		"body": [
-			"if ($1) then",
-			"  $2",
+			"if (${1:expression}) then",
+			"  ${2:statement}",
 			"else",
-			"  $3",
+			"  ${3:statement}",
 			"."
 		],
 		"description": "if/else statement"
@@ -423,10 +446,10 @@
 	"if/else_if statement": {
 		"prefix": "if",
 		"body": [
-			"if ($1) then",
-			"  $2",
-			"else_if ($3) then",
-			"  $4",
+			"if (${1:expression}) then",
+			"  ${2:statement}",
+			"else_if (${3:expression}) then",
+			"  ${4:statement}",
 			"."
 		],
 		"description": "if/else_if statement"
@@ -434,12 +457,12 @@
 	"if/else_if/else statement": {
 		"prefix": "if",
 		"body": [
-			"if ($1) then",
-			"  $2",
-			"else_if ($3) then",
-			"  $4",
-			"else ($5) then",
-			"  $6",
+			"if (${1:expression}) then",
+			"  ${2:statement}",
+			"else_if (${3:expression}) then",
+			"  ${4:statement}",
+			"else (${5:expression}) then",
+			"  ${6:statement}",
 			"."
 		],
 		"description": "if/else_if/else statement"
@@ -447,8 +470,8 @@
 	"ifnot statement": {
 		"prefix": "ifnot",
 		"body": [
-			"ifnot ($1) then",
-			"  $2",
+			"ifnot (${1:expression}) then",
+			"  ${2:statement}",
 			"."
 		],
 		"description": "ifnot statement"
@@ -457,7 +480,7 @@
 		"prefix": "ifnot",
 		"body": [
 			"ifnot (NC0:hidden | NC0:invisible) then",
-			"  $1",
+			"  ${1:statement}",
 			"."
 		],
 		"description": "ifnot NC0 visibility check"
@@ -466,7 +489,7 @@
 		"prefix": "ifnot",
 		"body": [
 			"ifnot (NP0:hidden | NP0:invisible | NP0:nonexist) then",
-			"  $1",
+			"  ${1:statement}",
 			"."
 		],
 		"description": "ifnot NP0 visibility check"
@@ -475,7 +498,7 @@
 		"prefix": "ifnot",
 		"body": [
 			"ifnot (NP0:hidden | NP0:invisible | NP0:nonexist | NC0:hidden | NC0:invisible) then",
-			"  $1",
+			"  ${1:statement}",
 			"."
 		],
 		"description": "ifnot NP0/NC0 visibility check"
@@ -483,8 +506,8 @@
 	"if statement": {
 		"prefix": "if",
 		"body": [
-			"if ($1) then",
-			"  $2",
+			"if (${1:expression}) then",
+			"  ${2:statement}",
 			"."
 		],
 		"description": "if statement"
@@ -492,85 +515,88 @@
 	"index": {
 		"prefix": "index",
 		"body": [
-			"index $1 for $2"
+			"index ${1:index} for ${2|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9|}"
 		],
 		"description": "index {value expression} for {node}\n\nFind player by character index."
 	},
 	"info": {
 		"prefix": "info",
 		"body": [
-			"info $1"
+			"info ${1|profile,table,varfield,script,verb|} $2"
 		],
 		"description": "info {type} {id#}\n\nGet information about a profile, table, profile, or script."
 	},
 	"infoitem": {
 		"prefix": "infoitem",
 		"body": [
-			"infoitem $1"
+			"infoitem ${1|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|}"
 		],
 		"description": "infoitem {NOx|NCx|NEx}\n\nPopulate a system table with all varfields and added vargroups for that node."
 	},
 	"injure": {
 		"prefix": "injure",
 		"body": [
-			"injure $1 area $2 by $3"
+			"injure ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|} area ${2|1,2,3,4,5,6,7,8,9,10,11,12,13,14|} by ${3|1,2,3,4|}"
 		],
 		"description": "injure {node} area {value expression} by {value expression}.\n\nInflict damage on specific area of player/creature."
 	},
 	"inphrase": {
 		"prefix": "inphrase",
 		"body": [
-			"inphrase $1 for $2"
+			"inphrase ${1|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9|}:gophrase for ${2|T0,T1,T2,T3,T4,T5,T6,T7,T8,T9|}"
 		],
 		"description": "inphrase {value expression} for {string variable}\n\nGet portal movement phrase."
 	},
 	"isinjured": {
 		"prefix": "isinjured",
 		"body": [
-			"isinjured $1 area $2 for $3"
+			"isinjured ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|} area ${2|1,2,3,4,5,6,7,8,9,10,11,12,13,14|} for ${3|A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,V0,V1,V2,V3,V4,V5,V6,V7,V8,V9,B0,B1,B2,B3,B4,B5,B6,B7,B8,B9|}"
 		],
 		"description": "isinjured {node} area {value expression} for {value variable}\n\nCheck injury on specific area of creature."
 	},
 	"isnamefree": {
 		"prefix": "isnamefree",
 		"body": [
-			"isnamefree $1"
+			"isnamefree ${1:name}"
 		],
 		"description": "isnamefree {string}\n\nChecks to see if a given name is already in use."
 	},
 	"kill": {
 		"prefix": "kill",
 		"body": [
-			"kill $1"
+			"kill ${1|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|}"
 		],
 		"description": "kill {node}\n\nDelete an existence."
 	},
 	"killallnp": {
 		"prefix": "killallnp",
 		"body": [
-			"killallnp"
+			"killallnp ${1|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|}"
 		],
 		"description": "kilallnp {node}\n\nDelete an existence and all other existences attached to it."
 	},
 	"loadchardata": {
 		"prefix": "loadchardata",
 		"body": [
-			"loadchardata $1 for $2 to $3"
+			"loadchardata ${1|locker,arrest,cmgr,quest,general,home,mmgr,caravan,wares,cbss,linked|} for {2:index} to ${3|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9|}"
 		],
 		"description": "loadchardata {tagfile} for {character-index} to {target-container}\n\nOpen a tagfile."
 	},
 	"log": {
 		"prefix": "log",
 		"body": [
-			"log $1 $2"
+			"log start \"${1:code}\"",
+			"log ${2|target_index,target_name,target_account,target_uid,target_other|} ${3:target}",
+			"log text \"${4:text}\"",
+			"log submit \"system\""
 		],
 		"description": "log {option} {data}\n\nBuild and submit log entry."
 	},
 	"loop": {
 		"prefix": "loop",
 		"body": [
-			"loop ($1)",
-			"  $2",
+			"loop (${1:expression})",
+			"  ${2:statement}",
 			"."
 		],
 		"description": "loop"
@@ -578,14 +604,14 @@
 	"lookroom": {
 		"prefix": "lookroom",
 		"body": [
-			"lookroom $1 for $2"
+			"lookroom ${1|NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|} for ${2|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9|}"
 		],
 		"description": "lookroom {node} for {value expression}\n\nOutputs a room description."
 	},
 	"lowercase": {
 		"prefix": "lowercase",
 		"body": [
-			"lowercase $1"
+			"lowercase ${1|S0,S1,S2,S3,S4,S5,S6,S7,S8,S9,T0,T1,T2,T3,T4,T5,T6,T7,T8,T9|}"
 		],
 		"description": "lowercase {string variable}\n\nLowercase characters in string."
 	},
@@ -593,9 +619,9 @@
 		"prefix": "mm",
 		"body": [
 			"!*********************************************************************************************************************",
-			": \"$1\"",
+			": \"$${1:matchmarker}\"",
 			"!*********************************************************************************************************************",
-			"  $2",
+			"  ${2:statement}",
 			"."
 		],
 		"description": "new matchmarker"
@@ -603,147 +629,140 @@
 	"matchspell": {
 		"prefix": "matchspell",
 		"body": [
-			"matchspell $1 spell $2"
+			"matchspell ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9|} spell \"${2:spell}\""
 		],
 		"description": "matchspell {node variable} spell {string expression}\n\nMatch spell mnemonic."
 	},
 	"move": {
 		"prefix": "move",
 		"body": [
-			"move $1 $2 $3"
+			"move ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|} ${2|ground,inventory,in,on,behind,under|} ${3|NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9,NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|}"
 		],
 		"description": "move {node} {value expression} {node}\n\nMove a node to another node."
 	},
 	"msg": {
 		"prefix": "msg",
 		"body": [
-			"msg $1 \"$2\""
+			"msg ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|} \"${2:text}\""
 		],
 		"description": "msg {node} {string expression}\n\nMessage to Node (player/room)."
 	},
 	"msgfsys": {
 		"prefix": "msgfsys",
 		"body": [
-			"msgfsys $1 \"$2\""
+			"msgfsys ${1|logon,logoff,disconnect,death,profession,inactivity,monsterbold|} \"${2:text}\""
 		],
 		"description": "msgfsys {flag} {string expression}\n\nMessage to all players with flag set."
 	},
 	"msggm": {
 		"prefix": "msggm",
 		"body": [
-			"msggm \"$1\""
+			"msggm \"${1:text}\""
 		],
 		"description": "msggm {string expression}\n\nSend message over GM channel."
 	},
 	"msgp": {
 		"prefix": "msgp",
 		"body": [
-			"msgp \"$1\""
+			"msgp \"${1:text}\""
 		],
 		"description": "msgp {string expression}\n\nMessage to Player."
 	},
 	"msgr": {
 		"prefix": "msgr",
 		"body": [
-			"msgr \"$1\""
+			"msgr \"${1:text}\""
 		],
 		"description": "msgr {string expression}\n\nMessage to Room."
 	},
 	"msgrgm": {
 		"prefix": "msgrgm",
 		"body": [
-			"msgrgm $1 mode $2 \"$3\""
+			"msgrgm ${1|NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|} mode ${2|debugging,tongues,signal,whisper,sneaking,info,experience,combat,creature,infrastructure,magic,crafting,guild,-1|} \"${3:text}\""
 		],
 		"description": "msgrgm {node} mode {value}{string expression}\n\nMessage to GMs in room."
 	},
 	"msgrx2": {
 		"prefix": "msgrx2",
 		"body": [
-			"msgrx2 \"$1\""
+			"msgrx2 \"${1:text}\""
 		],
 		"description": "msgrx2 {string expression}\n\nMessage Room except NP0 and NP1 players."
 	},
 	"msgrxp": {
 		"prefix": "msgrxp",
 		"body": [
-			"msgrxp \"$1\""
+			"msgrxp \"${1:text}\""
 		],
 		"description": "msgrxp {string expression}\n\nMessage to Room except NP0 Player."
 	},
 	"msgs": {
 		"prefix": "msgs",
 		"body": [
-			"msgs $1 \"$2\""
+			"msgs ${1:segment} \"${2:text}\""
 		],
 		"description": "msgs {value} {string expression}\n\nMessage to all players in segment."
 	},
 	"msgsgm": {
 		"prefix": "msgsgm",
 		"body": [
-			"msgsgm $1 \"$2\""
+			"msgsgm ${1:segment} \"${2:text}\""
 		],
 		"description": "msgsgm {value} {string expression}\n\nMessage to GMs in segment."
 	},
 	"msgsys": {
 		"prefix": "msgsys",
 		"body": [
-			"msgsys \"$1\""
+			"msgsys \"${1:text}\""
 		],
 		"description": "msgsys {string expression}\n\nMessage to System."
 	},
 	"msgw": {
 		"prefix": "msgw",
 		"body": [
-			"msgw $1 $2 \"$3\""
+			"msgw ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|} \"${2|thoughts,familiar,voln,death,logons,gmchat,gmevent,hostmsg,guide,debug|}\" \"${3:text}\""
 		],
 		"description": "msgw {player or room node} {window id} {string expression}\n\nMessage to specified room window."
 	},
 	"nexteffect": {
 		"prefix": "nexteffect",
 		"body": [
-			"nexteffect $1 $2 for $3"
+			"nexteffect ${1:#} ${2|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|} for ${3|A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,V0,V1,V2,V3,V4,V5,V6,V7,V8,V9,B0,B1,B2,B3,B4,B5,B6,B7,B8,B9|}"
 		],
 		"description": "nexteffect {effcode} {node} for {pointer}\n\nLoop through effects."
-	},
-	"nextnode": {
-		"prefix": "nextnode",
-		"body": [
-			"nextnode $1 $2 for $3"
-		],
-		"description": "nextnode {value expression} {node} for {node}\n\nIterate over nodes by criteria."
 	},
 	"openlocker": {
 		"prefix": "openlocker",
 		"body": [
-			"openlocker $1 using $2"
+			"openlocker ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9|} using ${2|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9|}"
 		],
 		"description": "openlocker {node} using {node}\n\nOpen a player's locker."
 	},
 	"outphrase": {
 		"prefix": "outphrase",
 		"body": [
-			"outphrase $1 for $2"
+			"outphrase ${1|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9|}:gophrase for ${2|T0,T1,T2,T3,T4,T5,T6,T7,T8,T9|}"
 		],
 		"description": "outphrase {value} for {variable}\n\nGet portal movement phrase."
 	},
 	"parse": {
 		"prefix": "parse",
 		"body": [
-			"parse $1"
+			"parse ${1|0,1,2,3,4,5,6,7,10,11,12,13,22,23,24,32,33,34|}"
 		],
 		"description": "parse {value expression}\n\nReparse user command."
 	},
 	"pauseeffects": {
 		"prefix": "pauseeffects",
 		"body": [
-			"pauseeffects $1"
+			"pauseeffects ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|}"
 		],
 		"description": "pauseeffects {node}\n\nPause effects associated with a node."
 	},
 	"pid": {
 		"prefix": "pid",
 		"body": [
-			"pid $1"
+			"pid ${1|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|}"
 		],
 		"description": "pid {node}\n\nGenerate a PID number for specified node."
 	},
@@ -757,9 +776,18 @@
 	"prempt": {
 		"prefix": "prempt",
 		"body": [
-			"prempt NP$1 \"$2\""
+			"prempt ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9|} \"${2:text}\""
 		],
 		"description": "prempt {NPx} {string expression}\n\nSend a string via the preemptive message stack, used for Storm Front XML."
+	},
+	"push/pop": {
+		"prefix": "push",
+		"body": [
+			"push",
+			"  ${1:statement}",
+			"pop"
+		],
+		"description": "push and pop template\n\nPush variables onto stack."
 	},
 	"push": {
 		"prefix": "push",
@@ -771,70 +799,70 @@
 	"random": {
 		"prefix": "random",
 		"body": [
-			"random $1 to $2 for $3"
+			"random ${1:#} to ${2:#} for ${3|A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,V0,V1,V2,V3,V4,V5,V6,V7,V8,V9,B0,B1,B2,B3,B4,B5,B6,B7,B8,B9|}"
 		],
 		"description": "random {value expression} to {value expression} for {value variable}\n\nReturn random number."
 	},
 	"rem2effect": {
 		"prefix": "rem2effect",
 		"body": [
-			"rem2effect code $1 value2 $2 from $3"
+			"rem2effect code ${1:#} value2 ${2:#} from ${3|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|}"
 		],
 		"description": "rem2effect code {value expression} value2 {value expression} from {node}\n\nRemove an effect from a node with no script execution."
 	},
 	"remeffect": {
 		"prefix": "remeffect",
 		"body": [
-			"remeffect code $1 from $2"
+			"remeffect code ${1:#} from ${2|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|}"
 		],
 		"description": "remeffect code {value expression} from {node}\n\nRemove an effect from a node with no script execution."
 	},
 	"remmenuitem": {
 		"prefix": "removemenuitem",
 		"body": [
-			"removemenuitem \"$1\""
+			"removemenuitem \"${1:text}\""
 		],
 		"description": "removemenuitem {string}\n\nRemoves menu options from the menu structure."
 	},
 	"remneffect": {
 		"prefix": "remneffect",
 		"body": [
-			"remneffect $1"
+			"remneffect ${1|A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,V0,V1,V2,V3,V4,V5,V6,V7,V8,V9,B0,B1,B2,B3,B4,B5,B6,B7,B8,B9|}"
 		],
 		"description": "remneffect {variable}\n\nRemove next effect."
 	},
 	"removevarfield": {
 		"prefix": "removevarfield",
 		"body": [
-			"removevarfield \"$1\" from $2"
+			"removevarfield \"${1:field}\" from ${2|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|}"
 		],
 		"description": "removevarfield {field} from {node}\n\nRemove a variable field."
 	},
 	"removevargroup": {
 		"prefix": "removevargroup",
 		"body": [
-			"removevargroup \"$1\" from $2"
+			"removevargroup \"${1:group}\" from ${2|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|}"
 		],
 		"description": "removevargroup {group} from {node}\n\nRemove all variable fields in a group."
 	},
 	"resizetable": {
 		"prefix": "resizetable",
 		"body": [
-			"resizetable $1 x $2 y $3 z $4"
+			"resizetable ${1:table} x ${2:#} y ${3:#} z ${4:#}"
 		],
 		"description": "resizetable {value expression} x {value expression} y {value expression} z {value expression}\n\nModify the size of a table."
 	},
 	"resumeeffects": {
 		"prefix": "resumeeffects",
 		"body": [
-			"resumeeffects $1"
+			"resumeeffects ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|}"
 		],
 		"description": "resumeeffects {node}\n\nResume effects processing for the node."
 	},
 	"rmcall": {
 		"prefix": "rmcall",
 		"body": [
-			"rmcall $1 call $2 callback $3 donematch $4"
+			"rmcall \"${1|GS40_home_address,GS4D0_home_address,GS4X0_home_address,GSF0_home_address,GST0_home_address,DR0_home_address,DRX0_home_address,DRD0_home_address,BillingRequest,EventRequest,LogRequest|}\" call ${2:script} callback ${3:script} donematch \"$4\""
 		],
 		"description": "rmcall {entity} call {procedure} callback {script} donematch {match}\n\nCall a remote procedure."
 	},
@@ -862,28 +890,28 @@
 	"rootexistof": {
 		"prefix": "rootexistof",
 		"body": [
-			"rootexistof $1 for $2"
+			"rootexistof ${1|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9|} for ${2|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|}"
 		],
 		"description": "rootexistof {object} for {root}\n\nFind the root node that an object is attached to."
 	},
 	"roundtime": {
 		"prefix": "roundtime",
 		"body": [
-			"roundtime NP$1 $2"
+			"roundtime ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9|} ${2:#}"
 		],
 		"description": "roundtime {node} {value expression}\n\nApply roundtime to a player."
 	},
 	"scan": {
 		"prefix": "scan",
 		"body": [
-			"scan $1 match $2 for $3"
+			"scan ${1:text} match ${2:text} for ${3|A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,V0,V1,V2,V3,V4,V5,V6,V7,V8,V9,B0,B1,B2,B3,B4,B5,B6,B7,B8,B9|}"
 		],
 		"description": "scan {string expression} match {string expression} for {value variable}\n\nScan string for specific match."
 	},
 	"scaneffect": {
 		"prefix": "scaneffect",
 		"body": [
-			"scaneffect $1 code $2 value2 $3"
+			"scaneffect ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|} code ${2:#} value2 ${3:#}"
 		],
 		"description": "scaneffect {node} code {value expression} value2 {value expression}\n\nCheck for the existence of a specific effect on a node."
 	},
@@ -892,13 +920,13 @@
 		"body": [
 			"!*********************************************************************************************************************",
 			"!",
-			"! s$1",
+			"! s${1:#}",
 			"! Description",
 			"!",
-			"! Keywords: $2",
+			"! Keywords: ${2:text}",
 			"!",
 			"! Modification History:",
-			"! $3/$4/$5 - $6 - Initial script creation/code.",
+			"! ${3:#}/${4:#}/${5:#} - ${6:text} - Initial script creation/code.",
 			"!",
 			"!*********************************************************************************************************************",
 			"!"
@@ -908,14 +936,14 @@
 	"set": {
 		"prefix": "set",
 		"body": [
-			"set $1 to $2"
+			"set ${1|A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,V0,V1,V2,V3,V4,V5,V6,V7,V8,V9,B0,B1,B2,B3,B4,B5,B6,B7,B8,B9,S0,S1,S2,S3,S4,S5,S6,S7,S8,S9,T0,T1,T2,T3,T4,T5,T6,T7,T8,T9|} to ${2:expression}"
 		],
 		"description": "set {variable} to {expression}\n\nSet a variable to a value."
 	},
 	"sparse": {
 		"prefix": "sparse",
 		"body": [
-			"sparse S$1"
+			"sparse ${1|0,1,2,3,4,5,6,7,10,11,12,13,22,23,24,32,33,34|}"
 		],
 		"description": "sparse {value expression}\n\nParse a string made with S-variables."
 	},
@@ -929,110 +957,110 @@
 	"storechardata": {
 		"prefix": "storechardata",
 		"body": [
-			"storechardata $1 for $2 from $3"
+			"storechardata ${1|locker,arrest,cmgr,quest,general,home,mmgr,caravan,wares,cbss,linked|} for ${2:index} from ${3|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9|}"
 		],
 		"description": "storechardata {tagfile} for {character-index} from {source-container}\n\nSave a tagfile."
 	},
 	"stov": {
 		"prefix": "stov",
 		"body": [
-			"stov $1 for $2"
+			"stov ${1|S0,S1,S2,S3,S4,S5,S6,S7,S8,S9,T0,T1,T2,T3,T4,T5,T6,T7,T8,T9|} for ${4|A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,V0,V1,V2,V3,V4,V5,V6,V7,V8,V9,B0,B1,B2,B3,B4,B5,B6,B7,B8,B9|}"
 		],
 		"description": "stov {string expression} for {value variable}\n\nConvert string to value."
 	},
 	"substring": {
 		"prefix": "substring",
 		"body": [
-			"substring $1 from $2 to $3 for $4"
+			"substring ${1:text} from ${2:#} to ${3:#} for ${1|S0,S1,S2,S3,S4,S5,S6,S7,S8,S9,T0,T1,T2,T3,T4,T5,T6,T7,T8,T9|}"
 		],
 		"description": "substring {string expression} from {value expression} to {value expression} for {string variable}\n\nExtracts a string from string."
 	},
 	"tableinfo": {
 		"prefix": "tableinfo",
 		"body": [
-			"tableinfo $1"
+			"tableinfo ${1:#}"
 		],
 		"description": "tableinfo (value expression}\n\nGet header info about a table."
 	},
 	"test_assert": {
 		"prefix": "test_assert",
 		"body": [
-			"test_assert $1 or_yell \"$2\" to $3"
+			"test_assert ${1:expression} or_yell \"${2:text}\" to ${3|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|}"
 		],
 		"description": "test_assert {condition} or_yellL {message} to {room or player node}\n\nA GSL variable dump with stack tracing."
 	},
 	"test2effect": {
 		"prefix": "test2effect",
 		"body": [
-			"test2effect $1 code $2 value2 $3"
+			"test2effect ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|} code ${2:#} value2 ${3:#}"
 		],
 		"description": "test2effect {node} code {value expression} value2 {value expression}\n\nTest for an effect."
 	},
 	"testeffect": {
 		"prefix": "testeffect",
 		"body": [
-			"testeffect $1 code $2"
+			"testeffect ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|} code ${2:#}"
 		],
 		"description": "testeffect {node} code {value expression}\n\nTest for an effect."
 	},
 	"tparse": {
 		"prefix": "tparse",
 		"body": [
-			"tparse T$1"
+			"tparse \"${1:text}\" ${2|0,1,2,3,4,5,6,7,10,11,12,13,22,23,24,32,33,34|}"
 		],
 		"description": "tparse {text expression} {parse code}\n\nParse a string composed of T-variables."
 	},
 	"underoff": {
 		"prefix": "underoff",
 		"body": [
-			"underoff $1"
+			"underoff ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|}"
 		],
 		"description": "underoff\n\nStop underlining text."
 	},
 	"underon": {
 		"prefix": "underon",
 		"body": [
-			"underon $1"
+			"underon ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|}"
 		],
 		"description": "underon\n\nStart underlining text."
 	},
 	"unload": {
 		"prefix": "unload",
 		"body": [
-			"unload $1"
+			"unload ${1:segment}"
 		],
 		"description": "unload {value expression}\n\nTouch a segment."
 	},
 	"updatetable": {
 		"prefix": "updatetable",
 		"body": [
-			"updatetable $1"
+			"updatetable ${1:#}"
 		],
 		"description": "updatetable {value expression}\n\nUpdate disk copy of a table."
 	},
 	"vtos": {
 		"prefix": "vtos",
 		"body": [
-			"vtos $1 for $2"
+			"vtos ${1|A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,V0,V1,V2,V3,V4,V5,V6,V7,V8,V9,B0,B1,B2,B3,B4,B5,B6,B7,B8,B9|} for ${2|S0,S1,S2,S3,S4,S5,S6,S7,S8,S9,T0,T1,T2,T3,T4,T5,T6,T7,T8,T9|}"
 		],
 		"description": "vtos {value expression} for {string variable}\n\nConvert value to string."
 	},
 	"watch": {
 		"prefix": "watch",
 		"body": [
-			"watch room $1 for $2"
+			"watch room ${1:#} for ${2|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9|}"
 		],
 		"description": "watch room {node} for {node}\n\nSet watchroom value."
 	},
 	"when statement": {
 		"prefix": "when",
 		"body": [
-			"when $1",
-			"  is $2",
-			"    $3",
+			"when ${1:expression}",
+			"  is ${2:expression}",
+			"    ${3:statement}",
 			"  .",
 			"  default",
-			"    $4",
+			"    ${4:statement}",
 			"  .",
 			"."
 		],
@@ -1041,22 +1069,29 @@
 	"where": {
 		"prefix": "where",
 		"body": [
-			"where $1 for $2"
+			"where ${1|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|} for ${2|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|}"
 		],
 		"description": "where {node} for {node variable}\n\nFind the location of a node."
 	},
 	"whereat": {
 		"prefix": "whereat",
 		"body": [
-			"whereat $1 for $2"
+			"whereat ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|} for ${2|A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,V0,V1,V2,V3,V4,V5,V6,V7,V8,V9,B0,B1,B2,B3,B4,B5,B6,B7,B8,B9|}"
 		],
 		"description": "whereat {node} for {node variable}\n\nDetermine exact location of node."
 	},
 	"whereitem": {
 		"prefix": "whereitem",
 		"body": [
-			"whereitem $1 for $2"
+			"whereitem ${1|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|} for ${2|S0,S1,S2,S3,S4,S5,S6,S7,S8,S9,T0,T1,T2,T3,T4,T5,T6,T7,T8,T9|}"
 		],
 		"description": "whereitem {node} for {node variable}\n\nFind the type of a node's location."
+	},
+	"writechar": {
+		"prefix": "writechar",
+		"body": [
+			"writechar ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9|}"
+		],
+		"description": "writechar {node}\n\nForces the character file of the specified player node to be written to disk immediately."
 	}
 }

@@ -2,14 +2,14 @@
     "name": "gsl",
     "displayName": "GSL",
     "description": "GSL Editor",
-    "version": "0.0.33",
+    "version": "1.0.0",
     "publisher": "patricktrant",
     "author": {
         "name": "Patrick Trant",
         "email": "estild@gmail.com"
     },
     "engines": {
-        "vscode": "^1.14.0"
+        "vscode": "^1.15.0"
     },
     "categories": [
         "Languages"
@@ -167,6 +167,18 @@
             {
                 "language": "gsl",
                 "path": "./snippets/gsl.json"
+            }
+        ],
+        "themes": [
+            {
+                "label": "GSL Dark",
+                "uiTheme": "vs-dark",
+                "path": "./themes/gsl_dark.json"
+            },
+            {
+                "label": "GSL Light",
+                "uiTheme": "vs",
+                "path": "./themes/gsl_light.json"
             }
         ],
         "views": {

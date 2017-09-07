@@ -1,101 +1,468 @@
 {
 	"name": "GSL",
 	"patterns": [
-		{
-			"include": "#keywords"
-		},
-		{
-			"include": "#strings"
-		},
-		{
-			"include": "#numbers"
-		},
-		{
-			"include": "#comments"
-		},
-		{
-			"include": "#variables"
-		},
-		{
-			"include": "#nodes"
-		}
+		{ "include": "#all" },
+		{ "include": "#matchmarker" }
 	],
 	"repository": {
+		"all": {
+			"patterns": [
+				{ "include": "#statements" },
+				{ "include": "#keywords" },
+				{ "include": "#strings" },
+				{ "include": "#numbers" },
+				{ "include": "#comments" },
+				{ "include": "#variables" },
+				{ "include": "#punctuation" }
+			]
+		},
+		"matchmarker": {
+			"patterns": [
+				{
+					"name": "matchmarker.gsl",
+					"begin": "^:\\s+\"(.*?)\"\\s*\\!?\\s*$",
+					"end": "^\\.\\s*\\!?\\s*$",
+					"patterns": [
+						{ "include": "#all" }
+					],
+					"contentName": "source.gsl"
+				}
+			]
+		},
+		"statements": {
+			"patterns": [
+				{
+					"name": "statement.gsl.set",
+					"begin": "\\b(?i)(set)\\b",
+					"beginCaptures": { "1": { "name": "keyword.gsl.assignment" } },
+					"end": "$",
+					"patterns": [
+						{
+							"name": "keyword.gsl.assignment.param",
+							"match": "\\b(?i)(to)\\b"
+						},
+						{ "include": "#expression" }
+					]
+				},
+				{
+					"name": "statement.gsl.clear",
+					"begin": "\\b(?i)(clear)\\b",
+					"beginCaptures": { "1": { "name": "keyword.gsl.assignment" } },
+					"end": "$",
+					"patterns": [
+						{ "include": "#variables" },
+						{ "include": "#comments" }
+					]
+				},
+				{
+					"name": "statement.gsl.messaging",
+					"begin": "\\b(?i)(msg|msgp|msgr|msgrxp|msgrx2)\\b",
+					"end": "$",
+					"beginCaptures": {
+						"1": { "name": "keyword.gsl.messaging" }
+					},
+					"patterns": [
+						{ "include": "#strings" },
+						{ "include": "#comments" }
+					]
+				},
+				{
+					"name": "statement.gsl.messaging.special",
+					"begin": "\\b(?i)(msgrgm|msggm)\\b",
+					"end": "$",
+					"beginCaptures": {
+						"1": { "name": "keyword.gsl.messaging.special" }
+					},
+					"patterns": [
+						{
+							"name": "keyword.gsl.messaging.special",
+							"match": "\\b(?i)(?:mode)\\b"
+						},
+						{ "include": "#node_vars" },
+						{ "include": "#numbers" },
+						{ "include": "#strings" },
+						{ "include": "#comments" }
+					]
+				},
+				{
+					"name": "statement.gsl.callmatch",
+					"match": "(?i:(callmatch)\\s+(must_match|may_match|check)\\s+(\"[\\S+]*?\")\\s+(in))",
+					"captures": {
+						"1": { "name": "keyword.gsl.callmatch" },
+						"2": { "name": "keyword.gsl.callmatch.param" },
+						"3": { "name": "matchmarker.gsl" },
+						"4": { "name": "keyword.gsl.callmatch.param" }
+					}
+				},
+				{
+					"name": "statement.gsl.gathering",
+					"begin": "\\b(?i)(gather)\\b",
+					"beginCaptures": { "1": { "name": "keyword.gsl.gathering" } },
+					"end": "$",
+					"patterns": [
+						{
+							"name": "keyword.gsl.gathering.param",
+							"match": "\\b(?i)(?:(?:first|next)(?:obj|player|watch|blood)|allplayers|nextroom|for|sametype|(?:non)?exist|all)\\b"
+						},
+						{ "include": "#node_vars" }
+					]
+				},
+				{
+					"name": "statement.gsl.addeffect",
+					"begin": "\\b(?i)(addeffect)\\b",
+					"beginCaptures": { "1": { "name": "keyword.gsl.effects" } },
+					"end": "$",
+					"patterns": [
+						{
+							"name": "keyword.gsl.param.effects",
+							"match": "\\b(?i:code|value1|value2|flags|with|in|script)\\b"
+						},
+						{ "include": "#expression" }
+					]
+				},
+				{
+					"name": "statement.gsl.effects",
+					"begin": "\\b(?i)((?:test|rem)2?(?:effect))\\b",
+					"beginCaptures": { "1": { "name": "keyword.gsl.effects" } },
+					"end": "$",
+					"patterns": [
+						{
+							"name": "keyword.gsl.param.effects",
+							"match": "\\b(?i)(code|value2|from)\\b"
+						},
+						{ "include": "#expression" }
+					]
+				},
+				{
+					"name": "statement.gsl.conditional",
+					"begin": "\\b(?i)(if|ifnot|else_if|else_ifnot)\\b",
+					"beginCaptures": { "1": { "name": "keyword.gsl.control" } },
+					"end": "\\b(?i)(then)\\b",
+					"endCaptures": { "1": { "name": "keyword.gsl.control.param" } },
+					"patterns": [
+						{ "include": "#expression" }
+					]
+				},
+				{
+					"name": "statement.gsl.assert",
+					"begin": "\\b(?i)(assert)\\b",
+					"beginCaptures": { "1": { "name": "keyword.gsl.assert" } },
+					"end": "$",
+					"patterns": [
+						{
+							"name": "keyword.gsl.assert.param",
+							"match": "\\b(?i)(or_yell)\\b"
+						},
+						{ "include": "#expression" }
+					]
+				},
+				{
+					"name": "statement.gsl.logging",
+					"begin": "\\b(?i)(log)\\b",
+					"beginCaptures": { "1": { "name": "keyword.gsl.logging" } },
+					"end": "$",
+					"patterns": [
+						{
+							"name": "keyword.gsl.logging.param",
+							"match": "\\b(?i)(?:start|submit|text|target_(?:index|name|account|uid|other))\\b"
+						},
+						{ "include": "#expression" }
+					]
+				},
+				{
+					"example": "removevarfield monitor_msggm from NP0",
+					"name": "statement.gsl.removevarfield",
+					"begin": "\\b(?i)(removevarfield)\\s+([A-Za-z0-9_]+)\\b",
+					"beginCaptures": {
+						"1": { "name": "keyword.gsl.dangerous" },
+						"2": { "name": "variable.gsl.field" }
+					},
+					"end": "$",
+					"patterns": [
+						{
+							"name": "keyword.gsl.dangerous.param",
+							"match": "\\b(?i)(?:from)\\b"
+						},
+						{
+							"include": "#node_vars"
+						}
+					]
+
+				}
+			]
+		},
+		"expression": {
+			"patterns": [
+				{
+					"include": "#comments"
+				},
+				{
+					"include": "#variables"
+				},
+				{
+					"include": "#literals"
+				},
+				{
+					"begin": "\\(",
+					"end": "\\)",
+					"patterns": [
+						{
+							"include": "#literals"
+						},
+						{
+							"include": "#variables"
+						},
+						{
+							"include": "#punctuation"
+						}
+					]
+				}
+			]
+		},
+		"literals": {
+			"patterns": [
+				{
+					"include": "#strings"
+				},
+				{
+					"include": "#numbers"
+				},
+				{
+					"name": "variable.gsl.field.literal",
+					"match": "(\\^[A-Za-z0-9_]+)"
+				}
+			]
+		},
 		"keywords": {
 			"patterns": [
 				{
-					"name": "keyword.control.gsl",
-					"match": "\\b(?i:if|ifnot|else_if|else_ifnot|else|when|while)\\b"
+					"name": "keyword.gsl.stop",
+					"match": "\\b(?i:stop)\\b"
 				},
 				{
-					"name": "keyword.operator.gsl",
-					"match": "!="
+					"name": "keyword.gsl.effects",
+					"match": "\\b(?i:checkeffect|nexteffect|scaneffect)\\b"
 				},
 				{
-					"name": "keyword.gsl",
-					"match": "\\$(?i:x)\\d(?i:f|g|h|i)"
+					"name": "keyword.gsl.msg.gm",
+					"match": "\\b(?i:msggm|msgrgm|mode)\\b"
 				},
 				{
-					"name": "keyword.gsl",
-					"match": "\\$(?i:p)\\d(?i:a|b|f|g|h|i|l|m|p|r|s|u)"
+					"name": "keyword.gsl.stack",
+					"match": "\\b(?i:fastpush|fastpop|push|pop)\\b"
 				},
 				{
-					"name": "keyword.gsl",
-					"match": "\\$(?i:a|b|d|v|l|s|k|t|p|x)\\d"
+					"name": "keyword.gsl.formatting",
+					"match": "\\b(?i:boldon|boldoff)\\b"
 				},
 				{
-					"name": "keyword.gsl",
-					"match": "\\$(?i:q|r|ze)"
+					"name": "keyword.gsl.string",
+					"match": "\\b(?i:lowercase|expand|stov|vtos|scan|substring|match|from|to)\\b"
 				},
 				{
-					"name": "keyword.gsl",
-					"match": "\\$(?i:c)\\d(?i:a|j|n|d|s|t|u|m)"
+					"name": "keyword.gsl.gather",
+					"match": "\\b(?i:gather|firstobj|nextobj|firstplayer|nextplayer|firstroom|nextroom|sametype|all|for)\\b"
 				},
 				{
-					"name": "keyword.gsl",
-					"match": "\\$(?i:o)\\d(?i:a|j|n|d|s|c|t|m)"
+					"name": "keyword.gsl.attachment",
+					"match": "\\b(?i:move|ground|inventory|in|on|under|behind|where|whereat|rootexistof)\\b"
 				},
 				{
-					"name": "keyword.gsl",
-					"match": "\\$(?i:e)\\d(?i:a|j|n|d|s|t|m)"
+					"name": "keyword.gsl.info",
+					"match": "\\b(?i:index|info|getnameof|table|profile|script)\\b"
 				},
 				{
-					"name": "keyword.gsl",
-					"match": "\\$(\\$|\\\\|\\^|'|\\*|\\+)"
+					"name": "keyword.gsl.table",
+					"match": "\\b(?i:createtable|resizetable|updatetable|deletetable|cleartable|type|size|x|y|z)\\b"
 				},
 				{
-					"name": "keyword.gsl",
-					"match": "\\$(?i:break|callback|calledby|descmode|donematch|error|match|maxtextchanges|maxuobjs|stime|time|systime|thisscript|users|inttable|strtable)"
+					"name": "keyword.gsl.player",
+					"match": "\\b(?i:glue)\\b"
+				},
+				{
+					"name": "keyword.gsl.existences",
+					"match": "\\b(?i:create|addgroup)\\b"
+				},
+				{
+					"name": "keyword.gsl.parsing",
+					"match": "\\b(?i:(s|t)?parse)\\b"
+				},
+				{
+					"name": "keyword.gsl.system",
+					"match": "\\b(?i:roundtime|hash1|hash2|storechardata|loadchardata|locker)\\b"
+				},
+				{
+					"name": "keyword.gsl.control",
+					"match": "\\b(?i:else|when|while|loop|is|default)\\b"
+				},
+				{
+					"name": "keyword.gsl.bugreport",
+					"match": "\\b(?i:bugreport|message)\\b"
+				},
+				{
+					"name": "keyword.gsl.dangerous",
+					"match": "\\b(?i:kill|killallnp|removevargroup|removevarfield)\\b"
+				}
+			]
+		},
+		"tokens": {
+			"patterns": [
+				{
+					"name": "token.gsl.entity",
+					"match": "\\$X\\d[FGHI]?"
+				},
+				{
+					"name": "token.gsl.player",
+					"match": "\\$P\\d(?:[ABFGHILMPRSU]|(?::[-A-Za-z0-9_]+)?)?"
+				},
+				{
+					"name": "token.gsl.creature",
+					"match": "\\$C\\d(?:[AJNDSTUM]|(?::[-A-Za-z0-9_]{1,15})?)"
+				},
+				{
+					"name": "token.gsl.object",
+					"match": "\\$O\\d(?:[AJNDSCOTM]|(?::[-A-Za-z0-9_]{1,15})?)"
+				},
+				{
+					"name": "token.gsl.event",
+					"match": "\\$E\\d(?:[AJNDSTM]|(?::[-A-Za-z0-9_]+)?)"
+				},
+				{
+					"name": "token.gsl.room",
+					"match": "\\$r\\d(?::[-A-Za-z0-9_]+)?"
+				},
+				{
+					"name": "token.gsl.register",
+					"match": "\\$[ABVST]\\d"
+				},
+				{
+					"name": "token.gsl.formatting",
+					"match": "\\$[DLK]\\d"
+				},
+				{
+					"name": "token.gsl.table",
+					"match": "\\$:(\\d+|[ABV]\\d)\\[(\\d+|[ABV]\\d),(\\d+|[ABV]\\d),(\\d+|[ABV]\\d)\\]"
+				},
+				{
+					"name": "token.gsl.misc",
+					"match": "\\$(\\$|\\\\|\\^|\\*|\\+|'|Q|R|ZE)"
+				},
+				{
+					"name": "token.gsl.xml",
+					"begin": "\\$<",
+					"end": "\\$>",
+					"patterns": [
+						{
+							"name": "token.gsl.xml.attribute",
+							"match": "([A-Za-z]+)=((?'quote'(?:\"|'|\\$Q))(?:.*?)\\k'quote')",
+							"captures": {
+								"1": { "name": "token.gsl.xml.attribute.name" },
+								"2": { "name": "token.gsl.xml.attribute.value" }
+							}
+						}
+					]
+				}
+			]
+		},
+		"punctuation": {
+			"patterns": [
+				{
+					"name": "operator.gsl",
+					"match": "[+=<>!&|%]+"
+				},
+				{
+					"name": "operator.gsl",
+					"match": "(?:-(?!\\d))"
+				},
+				{
+					"name": "operator.gsl.special",
+					"match": "\\b(?i:isoftype|isnotoftype|isexactly|isnotexactly)\\b"
 				}
 			]
 		},
 		"strings": {
-			"name": "string.quoted.double.gsl",
-			"begin": "\"",
-			"end": "\"",
-			"patterns": [{"include": "#keywords"}]
+			"patterns": [
+				{
+					"name": "string.quoted.double.gsl",
+					"begin": "\"",
+					"end": "\"",
+					"patterns": [{ "include": "#tokens" }]
+				},
+				{
+					"include": "#string_vars"
+				}
+			]
+			
 		},
 		"numbers": {
-			"name": "constant.numeric.gsl",
-			"match": "\\b\\d+\\b",
-			"patterns": []
+			"patterns": [
+				{
+					"name": "constant.numeric.gsl",
+					"match": "(?:\\b-?\\d+\\b)",
+					"patterns": []
+				},
+				{
+					"include": "#number_vars"
+				}
+			]
 		},
 		"comments": {
 			"name": "comment.line.gsl",
 			"begin": "!",
 			"end": "$",
-			"patterns": []
+			"patterns": [
+				{
+					"name": "comment.gsl.scan.index",
+					"match": "123456789(0)",
+					"captures": { "1": { "name": "comment.gsl.scan.index.ten" } }
+				}
+			]
 		},
 		"variables": {
-			"name": "variable.gsl",
-			"match": "\\b(?i:a|b|s|t|v)\\d\\b",
-			"patterns": []
-		}
-		,
-		"nodes": {
-			"name": "entity.name.type.gsl",
-			"match": "\\b(?i:np|nc|nr|no|ne)\\d\\b",
-			"patterns": []
+			"patterns": [
+				{ "include": "#node_vars" },
+				{ "include": "#string_vars" },
+				{ "include": "#number_vars" },
+				{
+					"match": "\\b(?i)(table):",
+					"captures": { "1": { "name": "variable.gsl.table" } }
+				}
+			]
+		},
+		"node_vars": {
+			"patterns": [
+				{
+					"match": "\\b(?:((?i:np|nc|nr|no|ne)\\d)\\:?([-A-Za-z0-9_]+)?)\\b",
+					"captures": {
+						"1": { "name": "variable.gsl.node" },
+						"2": { "name": "variable.gsl.field" }
+					}
+				}
+			]
+		},
+		"string_vars": {
+			"patterns": [
+				{
+					"name": "variable.gsl.register.string",
+					"match": "\\b(?i)[ST]\\d\\b"
+				},
+				{
+					"name": "variable.gsl.system.string",
+					"match": "\\$(?i:GAMECODE|GAMENAME|SHORTNAME|TIMES)\\b"
+				}
+			]
+		},
+		"number_vars": {
+			"patterns": [
+				{
+					"name": "variable.gsl.register.number",
+					"match": "\\b(?i)[ABV]\\d\\b"
+				},
+				{
+					"name": "variable.gsl.system.number",
+					"match": "\\$(?i:ERROR|BREAK|THISSCRIPT|CALLEDBY|INTTABLE|STRTABLE|DESCMODE|LOADINGFROMSAVE|USERS|MAXUOBJS|MAXTEXTCHANGES|SYSTIME|TIME)\\b"
+				}
+			]
 		}
 	},
 	"scopeName": "source.gsl"
