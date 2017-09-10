@@ -20,8 +20,11 @@
 			"patterns": [
 				{
 					"name": "matchmarker.gsl",
-					"begin": "^:\\s+\"(.*?)\"\\s*\\!?\\s*$",
-					"end": "^\\.\\s*\\!?\\s*$",
+					"begin": "^:\\s+\"(.*?)\"",
+					"beginCaptures": {
+						"1": { "name": "matchmarker.gsl.name" }
+					},
+					"end": "^\\.",
 					"patterns": [
 						{ "include": "#all" }
 					],
@@ -34,7 +37,9 @@
 				{
 					"name": "statement.gsl.set",
 					"begin": "\\b(?i)(set)\\b",
-					"beginCaptures": { "1": { "name": "keyword.gsl.assignment" } },
+					"beginCaptures": {
+						"1": { "name": "keyword.gsl.assignment" }
+					},
 					"end": "$",
 					"patterns": [
 						{
@@ -47,7 +52,9 @@
 				{
 					"name": "statement.gsl.clear",
 					"begin": "\\b(?i)(clear)\\b",
-					"beginCaptures": { "1": { "name": "keyword.gsl.assignment" } },
+					"beginCaptures": {
+						"1": { "name": "keyword.gsl.assignment" }
+					},
 					"end": "$",
 					"patterns": [
 						{ "include": "#variables" },
@@ -86,11 +93,11 @@
 				},
 				{
 					"name": "statement.gsl.callmatch",
-					"match": "(?i:(callmatch)\\s+(must_match|may_match|check)\\s+(\"[\\S+]*?\")\\s+(in))",
+					"match": "(?i:(callmatch)\\s+(must_match|may_match|check)\\s+\"([\\S+]*?)\"\\s+(in))",
 					"captures": {
 						"1": { "name": "keyword.gsl.callmatch" },
 						"2": { "name": "keyword.gsl.callmatch.param" },
-						"3": { "name": "matchmarker.gsl" },
+						"3": { "name": "matchmarker.gsl.name" },
 						"4": { "name": "keyword.gsl.callmatch.param" }
 					}
 				},
@@ -110,7 +117,9 @@
 				{
 					"name": "statement.gsl.addeffect",
 					"begin": "\\b(?i)(addeffect)\\b",
-					"beginCaptures": { "1": { "name": "keyword.gsl.effects" } },
+					"beginCaptures": {
+						"1": { "name": "keyword.gsl.effects" }
+					},
 					"end": "$",
 					"patterns": [
 						{
@@ -123,7 +132,9 @@
 				{
 					"name": "statement.gsl.effects",
 					"begin": "\\b(?i)((?:test|rem)2?(?:effect))\\b",
-					"beginCaptures": { "1": { "name": "keyword.gsl.effects" } },
+					"beginCaptures": {
+						"1": { "name": "keyword.gsl.effects" }
+					},
 					"end": "$",
 					"patterns": [
 						{
@@ -146,7 +157,9 @@
 				{
 					"name": "statement.gsl.assert",
 					"begin": "\\b(?i)(assert)\\b",
-					"beginCaptures": { "1": { "name": "keyword.gsl.assert" } },
+					"beginCaptures": {
+						"1": { "name": "keyword.gsl.assert" }
+					},
 					"end": "$",
 					"patterns": [
 						{
@@ -159,7 +172,9 @@
 				{
 					"name": "statement.gsl.logging",
 					"begin": "\\b(?i)(log)\\b",
-					"beginCaptures": { "1": { "name": "keyword.gsl.logging" } },
+					"beginCaptures": {
+						"1": { "name": "keyword.gsl.logging" }
+					},
 					"end": "$",
 					"patterns": [
 						{
@@ -414,7 +429,9 @@
 				{
 					"name": "comment.gsl.scan.index",
 					"match": "123456789(0)",
-					"captures": { "1": { "name": "comment.gsl.scan.index.ten" } }
+					"captures": {
+						"1": { "name": "comment.gsl.scan.index.ten" }
+					}
 				}
 			]
 		},
@@ -425,7 +442,9 @@
 				{ "include": "#number_vars" },
 				{
 					"match": "\\b(?i)(table):",
-					"captures": { "1": { "name": "variable.gsl.table" } }
+					"captures": {
+						"1": { "name": "variable.gsl.table" }
+					}
 				}
 			]
 		},

@@ -123,6 +123,7 @@ function LogIntoGame() {
             });
             sgeClient.setEncoding('ascii');
             sgeClient.on('close', onConnSGEClose);
+            sgeClient.on('disconnect', onConnSGEClose);
             sgeClient.on('data', onConnSGEData);
             sgeClient.on('error', onConnError);
             sgeClient.setNoDelay(true);
@@ -407,7 +408,7 @@ function downloadScript(receivedMsg) {
             fs.mkdirSync(extPath); //Create directory
         }
         return __awaiter(this, void 0, void 0, function* () {
-            let fileName = extPath + '\\' + gslEditor.scriptNum;
+            let fileName = path.join(extPath, gslEditor.scriptNum) + '.gsl';
             if (fs.existsSync(fileName)) { //Check for existing file
                 fs.unlinkSync(fileName); //Already exists, delete it
             }
@@ -511,6 +512,7 @@ function onConnSGEData(data) {
         });
         gameClient.setEncoding('ascii');
         gameClient.on('close', onConnGameClose);
+        gameClient.on('disconnect', onConnGameClose);
         gameClient.on('data', onConnGameData);
         gameClient.on('error', onConnError);
         gameClient.setNoDelay(true);

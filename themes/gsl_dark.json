@@ -47,6 +47,12 @@
             "settings": {
                 "foreground": "#AE66CF"
             }
+        },
+        {
+            "scope": "matchmarker.gsl.name",
+            "settings": {
+                "fontStyle": "bold"
+            }
 		},
 		{
 			"scope": "string.quoted.double.gsl",

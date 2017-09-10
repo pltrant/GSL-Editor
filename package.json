@@ -2,7 +2,7 @@
     "name": "gsl",
     "displayName": "GSL",
     "description": "GSL Editor",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "publisher": "patricktrant",
     "author": {
         "name": "Patrick Trant",
@@ -104,7 +104,7 @@
                         "string"
                     ],
                     "default": "",
-                    "description": "Path to save downloaded scripts.  Use double slashes when specifying, e.g. C:\\\\GemStone\\\\Scripts"
+                    "description": "Path to save downloaded scripts.  Window users: use double slashes when specifying, e.g. C:\\\\GemStone\\\\Scripts"
                 }
             }
         },

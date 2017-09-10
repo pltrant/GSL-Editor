@@ -43,6 +43,12 @@
 			}
 		},
 		{
+            "scope": "matchmarker.gsl.name",
+            "settings": {
+                "fontStyle": "bold"
+            }
+		},
+		{
 			"scope": "string.quoted.double.gsl",
 			"settings": {
 				"foreground": "#a31515"

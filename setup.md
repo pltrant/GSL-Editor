@@ -25,8 +25,8 @@ Use the below instructions to setup and use the GSL Editor.
 ## Tips
 
 * Use the Matchmarkers view available in the Explorer panel (top icon in the left navigation menu or Ctrl+Shift+E).  It will list all matchmarkers found in a script and clicking on one of them will take you to that matchmarker.
-* If you're wanting to create an entirely new script file to work with, use the filename format of S##### (e.g. S18070 for script # 18070).  A .gsl extension is optional.  This is required to use the Upload functionality.
-* Use different color themes to customize the look of VSCode - a light background with dark text, a dark background with light text, etc.  File > Preferences > Color Theme (Ctrl+K Ctrl+T).
+* If you're wanting to create an entirely new script file to work with, you can name the file anything you want, but to avoid being prompted to enter the script number on Upload, specify 5 digits in the filename somewhere (e.g. "S18070", "S18070 - Test", "Magic 18070.gsl")
+* Use different color themes to customize the look of VSCode - a light background with dark text, a dark background with light text, etc.  GSL Editor comes with 2 prebuilt color themes - GSL Dark and GSL Light.  **The GSL Dark theme is strongly recommended.  To change your color theme, go to File > Preferences > Color Theme (or Ctrl+K Ctrl+T).**
 * Review the Interactive Playground from the "Quick links" section on the Welcome page (Help > Welcome) to learn useful functionality like multi-cursor editing, code folding, and line actions!  Also:
     * Indent any block of selected text with Tab.  Unindent with Shift+Tab.
     * Comment or uncomment any block of selected text with Ctrl+/.
