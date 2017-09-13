@@ -63,7 +63,7 @@
 				},
 				{
 					"name": "statement.gsl.messaging",
-					"begin": "\\b(?i)(msg|msgp|msgr|msgrxp|msgrx2)\\b",
+					"begin": "\\b(?i)(msgp|msgr|msgrxp|msgrx2)\\b",
 					"end": "$",
 					"beginCaptures": {
 						"1": { "name": "keyword.gsl.messaging" }
@@ -92,6 +92,33 @@
 					]
 				},
 				{
+					"name": "statement.gsl.messaging.window",
+					"begin": "\\b(?i)(msgw)\\s?(n[pr]\\d)?\\s([st]\\d|\".*?\")?",
+					"beginCaptures": {
+						"1": { "name": "keyword.gsl.messaging" },
+						"2": { "name": "variable.gsl.node" },
+						"3": { "patterns": [ { "include": "#strings" }] }
+					},
+					"end": "$",
+					"patterns": [
+						{ "include": "#strings" },
+						{ "include": "#comments" }
+					]
+				},
+				{
+					"name": "statement.gsl.messaging.targeted",
+					"begin": "\\b(?i)(msg)\\s?(n[pr]\\d)?",
+					"beginCaptures": {
+						"1": { "name": "keyword.gsl.messaging" },
+						"2": { "name": "variable.gsl.node" }
+					},
+					"end": "$",
+					"patterns": [
+						{ "include": "#strings" },
+						{ "include": "#comments" }
+					]
+				},
+				{
 					"name": "statement.gsl.callmatch",
 					"match": "(?i:(callmatch)\\s+(must_match|may_match|check)\\s+\"([\\S+]*?)\"\\s+(in))",
 					"captures": {
@@ -111,7 +138,8 @@
 							"name": "keyword.gsl.gathering.param",
 							"match": "\\b(?i)(?:(?:first|next)(?:obj|player|watch|blood)|allplayers|nextroom|for|sametype|(?:non)?exist|all)\\b"
 						},
-						{ "include": "#node_vars" }
+						{ "include": "#node_vars" },
+						{ "include": "#comments"}
 					]
 				},
 				{
@@ -185,7 +213,6 @@
 					]
 				},
 				{
-					"example": "removevarfield monitor_msggm from NP0",
 					"name": "statement.gsl.removevarfield",
 					"begin": "\\b(?i)(removevarfield)\\s+([A-Za-z0-9_]+)\\b",
 					"beginCaptures": {
@@ -198,11 +225,25 @@
 							"name": "keyword.gsl.dangerous.param",
 							"match": "\\b(?i)(?:from)\\b"
 						},
-						{
-							"include": "#node_vars"
-						}
+						{ "include": "#node_vars" },
+						{ "include": "#comments" }
 					]
-
+				},
+				{
+					"name": "statement.gsl.rmcall",
+					"begin": "\\b(?i)(rmcall)\\b",
+					"beginCaptures": {
+						"1": { "name": "keyword.gsl.rmcall" }
+					},
+					"end": "$",
+					"patterns": [
+						{
+							"name": "keyword.gsl.rmcall.param",
+							"match": "\\b(?i)(call|callback|donematch)\\b"
+						},
+						{ "include": "#variables" },
+						{ "include": "#comments" }
+					]
 				}
 			]
 		},
@@ -324,7 +365,7 @@
 			"patterns": [
 				{
 					"name": "token.gsl.entity",
-					"match": "\\$X\\d[FGHI]?"
+					"match": "\\$X\\d[FGHIT]?"
 				},
 				{
 					"name": "token.gsl.player",
@@ -391,7 +432,7 @@
 				},
 				{
 					"name": "operator.gsl.special",
-					"match": "\\b(?i:isoftype|isnotoftype|isexactly|isnotexactly)\\b"
+					"match": "\\b(?i:isoftype|isnotoftype|isexactly|isnotexactly|hasfield)\\b"
 				}
 			]
 		},
@@ -413,7 +454,7 @@
 			"patterns": [
 				{
 					"name": "constant.numeric.gsl",
-					"match": "(?:\\b-?\\d+\\b)",
+					"match": "(?:-?\\d+\\b)",
 					"patterns": []
 				},
 				{
@@ -467,7 +508,7 @@
 				},
 				{
 					"name": "variable.gsl.system.string",
-					"match": "\\$(?i:GAMECODE|GAMENAME|SHORTNAME|TIMES)\\b"
+					"match": "\\$(?i:MATCH|GAMECODE|GAMENAME|REPLYADDRESS|SHORTNAME|TIMES)\\b"
 				}
 			]
 		},
