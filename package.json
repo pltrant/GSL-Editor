@@ -8,19 +8,24 @@
         "name": "Patrick Trant",
         "email": "estild@gmail.com"
     },
-    "engines": {
-        "vscode": "^1.15.0"
-    },
     "categories": [
         "Languages"
     ],
+    "license": "GPL-3.0",
+    "private": false,
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/pltrant/GSL-Editor.git"
+    },
+    "homepage": "https://github.com/pltrant/GSL-Editor",
+    "bugs": {
+        "url": "https://github.com/pltrant/GSL-Editor/issues"
+    },
     "activationEvents": [
         "*"
     ],
-    "private": true,
-    "repository": {
-        "type": "git",
-        "url": "https://gitlab.com/GSIV/GSL-Editor.git"
+    "engines": {
+        "vscode": "^1.15.0"
     },
     "main": "extension",
     "contributes": {

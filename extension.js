@@ -82,6 +82,27 @@ class matchMarkersProvider {
     }
 }
 
+class symbolProvider {
+    provideDocumentSymbols(document, token) {
+        return new Promise((resolve, reject) => {
+            let symbols = [];
+            let myRegexp = /^:\s+\"(.*?)\"/;
+            for (let i = 0; i < document.lineCount; i++) {
+                let line = document.lineAt(i);
+                if (line.text.startsWith(": ")) {
+                    let matchMarker = myRegexp.exec(line.text);
+                    symbols.push({
+                        name: matchMarker[1],
+                        kind: vscode.SymbolKind.Method,
+                        location: new vscode.Location(document.uri, line.range)
+                    })
+                }
+            }
+            resolve(symbols);
+        });
+    }
+}
+
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
@@ -169,6 +190,11 @@ function activate(context) {
     if (vscode.workspace.getConfiguration('gsl').get('displayGameChannel')) {
         getGameChannel().show(true);
     }
+
+    context.subscriptions.push(vscode.languages.registerDocumentSymbolProvider(
+        {language: "gsl"},
+        new symbolProvider()
+    ));
 
     const matchMarkersProvider1 = new matchMarkersProvider(context);
     vscode.window.registerTreeDataProvider('matchMarkers', matchMarkersProvider1);
@@ -282,7 +308,7 @@ function uploadScript(receivedMsg) {
         return vscode.window.showErrorMessage(gslEditor.scriptNum + ' is an invalid script #.');
     } else if ((/Edt:$/.test(receivedMsg)) && (gslEditor.sendScript == 1)) {
         sendMsg('Z\n');
-    } else if (/ZAP!  All lines deleted\./.test(receivedMsg)) {
+    } else if ((/ZAP!  All lines deleted\./.test(receivedMsg)) | (/New File/.test(receivedMsg))) {
         let scriptText = gslEditor.scriptTxt.replace(/\r/g,'\n').replace(/\n\n/g,'\n');
         gameClient.write(scriptText + '\n');
         if (!scriptText.endsWith('\n')) {
@@ -389,10 +415,14 @@ function downloadScript(receivedMsg) {
     } else if (/Verb not found/.test(receivedMsg)) {
         return vscode.window.showErrorMessage('Verb name ' + gslEditor.input + ' has not been created yet.');
     } else if (/LineEditor/.test(receivedMsg)) {
-        let myRegexp = /File:\s\.\.\/scripts\/(S\d\d\d\d\d)/;
+        let myRegexp = /(?:New\s)?File:\s\.\.\/scripts\/(S\d\d\d\d\d)/;
         let match = myRegexp.exec(receivedMsg);
+        if (/New File/.test(receivedMsg)) {
+            sendMsg('\n');
+        } else {
+            sendMsg('P\n');
+        }
         gslEditor.scriptNum = match[1];
-        sendMsg('P\n');
         gslEditor.getScript = 2;
     } else if (/Edt:$/.test(receivedMsg)) {
         sendMsg('Q\n');

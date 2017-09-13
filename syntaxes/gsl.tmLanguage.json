@@ -20,7 +20,7 @@
 			"patterns": [
 				{
 					"name": "matchmarker.gsl",
-					"begin": "^:\\s+\"(.*?)\"",
+					"begin": "^:\\s+(\".*?\")",
 					"beginCaptures": {
 						"1": { "name": "matchmarker.gsl.name" }
 					},
@@ -120,7 +120,7 @@
 				},
 				{
 					"name": "statement.gsl.callmatch",
-					"match": "(?i:(callmatch)\\s+(must_match|may_match|check)\\s+\"([\\S+]*?)\"\\s+(in))",
+					"match": "(?i:(callmatch)\\s+(must_match|may_match|check)\\s+(\"[\\S+]*?\")\\s+(in))",
 					"captures": {
 						"1": { "name": "keyword.gsl.callmatch" },
 						"2": { "name": "keyword.gsl.callmatch.param" },

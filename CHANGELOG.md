@@ -1,11 +1,34 @@
 # Change Log
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.0.2] - 2017-09-##
+## Added
+- Matchmarkers are now considered symbols (for go to symbol functionality (Ctrl+Shift+O)) from Don/Konacon.
+
+## Changed
+- More language definition updates from Oliver/Naos:
+    - fixed comments on GATHER and REMOVEVARFIELD lines
+    - added MATCH and REPLYADDRESS system string vars
+    - added highlighting for RMCALL statements
+    - added MSGW to messaging statement definition
+    - added better definition for MSG statement
+    - added $X#T token
+    - fixed negative numbers not highlighting the - sign
+
+## Fixed
+- You should now able to download new scripts which have no text yet.
+
+## Changed
+- Moved GSL Editor repository to https://github.com/pltrant/GSL-Editor.
+
 ## [1.0.1] - 2017-09-10
 ## Fixed
 - If the connection to the game drops, it will now automatically reconnect on the next upload/download.
 - Script downloads should work correctly on macOS again.
 - Matchmarker color highlighting should now be consistent.
+
+## Changed
+- Downloaded scripts will now have a .gsl extension.
 
 ## [1.0.0] - 2017-09-06
 ## Added

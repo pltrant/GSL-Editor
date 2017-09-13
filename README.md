@@ -1,5 +1,3 @@
-# gsl README
-
 The GSL Editor is an extension for a custom scripting language.  If you're unfamiliar with GSL, you probably do not need this extension.
 
 ## Features

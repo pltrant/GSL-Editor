@@ -36,4 +36,4 @@ Use the below instructions to setup and use the GSL Editor.
     ![](https://radiantglyph.com/gsiv/gsleditor/snippets.gif)
 
 * Review the entire list of 100+ settings (File > Preferences > Settings (Ctrl+Comma)) that are built into VSCode.  You can customize settings such as auto-save, font size, drag and drop text selections, and more!
-* For advanced users, setup a local git repository of the Dev script archive from https://gitlab.com/GSIV/Dev.git, allowing you to use the built in Search functionality of VSCode.  You can then easily keep your local repository in sync (git pull) and quickly search all script files using keywords or regex with a useful graphical user interface to review the results.
+* For advanced users, setup a local git repository of the Dev script archive from https://github.com/pltrant/GSL-Editor.git, allowing you to use the built in Search functionality of VSCode.  You can then easily keep your local repository in sync (git pull) and quickly search all script files using keywords or regex with a useful graphical user interface to review the results.
