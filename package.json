@@ -110,6 +110,13 @@
                     ],
                     "default": "",
                     "description": "Path to save downloaded scripts.  Window users: use double slashes when specifying, e.g. C:\\\\GemStone\\\\Scripts"
+                },
+                "gsl.displayDateCheck": {
+                    "type": [
+                        "boolean"
+                    ],
+                    "default": false,
+                    "description": "Enable to display the 'Date Check' button to check last modified information for QC."
                 }
             }
         },

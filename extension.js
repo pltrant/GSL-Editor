@@ -242,9 +242,11 @@ function showGSLStatusBarItems(context) {
     context._ULstatusBarItem.text = '↑ Upload';
     context._ULstatusBarItem.command = 'extension.gslUpload';
     context._ULstatusBarItem.show();
-    context._DCstatusBarItem.text = 'Date Check';
-    context._DCstatusBarItem.command = 'extension.gslDateCheck';
-    context._DCstatusBarItem.show();
+    if (vscode.workspace.getConfiguration('gsl').get('displayDateCheck')) {
+        context._DCstatusBarItem.text = 'Date Check';
+        context._DCstatusBarItem.command = 'extension.gslDateCheck';
+        context._DCstatusBarItem.show();
+    }
 }
 
 function gslSendGameCommand(context) {
@@ -479,8 +481,6 @@ function gslDateCheck(context) {
     if (!doc) {
         return vscode.window.showErrorMessage('You must have a script open before you can check its date.');
     }
-    doc.save();
-    gslEditor.scriptTxt = doc.getText();
     let scriptNum = /([1-9]\d+)/.exec(doc.fileName)[1];
     if (!/^\d{1,5}$/.test(scriptNum)) {
         return vscode.window.showErrorMessage('Unable to parse script # from file name.');
