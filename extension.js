@@ -85,17 +85,26 @@ class matchMarkersProvider {
 class symbolProvider {
     provideDocumentSymbols(document, token) {
         return new Promise((resolve, reject) => {
+            let header = true;
             let symbols = [];
             let myRegexp = /^:\s+\"(.*?)\"/;
             for (let i = 0; i < document.lineCount; i++) {
                 let line = document.lineAt(i);
                 if (line.text.startsWith(": ")) {
+                    header = false;
                     let matchMarker = myRegexp.exec(line.text);
                     symbols.push({
                         name: matchMarker[1],
                         kind: vscode.SymbolKind.Method,
                         location: new vscode.Location(document.uri, line.range)
                     })
+                } else if (header && !line.text.startsWith("!")) {
+                    header = false;
+                    symbols.push({
+                        name: '""',
+                        kind: vscode.SymbolKind.Method,
+                        location: new vscode.Location(document.uri, line.range)
+                    });
                 }
             }
             resolve(symbols);
