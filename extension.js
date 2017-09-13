@@ -487,6 +487,7 @@ function gslDateCheck(context) {
     }
     gslEditor.scriptNum = scriptNum;
     gslEditor.dateCheck = 1;
+    vscode.window.setStatusBarMessage('Checking last modified date of script ' + scriptNum + '...', 5000);
     LogIntoGame().then(function () {
         if (gameClient.connected) {
             dateCheck(' \nWelcome to \n \nAll Rights Reserved '); //Simulate initial login text
