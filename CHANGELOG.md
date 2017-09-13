@@ -1,8 +1,9 @@
 # Change Log
 All notable changes to the GSL Editor extension will be documented in this file.
 
-## [1.0.2] - 2017-09-##
+## [1.0.2] - 2017-09-13
 ## Added
+- There is now a Date Check command, thanks to Don/Konacon, that will display the last modified date of a script from the game (e.g. /ss script#) to assist with QC.  You can manually invoke the command from the Command Palette (F1, then type in GSL), from the keybinding Ctrl+Alt+C, or you can add a Check Date button to the Status Bar by enabling it under Settings.
 - Matchmarkers are now considered symbols (for go to symbol functionality (Ctrl+Shift+O)) from Don/Konacon.
 
 ## Changed

@@ -2,7 +2,7 @@
     "name": "gsl",
     "displayName": "GSL",
     "description": "GSL Editor",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "publisher": "patricktrant",
     "author": {
         "name": "Patrick Trant",
@@ -155,8 +155,7 @@
             {
                 "command": "extension.gslUpload",
                 "key": "ctrl+u",
-                "mac": "cmd+u",
-                "when": "editorTextFocus"
+                "mac": "cmd+u"
             },
             {
                 "command": "extension.gslSendGameCommand",
