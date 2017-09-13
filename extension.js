@@ -159,6 +159,9 @@ function activate(context) {
     if (!this._ULstatusBarItem) {
         this._ULstatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
     }
+    if (!this._DCstatusBarItem) {
+        this._DCstatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
+    }
     let self = this;
     if (vscode.workspace.getConfiguration('gsl').get('alwaysEnabled')) {
         showGSLStatusBarItems(self);
@@ -167,6 +170,7 @@ function activate(context) {
         if (!editor) {
             this._DLstatusBarItem.hide();
             this._ULstatusBarItem.hide();
+            this._DCstatusBarItem.hide();
             return;
         }
         let doc = editor.document;
@@ -175,6 +179,7 @@ function activate(context) {
         } else {
             this._DLstatusBarItem.hide();
             this._ULstatusBarItem.hide();
+            this._DCstatusBarItem.hide();
         }
     }
     context.subscriptions.push(vscode.commands.registerCommand('extension.gslDownload', () => {
@@ -182,6 +187,9 @@ function activate(context) {
     }));
     context.subscriptions.push(vscode.commands.registerCommand('extension.gslUpload', () => {
         gslUpload(context);
+    }));
+    context.subscriptions.push(vscode.commands.registerCommand('extension.gslDateCheck', () => {
+        gslDateCheck(context);
     }));
     context.subscriptions.push(vscode.commands.registerCommand('extension.gslSendGameCommand', () => {
         gslSendGameCommand(context);
@@ -234,6 +242,9 @@ function showGSLStatusBarItems(context) {
     context._ULstatusBarItem.text = '↑ Upload';
     context._ULstatusBarItem.command = 'extension.gslUpload';
     context._ULstatusBarItem.show();
+    context._DCstatusBarItem.text = 'Date Check';
+    context._DCstatusBarItem.command = 'extension.gslDateCheck';
+    context._DCstatusBarItem.show();
 }
 
 function gslSendGameCommand(context) {
@@ -289,6 +300,7 @@ function gslUpload(context) {
 function gslUpload2(scriptNum) {
     gslEditor.sendScript = 1;
     gslEditor.getScript = 0;
+    gslEditor.dateCheck = 0;
     vscode.window.setStatusBarMessage('Uploading script ' + scriptNum + '...', 5000);
     LogIntoGame().then(function () {
         if (gameClient.connected) {
@@ -458,6 +470,42 @@ function downloadScript(receivedMsg) {
     }
 }
 
+function gslDateCheck(context) {
+    let editor = vscode.window.activeTextEditor;
+    if (!editor) {
+        return vscode.window.showErrorMessage('You must have a script open before you can check its date.');
+    }
+    let doc = editor.document;
+    if (!doc) {
+        return vscode.window.showErrorMessage('You must have a script open before you can check its date.');
+    }
+    doc.save();
+    gslEditor.scriptTxt = doc.getText();
+    let scriptNum = /([1-9]\d+)/.exec(doc.fileName)[1];
+    if (!/^\d{1,5}$/.test(scriptNum)) {
+        return vscode.window.showErrorMessage('Unable to parse script # from file name.');
+    }
+    gslEditor.scriptNum = scriptNum;
+    gslEditor.dateCheck = 1;
+    LogIntoGame().then(function () {
+        if (gameClient.connected) {
+            dateCheck(' \nWelcome to \n \nAll Rights Reserved '); //Simulate initial login text
+        }
+    });
+}
+
+function dateCheck(receivedMsg) {
+    if (/Welcome to.*\s\n.*\s\nAll Rights Reserved/.test(receivedMsg)) {
+        sendMsg('/ss ' + gslEditor.scriptNum + '\n');
+    } else if (/Last modified by: /.test(receivedMsg)) {
+        let modifier = /Last modified by: ([\w-_\.]+)/.exec(receivedMsg)[1];
+        let date = /\nOn \w+ (\w+) (\d+) [\d:]+ (\d+)/.exec(receivedMsg);
+        let data = 'Last modified by ' + modifier + ' on ' + date[1] + ' ' + date[2] + ', ' + date[3];
+        vscode.window.showInformationMessage(data);
+        gslEditor.dateCheck = 0;
+    }
+}
+
 function sendMsg(msg) {
     outGameChannel('Sent: ' + msg);
     if (sgeClient.connected) {
@@ -573,6 +621,8 @@ function onConnGameData(data) {
         downloadScript(receivedMsg);
     } else if (gslEditor.sendScript) {
         uploadScript(receivedMsg);
+    } else if (gslEditor.dateCheck) {
+        dateCheck(receivedMsg);
     }
 }
 
