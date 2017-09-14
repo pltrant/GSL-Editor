@@ -1,6 +1,14 @@
 # Change Log
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.0.3] - 2017-09-14
+## Added
+- Upload script check: a timestamp is now stored when you download any script.  That timestamp is then referenced against the server before any upload.  If they are different, you will be prompted before continuing.  This should help ensure you don't upload a version of the script that is now out of date.
+- Empty matchmarker is now listed as "" at the top of the Matchmarkers view and symbol list. - Don/Konacon
+
+## Changed
+- Compile errors will now be presented in a pop-up error dialog.
+
 ## [1.0.2] - 2017-09-13
 ## Added
 - There is now a Date Check command, thanks to Don/Konacon, that will display the last modified date of a script from the game (e.g. /ss script#) to assist with QC.  You can manually invoke the command from the Command Palette (F1, then type in GSL), from the keybinding Ctrl+Alt+C, or you can add a Check Date button to the Status Bar by enabling it under Settings.
@@ -15,12 +23,10 @@ All notable changes to the GSL Editor extension will be documented in this file.
     - added better definition for MSG statement
     - added $X#T token
     - fixed negative numbers not highlighting the - sign
+- Moved GSL Editor repository to https://github.com/pltrant/GSL-Editor.
 
 ## Fixed
 - You should now able to download new scripts which have no text yet.
-
-## Changed
-- Moved GSL Editor repository to https://github.com/pltrant/GSL-Editor.
 
 ## [1.0.1] - 2017-09-10
 ## Fixed

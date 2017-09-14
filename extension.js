@@ -9,6 +9,7 @@ const sgeClient = new net.Socket();
 const gameClient = new net.Socket();
 var gameChannel;
 var gslEditor = {
+    extContext: '',
     hashKey: '',
     pwHash: '',
     gameCode: '',
@@ -55,13 +56,19 @@ class matchMarkersProvider {
         if (doc.languageId != "gsl") {
             return;
         }
+        let header = true;
+        let myRegexp = /^: "(.*)"/;
         for (let index = 1; index < doc.lineCount; index++) {
             let text = doc.lineAt(index).text;
             if (/^: "(.*)"/.test(text)) {
-                let myRegexp = /^: "(.*)"/;
+                header = false;
                 let match = myRegexp.exec(text);
                 this.tree.push(match[1]);
                 this.dict[match[1]] = index; //Store line number found at.
+            } else if (header && !text.startsWith("!")) {
+                header = false;
+                this.tree.push('""');
+                this.dict['""'] = index; //Store line number found at.
             }
         }
     }
@@ -95,14 +102,14 @@ class symbolProvider {
                     let matchMarker = myRegexp.exec(line.text);
                     symbols.push({
                         name: matchMarker[1],
-                        kind: vscode.SymbolKind.Method,
+                        kind: vscode.SymbolKind.Function,
                         location: new vscode.Location(document.uri, line.range)
                     })
                 } else if (header && !line.text.startsWith("!")) {
                     header = false;
                     symbols.push({
                         name: '""',
-                        kind: vscode.SymbolKind.Method,
+                        kind: vscode.SymbolKind.Function,
                         location: new vscode.Location(document.uri, line.range)
                     });
                 }
@@ -217,6 +224,10 @@ function activate(context) {
     vscode.window.registerTreeDataProvider('matchMarkers', matchMarkersProvider1);
 
     checkForUpdatedVersion(context);
+
+    gslEditor.extContext = context;
+    //let msgTest = context.globalState.get('Test3', '');
+    
 }
 exports.activate = activate;
 
@@ -292,7 +303,7 @@ function gslUpload(context) {
     }
     doc.save();
     gslEditor.scriptTxt = doc.getText();
-    let scriptNum = path.basename(doc.fileName).replace(/\D+/g, '');
+    let scriptNum = path.basename(doc.fileName).replace(/\D+/g, '').replace(/^0+/, '');
     if (!/^\d{1,5}$/.test(scriptNum)) {
         vscode.window.showInputBox({ ignoreFocusOut: true, prompt: 'Unable to parse script # from file name. Script number to upload?' }).then(input => {
             if ((input == null) | (input == '')) {
@@ -322,7 +333,26 @@ function gslUpload2(scriptNum) {
 
 function uploadScript(receivedMsg) {
     if (/Welcome to.*\s\n.*\s\nAll Rights Reserved/.test(receivedMsg)) {
-        sendMsg('/ms ' + gslEditor.scriptNum + '\n');
+        sendMsg('/ss ' + gslEditor.scriptNum + '\n');
+    } else if ((/^Name:[\s\S]*\d{4}\r\n.*>$/.test(receivedMsg)) && (gslEditor.sendScript == 1)) {
+        let modifier = /Last modified by: ([\w-_\.]+)/.exec(receivedMsg)[1];
+        let date = /\nOn \w+ (\w+) (\d+) (.+) (\d+)/.exec(receivedMsg);
+        let data = modifier + ' on ' + date[1] + ' ' + date[2] + ', ' + date[4] + ' at ' + date[3];
+        let lastMod = gslEditor.extContext.globalState.get('s' + gslEditor.scriptNum, '');
+        if ((lastMod != '') && (lastMod != data)) {
+            let msg = 'Script ' + gslEditor.scriptNum + ' appears to have been edited since you last downloaded it.';
+            msg = msg + '\n\nLocal: ' + lastMod + '\nServer: ' + data + '\n\nWould you like to upload this script anyway?' 
+            vscode.window.showWarningMessage(msg, { modal: true }, 'Yes').then(input => {
+                if (input == 'Yes') {
+                    sendMsg('/ms ' + gslEditor.scriptNum + '\n');
+                } else {
+                    gslEditor.sendScript = 0;
+                    vscode.window.setStatusBarMessage('Upload canceled.', 5000);
+                }
+            });
+        } else {
+            sendMsg('/ms ' + gslEditor.scriptNum + '\n');
+        }
     } else if (/Error: Script #(.*) is a verb. Please use \/mv (.*) instead\./.test(receivedMsg)) {
         let myRegexp = /Error: Script #(.*) is a verb. Please use \/mv (.*) instead\./;
         let match = myRegexp.exec(receivedMsg);
@@ -350,16 +380,20 @@ function uploadScript(receivedMsg) {
         vscode.window.setStatusBarMessage('Upload failed.', 5000);
         getGameChannel().show(true);
     } else if (/Compile Failed w\/(.*) errors and (.*) warnings\./.test(receivedMsg)) {
-        let myRegexp = /(Compile Failed w\/(.*) errors and (.*) warnings\.)/;
-        let match = myRegexp.exec(receivedMsg);
-        vscode.window.showErrorMessage(match[1]);
+        vscode.window.showErrorMessage(receivedMsg, { modal: true });
         sendMsg('Q\n');
         gslEditor.sendScript = 0;
         gslEditor.scriptTxt = '';
         vscode.window.setStatusBarMessage('Upload failed.', 5000);
-        getGameChannel().show(true);
     } else if (/Compile OK\./.test(receivedMsg)) {
         sendMsg('Q\n');
+    } else if (/Compile ok\./.test(receivedMsg)) {
+        sendMsg('/ss ' + gslEditor.scriptNum + '\n');
+    } else if ((/^Name:[\s\S]*\d{4}\r\n.*>$/.test(receivedMsg)) && (gslEditor.sendScript == 3)) {
+        let modifier = /Last modified by: ([\w-_\.]+)/.exec(receivedMsg)[1];
+        let date = /\nOn \w+ (\w+) (\d+) (.+) (\d+)/.exec(receivedMsg);
+        let data = modifier + ' on ' + date[1] + ' ' + date[2] + ', ' + date[4] + ' at ' + date[3];
+        gslEditor.extContext.globalState.update('s' + gslEditor.scriptNum, data);
         gslEditor.sendScript = 0;
         gslEditor.scriptTxt = '';
         vscode.window.setStatusBarMessage('Upload successful.', 5000);
@@ -472,6 +506,14 @@ function downloadScript(receivedMsg) {
             vscode.window.setStatusBarMessage('Download successful.', 5000);
         });
     } else if (/(Script edit aborted|Modification aborted)/.test(receivedMsg)) {
+        let scriptNum = gslEditor.scriptNum.replace(/\D+/g, '').replace(/^0+/, '');
+        sendMsg('/ss ' + scriptNum + '\n');
+    } else if (/^Name:[\s\S]*\d{4}\r\n.*>$/.test(receivedMsg)) {
+        let scriptNum = gslEditor.scriptNum.replace(/\D+/g, '').replace(/^0+/, '');
+        let modifier = /Last modified by: ([\w-_\.]+)/.exec(receivedMsg)[1];
+        let date = /\nOn \w+ (\w+) (\d+) (.+) (\d+)/.exec(receivedMsg);
+        let data = modifier + ' on ' + date[1] + ' ' + date[2] + ', ' + date[4] + ' at ' + date[3];
+        gslEditor.extContext.globalState.update('s' + scriptNum, data);
         gslEditor.scriptArray.shift();
         if (gslEditor.scriptArray.length > 0) {
             gslDownload2(gslEditor.scriptArray[0]);
@@ -490,7 +532,7 @@ function gslDateCheck(context) {
     if (!doc) {
         return vscode.window.showErrorMessage('You must have a script open before you can check its date.');
     }
-    let scriptNum = /([1-9]\d+)/.exec(doc.fileName)[1];
+    let scriptNum = path.basename(doc.fileName).replace(/\D+/g, '').replace(/^0+/, '');
     if (!/^\d{1,5}$/.test(scriptNum)) {
         return vscode.window.showErrorMessage('Unable to parse script # from file name.');
     }
@@ -509,8 +551,8 @@ function dateCheck(receivedMsg) {
         sendMsg('/ss ' + gslEditor.scriptNum + '\n');
     } else if (/Last modified by: /.test(receivedMsg)) {
         let modifier = /Last modified by: ([\w-_\.]+)/.exec(receivedMsg)[1];
-        let date = /\nOn \w+ (\w+) (\d+) [\d:]+ (\d+)/.exec(receivedMsg);
-        let data = 'Last modified by ' + modifier + ' on ' + date[1] + ' ' + date[2] + ', ' + date[3];
+        let date = /\nOn \w+ (\w+) (\d+) (.+) (\d+)/.exec(receivedMsg);
+        let data = 'Last modified by ' + modifier + ' on ' + date[1] + ' ' + date[2] + ', ' + date[4] + ' at ' + date[3] + '.';
         vscode.window.showInformationMessage(data);
         gslEditor.dateCheck = 0;
     }
