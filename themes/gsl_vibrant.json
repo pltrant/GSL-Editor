@@ -1,0 +1,92 @@
+{
+    "name": "GSL Dark",
+	"type": "dark",
+	"$schema": "vscode://schemas/color-theme",
+	"include": "./dark_plus.json",
+	"tokenColors": [
+        {
+            "scope": "comment",
+            "settings": {
+                "foreground": "#A0A0A0"
+            }
+        },
+        {
+			"scope": "constant.numeric",
+			"settings": {
+				"foreground": "#4BE000"
+			}
+		},
+		{
+            "scope": "keyword.gsl",
+            "settings": {
+                "foreground": "#D4D4D4"
+            }
+        },
+        {
+            "scope": "keyword.gsl.control",
+            "settings": {
+                "foreground": "#F92672"
+            }
+        },
+        {
+            "scope": "keyword.gsl.stack",
+            "settings": {
+                "foreground": "#F92672"
+            }
+        },
+        {
+            "scope": "keyword.gsl.stop",
+            "settings": {
+                "foreground": "#F92672"
+            }
+        },
+        {
+            "scope": "matchmarker.gsl.name",
+            "settings": {
+                "foreground": "#4EC9B0"
+            }
+		},
+		{
+			"scope": "string.quoted.double.gsl",
+			"settings": {
+				"foreground": "#E6DB74"
+			}
+		},
+        {
+            "scope": "token.gsl",
+            "settings": {
+                "foreground": "#AE81FF"
+            }
+		},
+		{
+			"scope": "variable.gsl",
+			"settings": {
+				"foreground": "#AE81FF"
+			}
+        },
+        {
+            "scope": "variable.gsl.register",
+            "settings": {
+                "foreground": "#00D9FF"
+            }
+        },
+		{
+			"scope": "variable.gsl.system",
+			"settings": {
+				"foreground": "#AE81FF"
+			}
+		},
+		{
+			"scope": "variable.gsl.node",
+			"settings": {
+				"foreground": "#569cd6"
+			}
+		},
+		{
+			"scope": "variable.gsl.field",
+			"settings": {
+				"foreground": "#FD971F"
+			}
+		}
+    ]
+}
