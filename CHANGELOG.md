@@ -1,6 +1,10 @@
 # Change Log
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.0.4] - 2017-09-##
+## Added
+- There is now a configuration settings to specify the file extension to use for downloaded scripts.  It defaults to .gsl.
+
 ## [1.0.3] - 2017-09-14
 ## Added
 - Upload script check: a timestamp is now stored when you download any script.  That timestamp is then referenced against the server before any upload.  If they are different, you will be prompted before continuing.  This should help ensure you don't upload a version of the script that is now out of date.

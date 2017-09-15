@@ -116,6 +116,13 @@
                     "default": "",
                     "description": "Path to save downloaded scripts.  Window users: use double slashes when specifying, e.g. C:\\\\GemStone\\\\Scripts"
                 },
+                "gsl.fileExtension": {
+                    "type": [
+                        "string"
+                    ],
+                    "default": ".gsl",
+                    "description": "File extension to use for downloaded scripts."
+                },
                 "gsl.displayDateCheck": {
                     "type": [
                         "boolean"
@@ -176,7 +183,7 @@
                     "gsl"
                 ],
                 "filenamePatterns": [
-                    "S[0-9][0-9][0-9][0-9][0-9]"
+                    "S[0-9][0-9][0-9][0-9][0-9].*"
                 ],
                 "extensions": [
                     ".gsl"

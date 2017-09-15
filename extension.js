@@ -9,7 +9,7 @@ const sgeClient = new net.Socket();
 const gameClient = new net.Socket();
 var gameChannel;
 var gslEditor = {
-    extContext: '',
+    extContext: null,
     hashKey: '',
     pwHash: '',
     gameCode: '',
@@ -169,6 +169,7 @@ function LogIntoGame() {
 }
 
 function activate(context) {
+    gslEditor.extContext = context;
     if (!this._DLstatusBarItem) {
         this._DLstatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
     }
@@ -198,40 +199,36 @@ function activate(context) {
             this._DCstatusBarItem.hide();
         }
     }
-    context.subscriptions.push(vscode.commands.registerCommand('extension.gslDownload', () => {
-        gslDownload(context);
+    gslEditor.extContext.subscriptions.push(vscode.commands.registerCommand('extension.gslDownload', () => {
+        gslDownload();
     }));
-    context.subscriptions.push(vscode.commands.registerCommand('extension.gslUpload', () => {
-        gslUpload(context);
+    gslEditor.extContext.subscriptions.push(vscode.commands.registerCommand('extension.gslUpload', () => {
+        gslUpload();
     }));
-    context.subscriptions.push(vscode.commands.registerCommand('extension.gslDateCheck', () => {
-        gslDateCheck(context);
+    gslEditor.extContext.subscriptions.push(vscode.commands.registerCommand('extension.gslDateCheck', () => {
+        gslDateCheck();
     }));
-    context.subscriptions.push(vscode.commands.registerCommand('extension.gslSendGameCommand', () => {
-        gslSendGameCommand(context);
+    gslEditor.extContext.subscriptions.push(vscode.commands.registerCommand('extension.gslSendGameCommand', () => {
+        gslSendGameCommand();
     }));
 
     if (vscode.workspace.getConfiguration('gsl').get('displayGameChannel')) {
         getGameChannel().show(true);
     }
 
-    context.subscriptions.push(vscode.languages.registerDocumentSymbolProvider(
+    gslEditor.extContext.subscriptions.push(vscode.languages.registerDocumentSymbolProvider(
         {language: "gsl"},
         new symbolProvider()
     ));
 
-    const matchMarkersProvider1 = new matchMarkersProvider(context);
+    const matchMarkersProvider1 = new matchMarkersProvider(gslEditor.extContext);
     vscode.window.registerTreeDataProvider('matchMarkers', matchMarkersProvider1);
 
-    checkForUpdatedVersion(context);
-
-    gslEditor.extContext = context;
-    //let msgTest = context.globalState.get('Test3', '');
-    
+    checkForUpdatedVersion();
 }
 exports.activate = activate;
 
-function checkForUpdatedVersion(context) {
+function checkForUpdatedVersion() {
     const showReleaseNotes = "Show Release Notes";
     const gslExtensionVersionKey = 'gslExtensionVersion';
     var extensionVersion = vscode
@@ -239,7 +236,7 @@ function checkForUpdatedVersion(context) {
         .getExtension("patricktrant.gsl")
         .packageJSON
         .version;
-    var storedVersion = context.globalState.get(gslExtensionVersionKey);
+    var storedVersion = gslEditor.extContext.globalState.get(gslExtensionVersionKey);
     if (!storedVersion) {
     }
     else if (extensionVersion !== storedVersion) {
@@ -252,7 +249,7 @@ function checkForUpdatedVersion(context) {
             }
         });
     }
-    context.globalState.update(gslExtensionVersionKey, extensionVersion);
+    gslEditor.extContext.globalState.update(gslExtensionVersionKey, extensionVersion);
 }
 
 function showGSLStatusBarItems(context) {
@@ -292,7 +289,7 @@ function delayedGameCommand(command) {
     }
 }
 
-function gslUpload(context) {
+function gslUpload() {
     let editor = vscode.window.activeTextEditor;
     if (!editor) {
         return vscode.window.showErrorMessage('You must have a script open before you can upload it.');
@@ -400,7 +397,7 @@ function uploadScript(receivedMsg) {
     }
 }
 
-function gslDownload(context) {
+function gslDownload() {
     vscode.window.showInputBox({ ignoreFocusOut: true, prompt: 'Script number or verb name to download? Multiple scripts via 12316;profile or 15-19.' }).then(input => {
         if ((input == null) | (input == '')) {
             return vscode.window.showErrorMessage('No input provided. Script download aborted.');
@@ -495,7 +492,7 @@ function downloadScript(receivedMsg) {
             fs.mkdirSync(extPath); //Create directory
         }
         return __awaiter(this, void 0, void 0, function* () {
-            let fileName = path.join(extPath, gslEditor.scriptNum) + '.gsl';
+            let fileName = path.join(extPath, gslEditor.scriptNum) + vscode.workspace.getConfiguration('gsl').get('fileExtension');
             if (fs.existsSync(fileName)) { //Check for existing file
                 fs.unlinkSync(fileName); //Already exists, delete it
             }
@@ -523,7 +520,7 @@ function downloadScript(receivedMsg) {
     }
 }
 
-function gslDateCheck(context) {
+function gslDateCheck() {
     let editor = vscode.window.activeTextEditor;
     if (!editor) {
         return vscode.window.showErrorMessage('You must have a script open before you can check its date.');
