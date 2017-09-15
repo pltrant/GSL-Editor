@@ -13,7 +13,7 @@
         {
 			"scope": "constant.numeric",
 			"settings": {
-				"foreground": "#4BE000"
+				"foreground": "#FD971F"
 			}
 		},
 		{
@@ -43,7 +43,7 @@
         {
             "scope": "matchmarker.gsl.name",
             "settings": {
-                "foreground": "#4EC9B0"
+                "foreground": "#4CDA00"
             }
 		},
 		{
@@ -57,17 +57,17 @@
             "settings": {
                 "foreground": "#AE81FF"
             }
-		},
-		{
-			"scope": "variable.gsl",
-			"settings": {
-				"foreground": "#AE81FF"
-			}
+        },
+        {
+            "scope": "variable.gsl",
+            "settings": {
+                "foreground": "#D4D4D4"
+            }
         },
         {
             "scope": "variable.gsl.register",
             "settings": {
-                "foreground": "#00D9FF"
+                "foreground": "#00DDFF"
             }
         },
 		{
@@ -85,7 +85,7 @@
 		{
 			"scope": "variable.gsl.field",
 			"settings": {
-				"foreground": "#FD971F"
+				"foreground": "#4EC9B0"
 			}
 		}
     ]

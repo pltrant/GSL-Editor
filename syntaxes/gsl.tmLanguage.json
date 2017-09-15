@@ -58,6 +58,7 @@
 					"end": "$",
 					"patterns": [
 						{ "include": "#variables" },
+						{ "include": "#numbers" },
 						{ "include": "#comments" }
 					]
 				},
