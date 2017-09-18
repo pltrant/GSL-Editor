@@ -1,6 +1,10 @@
 # Change Log
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.0.5] - 2017-09-##
+## Added
+- Status Bar text when logging into the game.
+
 ## [1.0.4] - 2017-09-18
 ## Added
 - There is a new GSL Vibrant theme.
