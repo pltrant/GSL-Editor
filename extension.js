@@ -163,6 +163,7 @@ function LogIntoGame() {
             sgeClient.on('disconnect', onConnSGEClose);
             sgeClient.on('data', onConnSGEData);
             sgeClient.on('error', onConnError);
+            sgeClient.setKeepAlive(true);
             sgeClient.setNoDelay(true);
         }
     });
@@ -642,6 +643,7 @@ function onConnSGEData(data) {
         gameClient.on('disconnect', onConnGameClose);
         gameClient.on('data', onConnGameData);
         gameClient.on('error', onConnError);
+        gameClient.setKeepAlive(true);
         gameClient.setNoDelay(true);
     }
 }

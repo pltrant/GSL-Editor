@@ -1,10 +1,11 @@
 # Change Log
 All notable changes to the GSL Editor extension will be documented in this file.
 
-## [1.0.4] - 2017-09-##
+## [1.0.4] - 2017-09-18
 ## Added
 - There is a new GSL Vibrant theme.
 - There is now a configuration settings to specify the file extension to use for downloaded scripts.  It defaults to .gsl.
+- Enabled TCP socket KeepAlive functionality, which should help in detecting disconnects.
 
 ## [1.0.3] - 2017-09-14
 ## Added
