@@ -144,6 +144,7 @@ class hoverProvider {
                 'M': 'The :pronoun field if set, otherwise the noun of creature.'
             },
             'P': {
+                '': 'First name of player.',
                 'A': '"Master" or "Mistress" for player.',
                 'B': 'First and last name of player.',
                 'F': '"himself" or "herself" for player.',
@@ -157,26 +158,36 @@ class hoverProvider {
                 'S': '"sir" or "madam" for player.'
             },
             'X': {
+                '': 'The article, adjective, and noun of creature OR first name of player.',
                 'F': '"himself" or "herself" for creature or player.',
                 'G': '"he" or "she" for creature or player.',
                 'H': '"his" or "her" for creature or player.',
                 'I': '"him" or "her" for creature or player.'
+            },
+            'E': {
+                'A': 'The article of event.',
+                'J': 'The adjective of event.',
+                'N': 'The noun of event.',
+                'D': 'The article, adjective and noun of event.',
+                'S': 'The adjective and noun of event.',
+                'T': '"the" followed by the noun of event.',
+                'M': 'The :pronoun field if set, otherwise the noun of event.'
             }
         };
     }
 
     provideHover(document, position, token) {
-        let wordRange = document.getWordRangeAtPosition(position, /(-?\d*\.\d\w*)|([\w.$]+)/);
+        let wordRange = document.getWordRangeAtPosition(position, /(-?\d*\.\d\w*)|([\w\$]+)/);
         if (!wordRange) return;
 
         let word = document.getText(wordRange);
-        if (/\$[POCEX]\d[A-Z]/.test(word)) {
+        if (/^\$[POCEX]\d[A-Z]?$/.test(word)) {
             return this.stringTokenHover(word);
         }
     };
 
     stringTokenHover(token) {
-        let tokenTypes = /\$(.)\d(.)/.exec(token);
+        let tokenTypes = /\$([POCEX])\d([A-Z]?)/.exec(token);
         if (tokenTypes[1] in this.tokenInfo && tokenTypes[2] in this.tokenInfo[tokenTypes[1]]) {
             return new vscode.Hover(this.tokenInfo[tokenTypes[1]][tokenTypes[2]]);
         }
