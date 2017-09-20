@@ -279,6 +279,9 @@ function activate(context) {
     gslEditor.extContext.subscriptions.push(vscode.commands.registerCommand('extension.gslSendGameCommand', () => {
         gslSendGameCommand();
     }));
+    gslEditor.extContext.subscriptions.push(vscode.commands.registerCommand('extension.gslListTokens', () => {
+        gslListTokens();
+    }));
 
     if (vscode.workspace.getConfiguration('gsl').get('displayGameChannel')) {
         getGameChannel().show(true);
@@ -352,6 +355,10 @@ function gslSendGameCommand(context) {
             }
         });
     });
+}
+
+function gslListTokens() {
+    vscode.commands.executeCommand('markdown.showPreview', vscode.Uri.file(path.resolve(__dirname, "./syntaxes/tokens.md")));
 }
 
 function delayedGameCommand(command) {

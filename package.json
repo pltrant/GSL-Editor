@@ -49,6 +49,11 @@
                 "command": "extension.gslDateCheck",
                 "title": "Check Script Date",
                 "category": "GSL"
+            }            ,
+            {
+                "command": "extension.gslListTokens",
+                "title": "List Tokens",
+                "category": "GSL"
             }
         ],
         "configuration": {
@@ -173,6 +178,11 @@
                 "command": "extension.gslDateCheck",
                 "key": "ctrl+alt+c",
                 "mac": "cmd+alt+c"
+            },
+            {
+                "command": "extension.gslListTokens",
+                "key": "ctrl+alt+l",
+                "mac": "cmd+alt+l"
             }
         ],
         "languages": [
