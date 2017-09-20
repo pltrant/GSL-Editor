@@ -119,6 +119,70 @@ class symbolProvider {
     }
 }
 
+class hoverProvider {
+    constructor() {
+        this.tokenInfo = {
+            'O': {
+                'A': 'The article of object.',
+                'J': 'The adjective of object.',
+                'N': 'The noun of object.',
+                'D': 'The article, adjective, and noun of object.',
+                'S': 'The adjective and noun of object.',
+                'C': '"opened" or "closed" depending on the closed flag of object.',
+                'O': '"an opened" or "a closed" depending on the closed flag of object.',
+                'T': '"the" followed by the noun of object.',
+                'M': 'The :pronoun field if set, otherwise the noun of object.'
+            },
+            'C': {
+                'A': 'The article of creature.',
+                'J': 'The adjective of creature.',
+                'N': 'The noun of creature.',
+                'D': 'The article, adjective and noun of creature.',
+                'S': 'The adjective and noun of creature.',
+                'T': 'The :crtr_name field if set, otherwise "the" followed by the noun of creature.',
+                'U': '"the" followed by the adjective and noun of creature.',
+                'M': 'The :pronoun field if set, otherwise the noun of creature.'
+            },
+            'P': {
+                'A': '"Master" or "Mistress" for player.',
+                'B': 'First and last name of player.',
+                'F': '"himself" or "herself" for player.',
+                'G': '"he" or "she" for player.',
+                'H': '"his" or "her" for player.',
+                'I': '"him" or "her" for player.',
+                'L': 'Last name of player.',
+                'M': '"man" or "woman" for player.',
+                'P': 'Profession of player.',
+                'R': 'Race of player.',
+                'S': '"sir" or "madam" for player.'
+            },
+            'X': {
+                'F': '"himself" or "herself" for creature or player.',
+                'G': '"he" or "she" for creature or player.',
+                'H': '"his" or "her" for creature or player.',
+                'I': '"him" or "her" for creature or player.'
+            }
+        };
+    }
+
+    provideHover(document, position, token) {
+        let wordRange = document.getWordRangeAtPosition(position, /(-?\d*\.\d\w*)|([\w.$]+)/);
+        if (!wordRange) return;
+
+        let word = document.getText(wordRange);
+        if (/\$[POCEX]\d[A-Z]/.test(word)) {
+            return this.stringTokenHover(word);
+        }
+    };
+
+    stringTokenHover(token) {
+        let tokenTypes = /\$(.)\d(.)/.exec(token);
+        if (tokenTypes[1] in this.tokenInfo && tokenTypes[2] in this.tokenInfo[tokenTypes[1]]) {
+            return new vscode.Hover(this.tokenInfo[tokenTypes[1]][tokenTypes[2]]);
+        }
+    }
+}
+
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
@@ -223,6 +287,10 @@ function activate(context) {
     gslEditor.extContext.subscriptions.push(vscode.languages.registerDocumentSymbolProvider(
         {language: "gsl"},
         new symbolProvider()
+    ));
+    gslEditor.extContext.subscriptions.push(vscode.languages.registerHoverProvider(
+        {language: "gsl"},
+        new hoverProvider()
     ));
 
     const matchMarkersProvider1 = new matchMarkersProvider(gslEditor.extContext);
