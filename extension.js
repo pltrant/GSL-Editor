@@ -121,76 +121,145 @@ class symbolProvider {
 
 class hoverProvider {
     constructor() {
-        this.tokenInfo = {
+        this.nodeInfo = {
             'O': {
-                'A': 'The article of object.',
-                'J': 'The adjective of object.',
-                'N': 'The noun of object.',
-                'D': 'The article, adjective, and noun of object.',
-                'S': 'The adjective and noun of object.',
-                'C': '"opened" or "closed" depending on the closed flag of object.',
-                'O': '"an opened" or "a closed" depending on the closed flag of object.',
-                'T': '"the" followed by the noun of object.',
-                'M': 'The :pronoun field if set, otherwise the noun of object.'
+                'A': 'article',
+                'J': 'adjective',
+                'N': 'noun',
+                'D': 'article adjective noun',
+                'S': 'adjective noun',
+                'C': 'opened/closed',
+                'O': 'an opened/a closed',
+                'T': "'the' followed by noun",
+                'M': "'pronoun' field if set, otherwise noun"
             },
             'C': {
-                'A': 'The article of creature.',
-                'J': 'The adjective of creature.',
-                'N': 'The noun of creature.',
-                'D': 'The article, adjective and noun of creature.',
-                'S': 'The adjective and noun of creature.',
-                'T': 'The :crtr_name field if set, otherwise "the" followed by the noun of creature.',
-                'U': '"the" followed by the adjective and noun of creature.',
-                'M': 'The :pronoun field if set, otherwise the noun of creature.'
+                'A': 'article',
+                'J': 'adjective',
+                'N': 'noun',
+                'D': 'article adjective noun',
+                'S': 'adjective noun',
+                'T': "'crtr_name' field if set, otherwise 'the' followed by noun",
+                'U': "'the' followed by adjective and noun",
+                'M': "'pronoun' field if set, otherwise noun"
             },
             'P': {
-                '': 'First name of player.',
-                'A': '"Master" or "Mistress" for player.',
-                'B': 'First and last name of player.',
-                'F': '"himself" or "herself" for player.',
-                'G': '"he" or "she" for player.',
-                'H': '"his" or "her" for player.',
-                'I': '"him" or "her" for player.',
-                'L': 'Last name of player.',
-                'M': '"man" or "woman" for player.',
-                'P': 'Profession of player.',
-                'R': 'Race of player.',
-                'S': '"sir" or "madam" for player.'
+                '': 'First name',
+                'A': 'Master/Mistress',
+                'B': 'First and last name',
+                'F': 'himself/herself',
+                'G': 'he/she',
+                'H': 'his/her',
+                'I': 'him/her',
+                'L': 'Last name',
+                'M': 'man/woman',
+                'P': 'profession',
+                'R': 'race',
+                'S': 'sir/madam'
             },
             'X': {
-                '': 'The article, adjective, and noun of creature OR first name of player.',
-                'F': '"himself" or "herself" for creature or player.',
-                'G': '"he" or "she" for creature or player.',
-                'H': '"his" or "her" for creature or player.',
-                'I': '"him" or "her" for creature or player.'
+                '': 'article adjective noun of creature OR first name of player.',
+                'F': 'himself/herself of creature or player.',
+                'G': 'he/she of creature or player.',
+                'H': 'his/her of creature or player.',
+                'I': 'him/her of creature or player.'
             },
             'E': {
-                'A': 'The article of event.',
-                'J': 'The adjective of event.',
-                'N': 'The noun of event.',
-                'D': 'The article, adjective and noun of event.',
-                'S': 'The adjective and noun of event.',
-                'T': '"the" followed by the noun of event.',
-                'M': 'The :pronoun field if set, otherwise the noun of event.'
+                'A': 'article',
+                'J': 'adjective',
+                'N': 'noun',
+                'D': 'article adjective noun',
+                'S': 'adjective noun',
+                'T': "'the' followed by noun",
+                'M': "'pronoun' field if set, otherwise noun"
+            },
+            'r': {
+                '': 'Room number.'
             }
         };
+        this.varInfo = {
+            'A': 'value',
+            'B': 'value',
+            'D': 'value / 100 with remainder as decimal',
+            'V': 'value',
+            'L': 'value right aligned to 7 characters',
+            'S': 'value',
+            'K': 'value right aligned to 16 characters',
+            'T': 'value',
+        };
+        this.tokenInfo = {
+            '$': '$ symbol',
+            '\\': 'Suppresses automatic linefeed',
+            '^': 'Uppercase first letter of string',
+            'Q': '" symbol',
+            'R': 'Linefeed',
+            '*': 'ESC code (ASCII 27)',
+            '+': 'Capitalizes first letter of next string token',
+            "'": "Adds 's to next string token, properly XML wrapped",
+            "ZE": "Outputs timestamp for token that follows"
+        };
+        this.baseHoverRegex = /\$(:\$[A-Z]+|:\d+\[\d+,\d+,\d+\]|[\w\d:_-]+|[ABDVLSKT]\d|[\$\\\^QR\*\+'])/;
+        this.stringTokenRegex = /\$([POCEXr])(\d)([A-Z]?)$/;
+        this.fieldRegex = /\$([POCEXr]\d):([\w\d_]+)$/;
+        this.varRegex = /\$([ABDVLSKT])(\d)/;
+        this.tokenRegex = /\$([\$\\\^QR\*\+']|ZE)/;
+        this.systemRegex = /\$:(\$[A-Z]+)/;
+        this.tableRegex = /\$:(\d+)(\[\d+,\d+,\d+\])/;
     }
 
     provideHover(document, position, token) {
-        let wordRange = document.getWordRangeAtPosition(position, /(-?\d*\.\d\w*)|([\w\$]+)/);
+        let wordRange = document.getWordRangeAtPosition(position, this.baseHoverRegex);
         if (!wordRange) return;
 
         let word = document.getText(wordRange);
-        if (/^\$[POCEX]\d[A-Z]?$/.test(word)) {
+        if (this.stringTokenRegex.test(word)) {
             return this.stringTokenHover(word);
+        } else if (this.fieldRegex.test(word)) {
+            return this.fieldHover(word);
+        } else if (this.varRegex.test(word)) {
+            return this.varHover(word);
+        } else if (this.tokenRegex.test(word)) {
+            return this.tokenHover(word);
+        } else if (this.systemRegex.test(word)) {
+            return this.systemHover(word);
+        } else if (this.tableRegex.test(word)) {
+            return this.tableHover(word);
         }
-    };
+    }
 
     stringTokenHover(token) {
-        let tokenTypes = /\$([POCEX])\d([A-Z]?)/.exec(token);
-        if (tokenTypes[1] in this.tokenInfo && tokenTypes[2] in this.tokenInfo[tokenTypes[1]]) {
-            return new vscode.Hover(this.tokenInfo[tokenTypes[1]][tokenTypes[2]]);
+        let tokenTypes = this.stringTokenRegex.exec(token);
+        if (tokenTypes[1] in this.nodeInfo && tokenTypes[3] in this.nodeInfo[tokenTypes[1]]) {
+            return new vscode.Hover('N' + tokenTypes[1].toUpperCase() + tokenTypes[2] + ': ' + this.nodeInfo[tokenTypes[1]][tokenTypes[3]]);
         }
+    }
+
+    fieldHover(token) {
+        let tokenTypes = this.fieldRegex.exec(token);
+        return new vscode.Hover("N" + tokenTypes[1].toUpperCase() + ": '" + tokenTypes[2] + "' field");
+    }
+
+    varHover(token) {
+        let tokenTypes = this.varRegex.exec(token);
+        let varName = tokenTypes[1];
+        if (varName == 'D' || varName == 'L') varName = 'V';
+        if (varName == 'K') varName = 'S';
+        return new vscode.Hover(varName + tokenTypes[2] + ": " + this.varInfo[tokenTypes[1]]);
+    }
+
+    tokenHover(word) {
+        let token = this.tokenRegex.exec(word)[1];
+        return new vscode.Hover(this.tokenInfo[token]);
+    }
+
+    systemHover(word) {
+        let token = this.systemRegex.exec(word)[1];
+        return new vscode.Hover('System variable ' + token);
+    }
+
+    tableHover(word) {
+        let tokenTypes = this.tableRegex.exec(word);
+        return new vscode.Hover('table #' + tokenTypes[1] + ': value in ' + tokenTypes[2]);
     }
 }
 
