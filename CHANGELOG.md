@@ -1,6 +1,7 @@
 # Change Log
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.0.5] - 2017-09-21
 ## Added
 - Hover over any token (e.g. $P0H = "his/her") to get a description of what it represents! - Don/Konacon
 - Get a listing of all tokens with the new List Tokens command.  Available by hitting F1 (to display the Command Palette), type in "gsl", then select List Tokens or use Ctrl+Alt+L.
