@@ -294,11 +294,11 @@ function outGameChannel(message) {
 }
 
 function LogIntoGame() {
-    let game = vscode.workspace.getConfiguration('gsl').get('game');
-    let character = vscode.workspace.getConfiguration('gsl').get('character');
-    vscode.window.setStatusBarMessage('Logging into ' + game + ' with ' + character + '...', 5000);
     return __awaiter(this, void 0, void 0, function* () {
         if (!gameClient.connected) {
+            let game = vscode.workspace.getConfiguration('gsl').get('game');
+            let character = vscode.workspace.getConfiguration('gsl').get('character');
+            vscode.window.setStatusBarMessage('Logging into ' + game + ' with ' + character + '...', 5000);
             sgeClient.connect(7900, 'eaccess.play.net', function () {
                 sgeClient.connected = true;
                 gslEditor.msgCount = 0;
