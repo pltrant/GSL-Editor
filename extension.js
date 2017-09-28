@@ -393,6 +393,8 @@ function checkForUpdatedVersion() {
         .version;
     var storedVersion = gslEditor.extContext.globalState.get(gslExtensionVersionKey);
     if (!storedVersion) {
+        // Default to GSL Vibrant theme on new install.
+        vscode.workspace.getConfiguration().update("workbench.colorTheme", "GSL Vibrant", true);
     }
     else if (extensionVersion !== storedVersion) {
         vscode

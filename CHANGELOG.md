@@ -1,6 +1,13 @@
 # Change Log
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.0.6] - 2017-09-##
+## Added
+- New installations of the extension will now default to the GSL Vibrant theme.
+
+## Fixed
+- Adjusted game login Status Bar text to truly only display when connecting.
+
 ## [1.0.5] - 2017-09-21
 ## Added
 - Hover over any token (e.g. $P0H = "his/her") to get a description of what it represents! - Don/Konacon
