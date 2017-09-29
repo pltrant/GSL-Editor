@@ -121,6 +121,13 @@
                     "default": "",
                     "description": "Path to save downloaded scripts.  Window users: use double slashes when specifying, e.g. C:\\\\GemStone\\\\Scripts"
                 },
+                "gsl.downloadToWorkspace": {
+                    "type": [
+                        "boolean"
+                    ],
+                    "default": false,
+                    "description": "If enabled, will attempt to save downloaded scripts in the current open root workspace folder."
+                },
                 "gsl.fileExtension": {
                     "type": [
                         "string"

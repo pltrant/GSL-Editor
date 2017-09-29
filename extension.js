@@ -641,7 +641,13 @@ function downloadScript(receivedMsg) {
         gslEditor.getScript = 2;
     } else if (/Edt:$/.test(receivedMsg)) {
         sendMsg('Q\n');
-        let extPath = vscode.workspace.getConfiguration('gsl').get('downloadPath');
+        let extPath = null;
+        let useWorkspaceFolder = vscode.workspace.getConfiguration('gsl').get('downloadToWorkspace');
+        if (useWorkspaceFolder && vscode.workspace.workspaceFolders) {
+            extPath = vscode.workspace.workspaceFolders[0].uri.fsPath
+        } else {
+            extPath = vscode.workspace.getConfiguration('gsl').get('downloadPath');
+        }
         if (!extPath) {
             let rootPath = path.resolve(__dirname, '../gsl');
             if (!fs.existsSync(rootPath)) { //Directory doesn't exist
