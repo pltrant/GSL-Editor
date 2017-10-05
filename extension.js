@@ -57,12 +57,11 @@ class matchMarkersProvider {
             return;
         }
         let header = true;
-        let myRegexp = /^: "(.*)"/;
         for (let index = 1; index < doc.lineCount; index++) {
             let text = doc.lineAt(index).text;
             if (/^: "(.*)"/.test(text)) {
                 header = false;
-                let match = myRegexp.exec(text);
+                let match = /^: "(.*)"/.exec(text);
                 this.tree.push(match[1]);
                 this.dict[match[1]] = index; //Store line number found at.
             } else if (header && !text.startsWith("!")) {
@@ -94,12 +93,11 @@ class symbolProvider {
         return new Promise((resolve, reject) => {
             let header = true;
             let symbols = [];
-            let myRegexp = /^:\s+\"(.*?)\"/;
             for (let i = 0; i < document.lineCount; i++) {
                 let line = document.lineAt(i);
                 if (line.text.startsWith(": ")) {
                     header = false;
-                    let matchMarker = myRegexp.exec(line.text);
+                    let matchMarker = /^:\s+\"(.*?)\"/.exec(line.text);
                     symbols.push({
                         name: matchMarker[1],
                         kind: vscode.SymbolKind.Function,
@@ -380,25 +378,32 @@ function activate(context) {
     vscode.window.registerTreeDataProvider('matchMarkers', matchMarkersProvider1);
 
     checkForUpdatedVersion();
+    this.diagnostics = vscode.languages.createDiagnosticCollection('GSL-Compile-Errors');
 }
 exports.activate = activate;
 
 function checkForUpdatedVersion() {
-    const showReleaseNotes = "Show Release Notes";
-    const gslExtensionVersionKey = 'gslExtensionVersion';
-    var extensionVersion = vscode
-        .extensions
-        .getExtension("patricktrant.gsl")
-        .packageJSON
-        .version;
-    var storedVersion = gslEditor.extContext.globalState.get(gslExtensionVersionKey);
-    if (!storedVersion) {
-        // Default to GSL Vibrant theme on new install.
-        vscode.workspace.getConfiguration().update("workbench.colorTheme", "GSL Vibrant", true);
+    // Check for new install.
+    let newInstallFlag = gslEditor.extContext.globalState.get("newInstallFlag");
+    if (!newInstallFlag) {
+        let applyTheme = "Apply Theme"
+        vscode.window
+            .showInformationMessage(`For the best experience, the GSL Vibrant theme is recommended for the GSL Editor.`, applyTheme)
+            .then(choice => {
+            if (choice === applyTheme) {
+                vscode.workspace.getConfiguration().update("workbench.colorTheme", "GSL Vibrant", true);
+            }
+        });
+        gslEditor.extContext.globalState.update("newInstallFlag", true);
     }
-    else if (extensionVersion !== storedVersion) {
-        vscode
-            .window
+
+    // Check for new Release Notes.
+    let showReleaseNotes = "Show Release Notes";
+    let gslExtensionVersionKey = 'gslExtensionVersion';
+    let extensionVersion = vscode.extensions.getExtension("patricktrant.gsl").packageJSON.version;
+    let storedVersion = gslEditor.extContext.globalState.get(gslExtensionVersionKey);
+    if (storedVersion && (extensionVersion !== storedVersion)) {
+        vscode.window
             .showInformationMessage(`The GSL Editor extension has been updated to version ${extensionVersion}!`, showReleaseNotes)
             .then(choice => {
             if (choice === showReleaseNotes) {
@@ -481,6 +486,7 @@ function gslUpload2(scriptNum) {
     gslEditor.sendScript = 1;
     gslEditor.getScript = 0;
     gslEditor.dateCheck = 0;
+    diagnostics.clear();
     vscode.window.setStatusBarMessage('Uploading script ' + scriptNum + '...', 5000);
     LogIntoGame().then(function () {
         if (gameClient.connected) {
@@ -512,8 +518,7 @@ function uploadScript(receivedMsg) {
             sendMsg('/ms ' + gslEditor.scriptNum + '\n');
         }
     } else if (/Error: Script #(.*) is a verb. Please use \/mv (.*) instead\./.test(receivedMsg)) {
-        let myRegexp = /Error: Script #(.*) is a verb. Please use \/mv (.*) instead\./;
-        let match = myRegexp.exec(receivedMsg);
+        let match = /Error: Script #(.*) is a verb. Please use \/mv (.*) instead\./.exec(receivedMsg);
         sendMsg('/mv ' + match[2] + '\n');
     } else if (/Invalid script number./.test(receivedMsg)) {
         return vscode.window.showErrorMessage(gslEditor.scriptNum + ' is an invalid script #.');
@@ -538,10 +543,32 @@ function uploadScript(receivedMsg) {
         vscode.window.setStatusBarMessage('Upload failed.', 5000);
         getGameChannel().show(true);
     } else if (/Compile Failed w\/(.*) errors and (.*) warnings\./.test(receivedMsg)) {
-        vscode.window.showErrorMessage(receivedMsg, { modal: true });
         sendMsg('Q\n');
         gslEditor.sendScript = 0;
         gslEditor.scriptTxt = '';
+        let diagnosticList = [];
+        let lines = receivedMsg.split("\r\n");
+        let startLine = 0;
+        for (let i = 0; i < lines.length; i++) {
+            if (lines[i] == "Line(s)  : Description") {
+                startLine = i;
+                break;
+            }
+        }
+        for (let x = startLine + 2; x < lines.length; x += 2) {
+            if (lines[x] && (/^\s*(\d+)\s:\s(.+)$/.test(lines[x]))) {
+                let match = /^\s*(\d+)\s:\s(.+)$/.exec(lines[x]);
+                let line = match[1];
+                let errorMsg = match[2];
+                let textLine = vscode.window.activeTextEditor.document.lineAt(Number(line) - 1);
+                let diagnostic = new vscode.Diagnostic(textLine.range, errorMsg, vscode.DiagnosticSeverity.Error);
+                diagnosticList.push(diagnostic);
+            }
+        }
+        diagnostics.set(vscode.window.activeTextEditor.document.uri, diagnosticList);
+        vscode.commands.executeCommand('workbench.actions.view.problems');
+        let match = /(Compile Failed w\/(.*) errors and (.*) warnings\.)/.exec(receivedMsg);
+        vscode.window.showErrorMessage(match[1]);
         vscode.window.setStatusBarMessage('Upload failed.', 5000);
     } else if (/Compile OK\./.test(receivedMsg)) {
         sendMsg('Q\n');
@@ -611,6 +638,9 @@ function gslDownload2(script) {
 }
 
 function downloadScript(receivedMsg) {
+    if (gslEditor.getScript == 2) { //Downloading script now, may span multiple messages
+        gslEditor.scriptTxt += receivedMsg.replace(/Edt:$/, ''); //Remove ending Edt:
+    }
     if (/Welcome to.*\s\n.*\s\nAll Rights Reserved/.test(receivedMsg)) {
         if (isNaN(gslEditor.input)) {
             vscode.window.setStatusBarMessage('Downloading verb ' + gslEditor.input + '...', 5000);
@@ -622,16 +652,14 @@ function downloadScript(receivedMsg) {
         gslEditor.getScript = 1;
         gslEditor.scriptTxt = '';
     } else if (/Error: Script #(.*) is a verb. Please use \/mv (.*) instead\./.test(receivedMsg)) {
-        let myRegexp = /Error: Script #(.*) is a verb. Please use \/mv (.*) instead\./;
-        let match = myRegexp.exec(receivedMsg);
+        let match = /Error: Script #(.*) is a verb. Please use \/mv (.*) instead\./.exec(receivedMsg);
         sendMsg('/mv ' + match[2] + '\n');
     } else if (/Error: Script #\d\d\d\d\d has not been created yet/.test(receivedMsg)) {
         return vscode.window.showErrorMessage('Script #' + gslEditor.input + ' has not been created yet.');
     } else if (/Verb not found/.test(receivedMsg)) {
         return vscode.window.showErrorMessage('Verb name ' + gslEditor.input + ' has not been created yet.');
     } else if (/LineEditor/.test(receivedMsg)) {
-        let myRegexp = /(?:New\s)?File:\s\.\.\/scripts\/(S\d\d\d\d\d)/;
-        let match = myRegexp.exec(receivedMsg);
+        let match = /(?:New\s)?File:\s\.\.\/scripts\/(S\d\d\d\d\d)/.exec(receivedMsg);
         if (/New File/.test(receivedMsg)) {
             sendMsg('\n');
         } else {
@@ -817,18 +845,12 @@ function onConnSGEData(data) {
 function onConnGameData(data) {
     let receivedMsg = data.toString();
     receivedMsg = receivedMsg.replace(/\n$/, ''); //Remove ending newline
-    let msgArray = receivedMsg.split('\t');
     outGameChannel(receivedMsg);
     gslEditor.lastMsg = receivedMsg;
     gslEditor.msgCount++;
 
     if (receivedMsg.includes('Edt:')) { //Editing a script
         setTimeout(function () { checkState(receivedMsg, gslEditor.msgCount) }, 5000);
-    }
-
-    if (gslEditor.getScript == 2) { //Downloading script now, may span multiple messages
-        gslEditor.scriptTxt += receivedMsg;
-        gslEditor.scriptTxt = gslEditor.scriptTxt.replace(/Edt:$/, ''); //Remove ending Edit:
     }
 
     if (/^<mode id="GAME"\/>$/.test(receivedMsg)) {

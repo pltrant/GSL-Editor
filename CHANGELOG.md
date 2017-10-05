@@ -1,12 +1,18 @@
 # Change Log
 All notable changes to the GSL Editor extension will be documented in this file.
 
-## [1.0.6] - 2017-09-##
+## [1.1.0] - 2017-10-05
 ## Added
-- New installations of the extension will now default to the GSL Vibrant theme.
+- New installations of the extension will now prompt users to apply the GSL Vibrant theme.
+- New "Download To Workspace" setting, which when enabled, will download scripts to your currently opened folder. - Oliver/Naos
+
+## Changed
+- Compile errors, detected when uploading, are now displayed using the diagnostic API for Visual Studio Code.  When an error is found, it will display the Problems view which lists all errors.  You can click on each error to go directly to that line.  A red squiggly line will also show up under the text for the line with the error, which will persist until you upload again and error is resolved.
+- A few minor adjustments to the colors in the GSL Light theme.
 
 ## Fixed
-- Adjusted game login Status Bar text to truly only display when connecting.
+- Adjusted game login Status Bar text to only display when connecting.
+- Langauge definition update for callmatch pattern. - Oliver/Naos
 
 ## [1.0.5] - 2017-09-21
 ## Added

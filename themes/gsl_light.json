@@ -5,9 +5,15 @@
 	"include": "./light_plus.json",
 	"tokenColors": [
 		{
-			"scope": "comment.gsl.scan.index.ten",
+            "scope": "comment",
+            "settings": {
+                "foreground": "#A0A0A0"
+            }
+		},
+		{
+			"scope": "constant.numeric",
 			"settings": {
-				"fontStyle": "bold"
+				"foreground": "#FD971F"
 			}
 		},
 		{
@@ -23,41 +29,27 @@
 			}
 		},
 		{
-			"scope": "keyword.gsl.dangerous",
-			"settings": {
-				"foreground": "#C64844",
-				"fontStyle": "bold"
-			}
-		},
-		{
 			"scope": "keyword.gsl.stop",
 			"settings": {
-				"foreground": "#AE66CF",
-				"fontStyle": "bold"
+				"foreground": "#0000ff"
 			}
 		},
 		{
 			"scope": "keyword.gsl.stack",
 			"settings": {
-				"foreground": "#AE66CF"
+				"foreground": "#0000ff"
 			}
 		},
 		{
             "scope": "matchmarker.gsl.name",
             "settings": {
-                "fontStyle": "bold"
+                "foreground": "#008000"
             }
-		},
-		{
-			"scope": "string.quoted.double.gsl",
-			"settings": {
-				"foreground": "#a31515"
-			}
 		},
 		{
 			"scope": "token.gsl",
 			"settings": {
-				"foreground": "#4EC9B0"
+				"foreground": "#AE81FF"
 			}
 		},
 		{
@@ -67,22 +59,27 @@
 			}
 		},
 		{
+            "scope": "variable.gsl.register",
+            "settings": {
+                "foreground": "#267f99"
+            }
+        },
+		{
 			"scope": "variable.gsl.system",
 			"settings": {
-				"foreground": "#267f99"
+				"foreground": "#AE81FF"
 			}
 		},
 		{
 			"scope": "variable.gsl.node",
 			"settings": {
-				"foreground": "#CC8300",
-				"fontStyle": "bold"
+				"foreground": "#AF00DB"
 			}
 		},
 		{
 			"scope": "variable.gsl.field",
 			"settings": {
-				"foreground": "#CC8300"
+				"foreground": "#FF00C8"
 			}
 		}
     ]
