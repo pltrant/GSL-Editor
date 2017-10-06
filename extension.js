@@ -27,6 +27,7 @@ var gslEditor = {
     input: '',
     lastMsg: ''
 }
+var logging = false;
 
 class matchMarkersProvider {
     constructor(context) {
@@ -360,6 +361,9 @@ function activate(context) {
     gslEditor.extContext.subscriptions.push(vscode.commands.registerCommand('extension.gslListTokens', () => {
         gslListTokens();
     }));
+    gslEditor.extContext.subscriptions.push(vscode.commands.registerCommand('extension.gslLogging', () => {
+        gslLogging();
+    }));
 
     if (vscode.workspace.getConfiguration('gsl').get('displayGameChannel')) {
         getGameChannel().show(true);
@@ -377,8 +381,9 @@ function activate(context) {
     const matchMarkersProvider1 = new matchMarkersProvider(gslEditor.extContext);
     vscode.window.registerTreeDataProvider('matchMarkers', matchMarkersProvider1);
 
+    this.diagnostics = vscode.languages.createDiagnosticCollection();
+
     checkForUpdatedVersion();
-    this.diagnostics = vscode.languages.createDiagnosticCollection('GSL-Compile-Errors');
 }
 exports.activate = activate;
 
@@ -448,6 +453,16 @@ function gslListTokens() {
     vscode.commands.executeCommand('markdown.showPreview', vscode.Uri.file(path.resolve(__dirname, "./syntaxes/tokens.md")));
 }
 
+function gslLogging() {
+    if (logging) {
+        logging = false;
+        vscode.window.setStatusBarMessage('Logging disabled.', 5000);
+    } else {
+        logging = true;
+        vscode.window.setStatusBarMessage('Logging enabled.', 5000);
+    }
+}
+
 function delayedGameCommand(command) {
     if (gameClient.connected) {
         getGameChannel().show(true);
@@ -498,7 +513,7 @@ function gslUpload2(scriptNum) {
 function uploadScript(receivedMsg) {
     if (/Welcome to.*\s\n.*\s\nAll Rights Reserved/.test(receivedMsg)) {
         sendMsg('/ss ' + gslEditor.scriptNum + '\n');
-    } else if ((/^Name:[\s\S]*\d{4}\r\n.*>$/.test(receivedMsg)) && (gslEditor.sendScript == 1)) {
+    } else if ((/Name:[\s\S]*\d{4}\r\n.*>$/.test(receivedMsg)) && (gslEditor.sendScript == 1)) {
         let modifier = /Last modified by: ([\w-_\.]+)/.exec(receivedMsg)[1];
         let date = /\nOn \w+ (\w+) (\d+) (.+) (\d+)/.exec(receivedMsg);
         let data = modifier + ' on ' + date[1] + ' ' + date[2] + ', ' + date[4] + ' at ' + date[3];
@@ -548,16 +563,9 @@ function uploadScript(receivedMsg) {
         gslEditor.scriptTxt = '';
         let diagnosticList = [];
         let lines = receivedMsg.split("\r\n");
-        let startLine = 0;
         for (let i = 0; i < lines.length; i++) {
-            if (lines[i] == "Line(s)  : Description") {
-                startLine = i;
-                break;
-            }
-        }
-        for (let x = startLine + 2; x < lines.length; x += 2) {
-            if (lines[x] && (/^\s*(\d+)\s:\s(.+)$/.test(lines[x]))) {
-                let match = /^\s*(\d+)\s:\s(.+)$/.exec(lines[x]);
+            if (lines[i] && (/^\s*(\d+)\s:\s(.+)$/.test(lines[i]))) {
+                let match = /^\s*(\d+)\s:\s(.+)$/.exec(lines[i]);
                 let line = match[1];
                 let errorMsg = match[2];
                 let textLine = vscode.window.activeTextEditor.document.lineAt(Number(line) - 1);
@@ -574,7 +582,7 @@ function uploadScript(receivedMsg) {
         sendMsg('Q\n');
     } else if (/Compile ok\./.test(receivedMsg)) {
         sendMsg('/ss ' + gslEditor.scriptNum + '\n');
-    } else if ((/^Name:[\s\S]*\d{4}\r\n.*>$/.test(receivedMsg)) && (gslEditor.sendScript == 3)) {
+    } else if ((/Name:[\s\S]*\d{4}\r\n.*>$/.test(receivedMsg)) && (gslEditor.sendScript == 3)) {
         let modifier = /Last modified by: ([\w-_\.]+)/.exec(receivedMsg)[1];
         let date = /\nOn \w+ (\w+) (\d+) (.+) (\d+)/.exec(receivedMsg);
         let data = modifier + ' on ' + date[1] + ' ' + date[2] + ', ' + date[4] + ' at ' + date[3];
@@ -669,25 +677,8 @@ function downloadScript(receivedMsg) {
         gslEditor.getScript = 2;
     } else if (/Edt:$/.test(receivedMsg)) {
         sendMsg('Q\n');
-        let extPath = null;
-        let useWorkspaceFolder = vscode.workspace.getConfiguration('gsl').get('downloadToWorkspace');
-        if (useWorkspaceFolder && vscode.workspace.workspaceFolders) {
-            extPath = vscode.workspace.workspaceFolders[0].uri.fsPath
-        } else {
-            extPath = vscode.workspace.getConfiguration('gsl').get('downloadPath');
-        }
-        if (!extPath) {
-            let rootPath = path.resolve(__dirname, '../gsl');
-            if (!fs.existsSync(rootPath)) { //Directory doesn't exist
-                fs.mkdirSync(rootPath); //Create directory
-            }
-            extPath = path.resolve(__dirname, '../gsl/scripts');
-        }
-        if (!fs.existsSync(extPath)) { //Directory doesn't exist
-            fs.mkdirSync(extPath); //Create directory
-        }
         return __awaiter(this, void 0, void 0, function* () {
-            let fileName = path.join(extPath, gslEditor.scriptNum) + vscode.workspace.getConfiguration('gsl').get('fileExtension');
+            let fileName = path.join(getDownloadLocation(), gslEditor.scriptNum) + vscode.workspace.getConfiguration('gsl').get('fileExtension');
             if (fs.existsSync(fileName)) { //Check for existing file
                 fs.unlinkSync(fileName); //Already exists, delete it
             }
@@ -700,7 +691,7 @@ function downloadScript(receivedMsg) {
     } else if (/(Script edit aborted|Modification aborted)/.test(receivedMsg)) {
         let scriptNum = gslEditor.scriptNum.replace(/\D+/g, '').replace(/^0+/, '');
         sendMsg('/ss ' + scriptNum + '\n');
-    } else if (/^Name:[\s\S]*\d{4}\r\n.*>$/.test(receivedMsg)) {
+    } else if (/Name:[\s\S]*\d{4}\r\n.*>$/.test(receivedMsg)) {
         let scriptNum = gslEditor.scriptNum.replace(/\D+/g, '').replace(/^0+/, '');
         let modifier = /Last modified by: ([\w-_\.]+)/.exec(receivedMsg)[1];
         let date = /\nOn \w+ (\w+) (\d+) (.+) (\d+)/.exec(receivedMsg);
@@ -713,6 +704,27 @@ function downloadScript(receivedMsg) {
             gslEditor.getScript = 0;
         }
     }
+}
+
+function getDownloadLocation() {
+    let extPath = null;
+    let useWorkspaceFolder = vscode.workspace.getConfiguration('gsl').get('downloadToWorkspace');
+    if (useWorkspaceFolder && vscode.workspace.workspaceFolders) {
+        extPath = vscode.workspace.workspaceFolders[0].uri.fsPath
+    } else {
+        extPath = vscode.workspace.getConfiguration('gsl').get('downloadPath');
+    }
+    if (!extPath) {
+        let rootPath = path.resolve(__dirname, '../gsl');
+        if (!fs.existsSync(rootPath)) { //Directory doesn't exist
+            fs.mkdirSync(rootPath); //Create directory
+        }
+        extPath = path.resolve(__dirname, '../gsl/scripts');
+    }
+    if (!fs.existsSync(extPath)) { //Directory doesn't exist
+        fs.mkdirSync(extPath); //Create directory
+    }
+    return extPath
 }
 
 function gslDateCheck() {
@@ -751,6 +763,9 @@ function dateCheck(receivedMsg) {
 }
 
 function sendMsg(msg) {
+    if (logging && (sgeClient.connected == false)) { // Don't log SGE connection data (account, password hash, etc)
+        fs.appendFile(path.join(getDownloadLocation(), 'GSL-Editor.log'), 'Sent: ' + msg);
+    }
     outGameChannel('Sent: ' + msg);
     if (sgeClient.connected) {
         sgeClient.write(msg);
@@ -844,6 +859,9 @@ function onConnSGEData(data) {
 
 function onConnGameData(data) {
     let receivedMsg = data.toString();
+    if (logging) {
+        fs.appendFile(path.join(getDownloadLocation(), 'GSL-Editor.log'), 'Received: ' + receivedMsg);
+    }
     receivedMsg = receivedMsg.replace(/\n$/, ''); //Remove ending newline
     outGameChannel(receivedMsg);
     gslEditor.lastMsg = receivedMsg;

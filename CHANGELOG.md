@@ -1,6 +1,10 @@
 # Change Log
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.1.1] - 2017-10-06
+## Added
+- New command to manually enable logging for debugging.  Defaults to off and does not log any SGE connection data (account, password hash, etc).
+
 ## [1.1.0] - 2017-10-05
 ## Added
 - New installations of the extension will now prompt users to apply the GSL Vibrant theme.
