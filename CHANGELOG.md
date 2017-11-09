@@ -1,6 +1,10 @@
 # Change Log
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.1.2] - 2017-##-##
+## Changed
+- The Problems view (which lists compile errors found during an upload) will no longer auto-close when uploading a script and the view is already open.
+
 ## [1.1.1] - 2017-10-06
 ## Added
 - New command to manually enable logging for debugging.  Defaults to off and does not log any SGE connection data (account, password hash, etc).

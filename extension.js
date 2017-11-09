@@ -574,7 +574,7 @@ function uploadScript(receivedMsg) {
             }
         }
         diagnostics.set(vscode.window.activeTextEditor.document.uri, diagnosticList);
-        vscode.commands.executeCommand('workbench.actions.view.problems');
+        vscode.commands.executeCommand('workbench.action.problems.focus');
         let match = /(Compile Failed w\/(.*) errors and (.*) warnings\.)/.exec(receivedMsg);
         vscode.window.showErrorMessage(match[1]);
         vscode.window.setStatusBarMessage('Upload failed.', 5000);
