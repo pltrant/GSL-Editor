@@ -1,7 +1,10 @@
 # Change Log
 All notable changes to the GSL Editor extension will be documented in this file.
 
-## [1.1.2] - 2017-##-##
+## [1.2.0] - 2018-01-27
+## Added
+- Implemented Go to/Peek Definitions.  You can now click on a line with a call(match), then hit F12 or right-click > Go to Definition to automatically open up that script and go to that matchmarker in it.  If you have an existing local copy already, it will open it; otherwise will download it from the server.  Keep in mind if it opens the local copy, the script could be out of date and not have changes that are implemented on the server.  Using Peek Definition allows you to view it in a frame instead of a new tab so you never have to leave your existing script.  Give both a try!
+
 ## Changed
 - The Problems view (which lists compile errors found during an upload) will no longer auto-close when uploading a script and the view is already open.
 

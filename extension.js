@@ -25,7 +25,8 @@ var gslEditor = {
     scriptTxt: '',
     debug: '',
     input: '',
-    lastMsg: ''
+    lastMsg: '',
+    goToDefinition: ''
 }
 var logging = false;
 
@@ -262,6 +263,52 @@ class hoverProvider {
     }
 }
 
+class definitionProvider {
+    provideDefinition(document, position, token) {
+        let txt = document.lineAt(position.line).text.trim().toLowerCase();
+        if (txt.includes('call')) {
+            let txtArray = txt.split(' ');
+            if (txtArray[4] == '$thisscript') {
+                for (let i = 0; i < document.lineCount; i++) {
+                    let line = document.lineAt(i);
+                    if (line.text.toLowerCase().startsWith(': ' + txtArray[2])) {
+                        return new vscode.Location(document.uri, new vscode.Position(i, 0));
+                    }
+                }
+            } else {
+                let scriptNum = '';
+                if (txtArray.length == 2) { //call #
+                    scriptNum = txtArray[1];
+                } else if (txtArray[3] == 'in') { //callmatch must_match "$*" in #
+                    scriptNum = txtArray[4];
+                } else {
+                    return;
+                }
+                while (scriptNum.length < 5) {
+                    scriptNum = '0' + scriptNum;
+                }
+                let scriptFile = path.join(getDownloadLocation(), 'S' + scriptNum) + vscode.workspace.getConfiguration('gsl').get('fileExtension');
+                if (fs.existsSync(scriptFile)) {
+                    let idx = 0;
+                    if (typeof txtArray[4] !== 'undefined') {
+                        let fileTxt = fs.readFileSync(scriptFile).toString().split('\r\n');
+                        for (let i = 0; i < fileTxt.length; i++) {
+                            if (fileTxt[i].toLowerCase().startsWith(': ' + txtArray[2])) {
+                                idx = i;
+                                break;
+                            }
+                        }
+                    }
+                    return new vscode.Location(vscode.Uri.file(scriptFile), new vscode.Position(idx, 0));
+                } else {
+                    gslEditor.goToDefinition = txtArray[2];
+                    gslDownload2(scriptNum);
+                }
+            }
+        }
+    }
+}
+
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
@@ -376,6 +423,10 @@ function activate(context) {
     gslEditor.extContext.subscriptions.push(vscode.languages.registerHoverProvider(
         {language: "gsl"},
         new hoverProvider()
+    ));
+    gslEditor.extContext.subscriptions.push(vscode.languages.registerDefinitionProvider(
+        {language: "gsl"},
+        new definitionProvider()
     ));
 
     const matchMarkersProvider1 = new matchMarkersProvider(gslEditor.extContext);
@@ -689,6 +740,17 @@ function downloadScript(receivedMsg) {
             vscode.window.setStatusBarMessage('Download successful.', 5000);
         });
     } else if (/(Script edit aborted|Modification aborted)/.test(receivedMsg)) {
+        if (gslEditor.goToDefinition) {
+            let doc = vscode.window.activeTextEditor.document;
+            for (let i = 0; i < doc.lineCount; i++) {
+                let line = doc.lineAt(i);
+                if (line.text.toLowerCase().startsWith(': ' + gslEditor.goToDefinition)) {
+                    vscode.commands.executeCommand('revealLine', {lineNumber: i, at: "top"})
+                    break;
+                }
+            }
+            gslEditor.goToDefinition = '';
+        }
         let scriptNum = gslEditor.scriptNum.replace(/\D+/g, '').replace(/^0+/, '');
         sendMsg('/ss ' + scriptNum + '\n');
     } else if (/Name:[\s\S]*\d{4}\r\n.*>$/.test(receivedMsg)) {
