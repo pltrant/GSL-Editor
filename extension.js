@@ -71,9 +71,9 @@ class matchMarkersProvider {
         let header = true;
         for (let index = 1; index < doc.lineCount; index++) {
             let text = doc.lineAt(index).text;
-            if (/^: "(.*)"/.test(text)) {
+            if (/^:\s+"(.*?)"/.test(text)) {
                 header = false;
-                let match = /^: "(.*)"/.exec(text);
+                let match = /^:\s+"(.*?)"/.exec(text);
                 this.tree.push(match[1]);
                 this.dict[match[1]] = index; //Store line number found at.
             } else if (header && !text.startsWith("!")) {
@@ -120,7 +120,7 @@ class symbolProvider {
                 let line = document.lineAt(i);
                 if (line.text.startsWith(": ")) {
                     header = false;
-                    let matchMarker = /^:\s+\"(.*?)\"/.exec(line.text);
+                    let matchMarker = /^:\s+"(.*?)"/.exec(line.text);
                     symbols.push({
                         name: matchMarker[1],
                         kind: vscode.SymbolKind.Function,

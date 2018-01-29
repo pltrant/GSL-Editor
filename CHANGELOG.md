@@ -1,6 +1,10 @@
 # Change Log
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.#.#] - 2018-##-##
+## Fixed
+- Matchmarkers view will no longer include comments in the matchmarker name.
+
 ## [1.2.2] - 2018-01-29
 ## Fixed
 - A performance update to lessen the impact of calculating the Matchmarkers view when text changes or the cursor is moved while staying on the same line.
