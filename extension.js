@@ -48,6 +48,11 @@ class matchMarkersProvider {
         this.refresh();
     }
     refresh() {
+        let currentLine = vscode.window.activeTextEditor.selection.active.line;
+        if ((this.lastLine !== 'undefined') & (this.lastLine == currentLine)) {
+            return; //No need to recalculate if they're still on the same line.
+        }
+        this.lastLine = currentLine;
         this.getMatchMarkers();
         this._onDidChangeTreeData.fire();
     }

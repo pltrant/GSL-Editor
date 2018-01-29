@@ -1,9 +1,13 @@
 # Change Log
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.2.2] - 2018-01-29
+## Fixed
+- A performance update to lessen the impact of calculating the Matchmarkers view when text changes or the cursor is moved while staying on the same line.
+
 ## [1.2.1] - 2018-01-28
 ## Added
-- An arrow will now display in the Matchmarkers view to represents where the cursor is.
+- An arrow will now display in the Matchmarkers view to represent the current matchmarker that the cursor is located in.
 
 ## [1.2.0] - 2018-01-27
 ## Added
