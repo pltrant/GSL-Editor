@@ -35,10 +35,13 @@ class matchMarkersProvider {
         this.context = context;
         this._onDidChangeTreeData = new vscode.EventEmitter();
         this.onDidChangeTreeData = this._onDidChangeTreeData.event;
-        vscode.window.onDidChangeActiveTextEditor((editor) => {
+        vscode.window.onDidChangeActiveTextEditor((e) => {
             this.refresh();
         });
         vscode.workspace.onDidChangeTextDocument((e) => {
+            this.refresh();
+        });
+        vscode.window.onDidChangeTextEditorSelection((e) => {
             this.refresh();
         });
         this.dict = {}; // key value of matchmarkers and the line number each can be found at.
@@ -58,6 +61,8 @@ class matchMarkersProvider {
         if (doc.languageId != "gsl") {
             return;
         }
+        let cursorLine = editor.selection.active.line;
+        this.currentMM = '';
         let header = true;
         for (let index = 1; index < doc.lineCount; index++) {
             let text = doc.lineAt(index).text;
@@ -70,6 +75,9 @@ class matchMarkersProvider {
                 header = false;
                 this.tree.push('""');
                 this.dict['""'] = index; //Store line number found at.
+            }
+            if ((index >= cursorLine) & (this.currentMM == '')) {
+                this.currentMM = this.tree[this.tree.length - 1];
             }
         }
     }
@@ -85,6 +93,14 @@ class matchMarkersProvider {
                 lineNumber: this.dict[element.label],
                 at: "top"
             }]
+        }
+        if (element.label == this.currentMM) {
+            element.iconPath = {
+                dark: vscode.Uri.file(path.resolve(__dirname, "./icons/dark-currentMM.svg")),
+                light: vscode.Uri.file(path.resolve(__dirname, "./icons/light-currentMM.svg"))
+            };
+        } else {
+            element.iconPath = vscode.Uri.file(path.resolve(__dirname, "./icons/none.svg"))
         }
         return element;
     }
