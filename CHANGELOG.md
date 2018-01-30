@@ -1,9 +1,17 @@
 # Change Log
 All notable changes to the GSL Editor extension will be documented in this file.
 
-## [1.#.#] - 2018-##-##
+## [1.3.0] - 2018-01-30
+## Added
+- Clicking on a conditional (e.g. 'if') or control (e.g. 'loop') keyword will now highlight it and its matching conditional (e.g. 'else') and closing keywords (e.g. '.').
+
+# Changed
+- Set highlight similiar matches on selection to disabled by default. (e.g. clicking on 'word' will no longer highlight all other instances of 'word').  You can override this in the settings.
+
 ## Fixed
 - Matchmarkers view will no longer include comments in the matchmarker name.
+- Removed 'while' from the control syntax highlight - that's not a valid keyword for GSL.
+- Added 'else_ifnot' to auto indentation rules.
 
 ## [1.2.2] - 2018-01-29
 ## Fixed

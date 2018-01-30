@@ -47,26 +47,27 @@ class matchMarkersProvider {
         this.dict = {}; // key value of matchmarkers and the line number each can be found at.
         this.refresh();
     }
+
     refresh() {
-        let currentLine = vscode.window.activeTextEditor.selection.active.line;
-        if ((this.lastLine !== 'undefined') & (this.lastLine == currentLine)) {
-            return; //No need to recalculate if they're still on the same line.
-        }
-        this.lastLine = currentLine;
-        this.getMatchMarkers();
-        this._onDidChangeTreeData.fire();
-    }
-    getMatchMarkers() {
-        this.tree = [];
         let editor = vscode.window.activeTextEditor;
         if (!editor) {
             return;
         }
+        let currentLine = editor.selection.active.line;
+        if (this.lastLine && (this.lastLine == currentLine)) {
+            return; //Don't recalc if they're still on the same line
+        }
+        this.lastLine = currentLine;
+        this.getMatchMarkers(editor, currentLine);
+        this._onDidChangeTreeData.fire();
+    }
+
+    getMatchMarkers(editor, currentLine) {
+        this.tree = [];
         let doc = editor.document;
         if (doc.languageId != "gsl") {
             return;
         }
-        let cursorLine = editor.selection.active.line;
         this.currentMM = '';
         let header = true;
         for (let index = 1; index < doc.lineCount; index++) {
@@ -81,15 +82,17 @@ class matchMarkersProvider {
                 this.tree.push('""');
                 this.dict['""'] = index; //Store line number found at.
             }
-            if ((index >= cursorLine) & (this.currentMM == '')) {
+            if ((index >= currentLine) && (this.currentMM == '')) {
                 this.currentMM = this.tree[this.tree.length - 1];
             }
         }
     }
+
     getChildren(element) {
         const nodes = this.tree.map(node => new vscode.TreeItem(node));
         return nodes;
     }
+
     getTreeItem(element) {
         element.command = {
             command: "revealLine",
@@ -311,7 +314,7 @@ class definitionProvider {
                 let scriptFile = path.join(getDownloadLocation(), 'S' + scriptNum) + vscode.workspace.getConfiguration('gsl').get('fileExtension');
                 if (fs.existsSync(scriptFile)) {
                     let idx = 0;
-                    if (typeof txtArray[4] !== 'undefined') {
+                    if (txtArray[4]) {
                         let fileTxt = fs.readFileSync(scriptFile).toString().split('\r\n');
                         for (let i = 0; i < fileTxt.length; i++) {
                             if (fileTxt[i].toLowerCase().startsWith(': ' + txtArray[2])) {
@@ -324,6 +327,124 @@ class definitionProvider {
                 } else {
                     gslEditor.goToDefinition = txtArray[2];
                     gslDownload2(scriptNum);
+                }
+            }
+        }
+    }
+}
+
+class documentHighlightProvider {
+    provideDocumentHighlights(document, position, token) {
+        let highlights = [];
+        let startKeywords = /^\s*(if|ifnot|loop|when|is|default|fastpush|push)\b.*$/i;
+        let middleKeywords = /^\s*(else|else_if|else_ifnot)\b.*$/i;
+        let endKeywords = /^\s*\.|(fastpop|pop)\b.*$/i;
+        let textRange = document.getWordRangeAtPosition(position);
+        let foundEnd = false;
+        let lineNum = 0;
+        let textLine = '';
+        let starts = 0;
+        let ends = 0;
+        if (startKeywords.test(document.getText(textRange))) {
+            highlights.push(new vscode.DocumentHighlight(textRange, {kind: 0}));
+            foundEnd = false;
+            lineNum = textRange.start.line;
+            textLine = '';
+            starts = 0;
+            ends = 0;
+            while (foundEnd == false) {
+                textLine = document.lineAt(lineNum).text;
+                if (startKeywords.test(textLine)) {
+                    starts++;
+                } else if ((starts == ends + 1) && (middleKeywords.test(textLine))) {
+                    this.addHighlight(highlights, document, lineNum, textLine);
+                } else if (endKeywords.test(textLine)) {
+                    ends++;
+                }
+                if (starts == ends) {
+                    this.addHighlight(highlights, document, lineNum, textLine);
+                    foundEnd = true;
+                }
+                lineNum++;
+            }
+        } else if (middleKeywords.test(document.getText(textRange))) {
+            highlights.push(new vscode.DocumentHighlight(textRange, {kind: 0}));
+            // Check for the starting keyword.
+            foundEnd = false;
+            lineNum = textRange.start.line;
+            textLine = '';
+            starts = 0;
+            ends = 1;
+            while (foundEnd == false) {
+                textLine = document.lineAt(lineNum).text;
+                if (startKeywords.test(textLine)) {
+                    starts++;
+                } else if ((starts == ends) && (middleKeywords.test(textLine))) {
+                    this.addHighlight(highlights, document, lineNum, textLine);
+                } else if (endKeywords.test(textLine)) {
+                    ends++;
+                }
+                if (starts == ends) {
+                    this.addHighlight(highlights, document, lineNum, textLine);
+                    foundEnd = true;
+                }
+                lineNum--;
+            }
+            // Check for the ending keyword.
+            foundEnd = false;
+            lineNum = textRange.start.line;
+            textLine = '';
+            starts = 1;
+            ends = 0;
+            while (foundEnd == false) {
+                textLine = document.lineAt(lineNum).text;
+                if (startKeywords.test(textLine)) {
+                    starts++;
+                } else if ((starts == ends + 1) && (middleKeywords.test(textLine))) {
+                    this.addHighlight(highlights, document, lineNum, textLine);
+                } else if (endKeywords.test(textLine)) {
+                    ends++;
+                }
+                if (starts == ends) {
+                    this.addHighlight(highlights, document, lineNum, textLine);
+                    foundEnd = true;
+                }
+                lineNum++;
+            }
+        } else if (endKeywords.test(document.getText(textRange))) {
+            highlights.push(new vscode.DocumentHighlight(textRange, {kind: 0}));
+            foundEnd = false;
+            lineNum = textRange.start.line;
+            textLine = '';
+            starts = 0;
+            ends = 0;
+            while (foundEnd == false) {
+                textLine = document.lineAt(lineNum).text;
+                if (startKeywords.test(textLine)) {
+                    starts++;
+                } else if ((starts + 1 == ends) && (middleKeywords.test(textLine))) {
+                    this.addHighlight(highlights, document, lineNum, textLine);
+                } else if (endKeywords.test(textLine)) {
+                    ends++;
+                }
+                if (starts == ends) {
+                    this.addHighlight(highlights, document, lineNum, textLine);
+                    foundEnd = true;
+                }
+                lineNum--;
+            }
+        }
+        return highlights;
+    }
+
+    addHighlight(highlights, document, lineNum, textLine) {
+        let startIdx = textLine.search(/\S|$/);
+        if (startIdx > -1) {
+            let endPos = new vscode.Position(lineNum, startIdx);
+            if (endPos) {
+                let endRange = document.getWordRangeAtPosition(endPos, /\.|if|ifnot|loop|when|is|default|else_ifnot|else_if|else|fastpush|fastpop|push|pop/);
+                if (endRange) {
+                    highlights.push(new vscode.DocumentHighlight(endRange));
                 }
             }
         }
@@ -437,6 +558,8 @@ function activate(context) {
         getGameChannel().show(true);
     }
 
+    vscode.languages.setLanguageConfiguration('gsl', {wordPattern: /[\S]+/});
+
     gslEditor.extContext.subscriptions.push(vscode.languages.registerDocumentSymbolProvider(
         {language: "gsl"},
         new symbolProvider()
@@ -448,6 +571,10 @@ function activate(context) {
     gslEditor.extContext.subscriptions.push(vscode.languages.registerDefinitionProvider(
         {language: "gsl"},
         new definitionProvider()
+    ));
+    gslEditor.extContext.subscriptions.push(vscode.languages.registerDocumentHighlightProvider(
+        {language: "gsl"},
+        new documentHighlightProvider()
     ));
 
     const matchMarkersProvider1 = new matchMarkersProvider(gslEditor.extContext);

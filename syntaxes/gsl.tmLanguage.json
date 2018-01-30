@@ -352,7 +352,7 @@
 				},
 				{
 					"name": "keyword.gsl.control",
-					"match": "\\b(?i:else|when|while|loop|is|default)\\b"
+					"match": "\\b(?i:else|when|loop|is|default)\\b"
 				},
 				{
 					"name": "keyword.gsl.matchspell",
