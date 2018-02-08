@@ -89,8 +89,10 @@ class matchMarkersProvider {
     }
 
     getChildren(element) {
-        const nodes = this.tree.map(node => new vscode.TreeItem(node));
-        return nodes;
+        if (typeof this.tree != 'undefined') {
+            const nodes = this.tree.map(node => new vscode.TreeItem(node));
+            return nodes;
+        }
     }
 
     getTreeItem(element) {

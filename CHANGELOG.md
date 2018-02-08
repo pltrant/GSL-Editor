@@ -1,11 +1,15 @@
 # Change Log
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.3.1] - 2018-02-07
+## Fixed
+- Corrected a "cannot read property 'map' of undefined" error when starting VSCode while not in a script file.
+
 ## [1.3.0] - 2018-01-30
 ## Added
 - Clicking on a conditional (e.g. 'if') or control (e.g. 'loop') keyword will now highlight it and its matching conditional (e.g. 'else') and closing keywords (e.g. '.').
 
-# Changed
+## Changed
 - Set highlight similiar matches on selection to disabled by default. (e.g. clicking on 'word' will no longer highlight all other instances of 'word').  You can override this in the settings.
 
 ## Fixed
