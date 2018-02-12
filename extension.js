@@ -578,9 +578,10 @@ function activate(context) {
         {language: "gsl"},
         new documentHighlightProvider()
     ));
-
-    const matchMarkersProvider1 = new matchMarkersProvider(gslEditor.extContext);
-    vscode.window.registerTreeDataProvider('matchMarkers', matchMarkersProvider1);
+    gslEditor.extContext.subscriptions.push(vscode.window.registerTreeDataProvider(
+        'matchMarkers',
+        new matchMarkersProvider()
+    ));
 
     this.diagnostics = vscode.languages.createDiagnosticCollection();
 
@@ -824,6 +825,7 @@ function gslDownload() {
                 return vscode.window.showErrorMessage('Invalid script range: ' + BreakException.element);
             }
         }
+        gslEditor.scriptNum = gslEditor.scriptArray[0];
         gslDownload2(gslEditor.scriptArray[0]);
     });
 }
@@ -1106,14 +1108,16 @@ function checkState(msg, count) {
 
 function onConnSGEClose() {
     outGameChannel('SGE connection closed.');
-    sgeClient.connected = false;
+    sgeClient.destroy();
     sgeClient.removeAllListeners();
+    sgeClient.connected = false;
 }
 
 function onConnGameClose() {
     outGameChannel('Game connection closed.');
-    gameClient.connected = false;
+    gameClient.destroy();
     gameClient.removeAllListeners();
+    gameClient.connected = false;
 }
 
 function onConnError(err) {
@@ -1128,6 +1132,18 @@ function onConnError(err) {
         gameClient.destroy();
         gameClient.removeAllListeners();
         gameClient.connected = false;
+    }
+    if ((err.code == 'ECONNABORTED') || (err.code == 'ECONNRESET')) {
+        if (gslEditor.sendScript) {
+            gslUpload2(gslEditor.scriptNum);
+            return;
+        } else if (gslEditor.getScript) {
+            gslDownload2(gslEditor.scriptNum);
+            return;
+        } else if (gslEditor.dateCheck) {
+            gslDateCheck();
+            return;
+        }
     }
     showError(err);
 }
