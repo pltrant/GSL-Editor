@@ -1,6 +1,10 @@
 # Change Log
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.3.3] - 2018-02-16
+## Changed
+- Rewrote some of the logic for the document highlighter (when the cursor is on an open/close control keyword, highlighting it and its counterpart).  This also fixed a bug when placing the cursor on the closing period of a matchmarker.  These changes should mostly be invisible to users.
+
 ## [1.3.2] - 2018-02-12
 ## Fixed
 - The logic to auto reconnect on disconnect should now work more consistently.

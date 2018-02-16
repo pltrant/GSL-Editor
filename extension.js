@@ -336,107 +336,77 @@ class definitionProvider {
 }
 
 class documentHighlightProvider {
+    constructor() {
+        this.startKeywords = /^:|^\s*(if|ifnot|loop|when|is|default|fastpush|push)\b.*$/i;
+        this.middleKeywords = /^\s*(else|else_if|else_ifnot)\b.*$/i;
+        this.endKeywords = /^\s*\.|(fastpop|pop)\b.*$/i;
+        this.gslWords = /:|\.|if|ifnot|loop|when|is|default|else_ifnot|else_if|else|fastpush|fastpop|push|pop/i;
+    }
+
     provideDocumentHighlights(document, position, token) {
         let highlights = [];
-        let startKeywords = /^\s*(if|ifnot|loop|when|is|default|fastpush|push)\b.*$/i;
-        let middleKeywords = /^\s*(else|else_if|else_ifnot)\b.*$/i;
-        let endKeywords = /^\s*\.|(fastpop|pop)\b.*$/i;
         let textRange = document.getWordRangeAtPosition(position);
-        let foundEnd = false;
-        let lineNum = 0;
-        let textLine = '';
+        let lineNum = textRange.start.line;
         let starts = 0;
         let ends = 0;
-        if (startKeywords.test(document.getText(textRange))) {
+        if (this.startKeywords.test(document.getText(textRange))) {
             highlights.push(new vscode.DocumentHighlight(textRange, {kind: 0}));
-            foundEnd = false;
-            lineNum = textRange.start.line;
-            textLine = '';
-            starts = 0;
-            ends = 0;
-            while (foundEnd == false) {
-                textLine = document.lineAt(lineNum).text;
-                if (startKeywords.test(textLine)) {
-                    starts++;
-                } else if ((starts == ends + 1) && (middleKeywords.test(textLine))) {
-                    this.addHighlight(highlights, document, lineNum, textLine);
-                } else if (endKeywords.test(textLine)) {
-                    ends++;
-                }
-                if (starts == ends) {
-                    this.addHighlight(highlights, document, lineNum, textLine);
-                    foundEnd = true;
-                }
-                lineNum++;
-            }
-        } else if (middleKeywords.test(document.getText(textRange))) {
+            this.searchLinesAfter(document, lineNum, highlights, starts, ends);
+        } else if (this.middleKeywords.test(document.getText(textRange))) {
             highlights.push(new vscode.DocumentHighlight(textRange, {kind: 0}));
             // Check for the starting keyword.
-            foundEnd = false;
-            lineNum = textRange.start.line;
-            textLine = '';
-            starts = 0;
             ends = 1;
-            while (foundEnd == false) {
-                textLine = document.lineAt(lineNum).text;
-                if (startKeywords.test(textLine)) {
-                    starts++;
-                } else if ((starts == ends) && (middleKeywords.test(textLine))) {
-                    this.addHighlight(highlights, document, lineNum, textLine);
-                } else if (endKeywords.test(textLine)) {
-                    ends++;
-                }
-                if (starts == ends) {
-                    this.addHighlight(highlights, document, lineNum, textLine);
-                    foundEnd = true;
-                }
-                lineNum--;
-            }
+            this.searchLinesBefore(document, lineNum, highlights, starts, ends);
             // Check for the ending keyword.
-            foundEnd = false;
             lineNum = textRange.start.line;
-            textLine = '';
             starts = 1;
             ends = 0;
-            while (foundEnd == false) {
-                textLine = document.lineAt(lineNum).text;
-                if (startKeywords.test(textLine)) {
-                    starts++;
-                } else if ((starts == ends + 1) && (middleKeywords.test(textLine))) {
-                    this.addHighlight(highlights, document, lineNum, textLine);
-                } else if (endKeywords.test(textLine)) {
-                    ends++;
-                }
-                if (starts == ends) {
-                    this.addHighlight(highlights, document, lineNum, textLine);
-                    foundEnd = true;
-                }
-                lineNum++;
-            }
-        } else if (endKeywords.test(document.getText(textRange))) {
+            this.searchLinesAfter(document, lineNum, highlights, starts, ends);
+        } else if (this.endKeywords.test(document.getText(textRange))) {
             highlights.push(new vscode.DocumentHighlight(textRange, {kind: 0}));
-            foundEnd = false;
-            lineNum = textRange.start.line;
-            textLine = '';
-            starts = 0;
-            ends = 0;
-            while (foundEnd == false) {
-                textLine = document.lineAt(lineNum).text;
-                if (startKeywords.test(textLine)) {
-                    starts++;
-                } else if ((starts + 1 == ends) && (middleKeywords.test(textLine))) {
-                    this.addHighlight(highlights, document, lineNum, textLine);
-                } else if (endKeywords.test(textLine)) {
-                    ends++;
-                }
-                if (starts == ends) {
-                    this.addHighlight(highlights, document, lineNum, textLine);
-                    foundEnd = true;
-                }
-                lineNum--;
-            }
+            this.searchLinesBefore(document, lineNum, highlights, starts, ends);
         }
         return highlights;
+    }
+
+    searchLinesAfter(document, lineNum, highlights, starts, ends) {
+        let foundEnd = false;
+        let textLine = '';
+        while (foundEnd == false) {
+            textLine = document.lineAt(lineNum).text;
+            if (this.startKeywords.test(textLine)) {
+                starts++;
+            } else if ((starts == ends + 1) && (this.middleKeywords.test(textLine))) {
+                this.addHighlight(highlights, document, lineNum, textLine);
+            } else if (this.endKeywords.test(textLine)) {
+                ends++;
+            }
+            if (starts == ends) {
+                this.addHighlight(highlights, document, lineNum, textLine);
+                foundEnd = true;
+            }
+            lineNum++;
+        }
+    }
+
+    searchLinesBefore(document, lineNum, highlights, starts, ends) {
+        let foundEnd = false;
+        let textLine = '';
+        while (foundEnd == false) {
+            textLine = document.lineAt(lineNum).text;
+            if (this.startKeywords.test(textLine)) {
+                starts++;
+            } else if ((starts + 1 == ends) && (this.middleKeywords.test(textLine))) {
+                this.addHighlight(highlights, document, lineNum, textLine);
+            } else if (this.endKeywords.test(textLine)) {
+                ends++;
+            }
+            if (starts == ends) {
+                this.addHighlight(highlights, document, lineNum, textLine);
+                foundEnd = true;
+            }
+            lineNum--;
+        }
     }
 
     addHighlight(highlights, document, lineNum, textLine) {
@@ -444,7 +414,7 @@ class documentHighlightProvider {
         if (startIdx > -1) {
             let endPos = new vscode.Position(lineNum, startIdx);
             if (endPos) {
-                let endRange = document.getWordRangeAtPosition(endPos, /\.|if|ifnot|loop|when|is|default|else_ifnot|else_if|else|fastpush|fastpop|push|pop/);
+                let endRange = document.getWordRangeAtPosition(endPos, this.gslWords);
                 if (endRange) {
                     highlights.push(new vscode.DocumentHighlight(endRange));
                 }
