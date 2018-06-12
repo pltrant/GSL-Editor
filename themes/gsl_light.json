@@ -82,5 +82,9 @@
 				"foreground": "#FF00C8"
 			}
 		}
-    ]
+    ],
+    "colors": {
+        "editorLineNumber.activeForeground": "#999999",
+        "editorIndentGuide.activeBackground": "#999999"  
+    }
 }

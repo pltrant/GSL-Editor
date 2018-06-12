@@ -818,11 +818,11 @@
 		"description": "remeffect code {value expression} from {node}\n\nRemove an effect from a node with no script execution."
 	},
 	"remmenuitem": {
-		"prefix": "removemenuitem",
+		"prefix": "remmenuitem",
 		"body": [
-			"removemenuitem \"${1:text}\""
+			"remmenuitem \"${1:text}\""
 		],
-		"description": "removemenuitem {string}\n\nRemoves menu options from the menu structure."
+		"description": "remmenuitem {string}\n\nRemoves menu options from the menu structure."
 	},
 	"remneffect": {
 		"prefix": "remneffect",
@@ -926,7 +926,7 @@
 			"! Keywords: ${2:text}",
 			"!",
 			"! Modification History:",
-			"! ${3:#}/${4:#}/${5:#} - ${6:text} - Initial script creation/code.",
+			"! $CURRENT_MONTH/$CURRENT_DATE/$CURRENT_YEAR_SHORT - ${6:text} - Initial script creation/code.",
 			"!",
 			"!*********************************************************************************************************************",
 			"!"

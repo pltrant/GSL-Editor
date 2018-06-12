@@ -1,13 +1,12 @@
-"use strict";
+'use strict';
 
-const vscode = require("vscode");
+const vscode = require('vscode');
 const net = require('net');
 const fs = require('fs');
-const path = require("path");
+const path = require('path');
 
 const sgeClient = new net.Socket();
 const gameClient = new net.Socket();
-var gameChannel;
 var gslEditor = {
     extContext: null,
     hashKey: '',
@@ -17,6 +16,10 @@ var gslEditor = {
     gameHost: '',
     gamePort: '',
     gameKey: '',
+    matchMarkersTree: null,
+    matchMarkersView: null,
+    gameChannel: null,
+    logging: false,
     msgCount: 0,
     getScript: 0,
     sendScript: 0,
@@ -28,11 +31,9 @@ var gslEditor = {
     lastMsg: '',
     goToDefinition: ''
 }
-var logging = false;
 
 class matchMarkersProvider {
-    constructor(context) {
-        this.context = context;
+    constructor() {
         this._onDidChangeTreeData = new vscode.EventEmitter();
         this.onDidChangeTreeData = this._onDidChangeTreeData.event;
         vscode.window.onDidChangeActiveTextEditor((e) => {
@@ -44,18 +45,21 @@ class matchMarkersProvider {
         vscode.window.onDidChangeTextEditorSelection((e) => {
             this.refresh();
         });
-        this.dict = {}; // key value of matchmarkers and the line number each can be found at.
         this.refresh();
     }
 
     refresh() {
+        vscode.commands.executeCommand('setContext', 'gsl.canShowTreeView', true);
+        this.tree = []; // Array of tree nodes
+        this.dict = {}; // Key value of matchmarkers and the line number each can be found at
         let editor = vscode.window.activeTextEditor;
         if (!editor) {
+            vscode.commands.executeCommand('setContext', 'gsl.canShowTreeView', false);
             return;
         }
         let currentLine = editor.selection.active.line;
         if (this.lastLine && (this.lastLine == currentLine)) {
-            return; //Don't recalc if they're still on the same line
+            return; // Don't recalc if they're still on the same line
         }
         this.lastLine = currentLine;
         this.getMatchMarkers(editor, currentLine);
@@ -63,12 +67,11 @@ class matchMarkersProvider {
     }
 
     getMatchMarkers(editor, currentLine) {
-        this.tree = [];
         let doc = editor.document;
-        if (doc.languageId != "gsl") {
+        if (doc.languageId != 'gsl') {
+            vscode.commands.executeCommand('setContext', 'gsl.canShowTreeView', false);
             return;
         }
-        this.currentMM = '';
         let header = true;
         for (let index = 1; index < doc.lineCount; index++) {
             let text = doc.lineAt(index).text;
@@ -76,14 +79,14 @@ class matchMarkersProvider {
                 header = false;
                 let match = /^:\s+"(.*?)"/.exec(text);
                 this.tree.push(match[1]);
-                this.dict[match[1]] = index; //Store line number found at.
-            } else if (header && !text.startsWith("!")) {
+                this.dict[match[1]] = index; // Store line number found at
+            } else if (header && !text.startsWith('!')) {
                 header = false;
                 this.tree.push('""');
-                this.dict['""'] = index; //Store line number found at.
+                this.dict['""'] = index; // Store line number found at
             }
-            if ((index >= currentLine) && (this.currentMM == '')) {
-                this.currentMM = this.tree[this.tree.length - 1];
+            if ((index == currentLine) && (gslEditor.matchMarkersView) && (this.tree[this.tree.length - 1])) {
+                gslEditor.matchMarkersView.reveal({label: this.tree[this.tree.length - 1]});
             }
         }
     }
@@ -95,22 +98,17 @@ class matchMarkersProvider {
         }
     }
 
+    getParent(element) {
+        return;
+    }
+
     getTreeItem(element) {
         element.command = {
-            command: "revealLine",
-            title: "",
+            command: 'revealLine',
             arguments: [{
                 lineNumber: this.dict[element.label],
-                at: "top"
+                at: 'top'
             }]
-        }
-        if (element.label == this.currentMM) {
-            element.iconPath = {
-                dark: vscode.Uri.file(path.resolve(__dirname, "./icons/dark-currentMM.svg")),
-                light: vscode.Uri.file(path.resolve(__dirname, "./icons/light-currentMM.svg"))
-            };
-        } else {
-            element.iconPath = vscode.Uri.file(path.resolve(__dirname, "./icons/none.svg"))
         }
         return element;
     }
@@ -123,7 +121,7 @@ class symbolProvider {
             let symbols = [];
             for (let i = 0; i < document.lineCount; i++) {
                 let line = document.lineAt(i);
-                if (line.text.startsWith(": ")) {
+                if (line.text.startsWith(': ')) {
                     header = false;
                     let matchMarker = /^:\s+"(.*?)"/.exec(line.text);
                     symbols.push({
@@ -131,7 +129,7 @@ class symbolProvider {
                         kind: vscode.SymbolKind.Function,
                         location: new vscode.Location(document.uri, line.range)
                     })
-                } else if (header && !line.text.startsWith("!")) {
+                } else if (header && !line.text.startsWith('!')) {
                     header = false;
                     symbols.push({
                         name: '""',
@@ -222,7 +220,7 @@ class hoverProvider {
             '*': 'ESC code (ASCII 27)',
             '+': 'Capitalizes first letter of next string token',
             "'": "Adds 's to next string token, properly XML wrapped",
-            "ZE": "Outputs timestamp for token that follows"
+            'ZE': 'Outputs timestamp for token that follows'
         };
         this.baseHoverRegex = /\$(:\$[A-Z]+|:\d+\[\d+,\d+,\d+\]|[\w\d:_-]+|[ABDVLSKT]\d|[\$\\\^QR\*\+'])/;
         this.stringTokenRegex = /\$([POCEXr])(\d)([A-Z]?)$/;
@@ -262,7 +260,7 @@ class hoverProvider {
 
     fieldHover(token) {
         let tokenTypes = this.fieldRegex.exec(token);
-        return new vscode.Hover("N" + tokenTypes[1].toUpperCase() + ": '" + tokenTypes[2] + "' field");
+        return new vscode.Hover('N' + tokenTypes[1].toUpperCase() + ": '" + tokenTypes[2] + "' field");
     }
 
     varHover(token) {
@@ -270,7 +268,7 @@ class hoverProvider {
         let varName = tokenTypes[1];
         if (varName == 'D' || varName == 'L') varName = 'V';
         if (varName == 'K') varName = 'S';
-        return new vscode.Hover(varName + tokenTypes[2] + ": " + this.varInfo[tokenTypes[1]]);
+        return new vscode.Hover(varName + tokenTypes[2] + ': ' + this.varInfo[tokenTypes[1]]);
     }
 
     tokenHover(word) {
@@ -303,11 +301,14 @@ class definitionProvider {
                 }
             } else {
                 let scriptNum = '';
-                if (txtArray.length == 2) { //call #
+                if (txtArray.length == 2) { // call #
                     scriptNum = txtArray[1];
-                } else if (txtArray[3] == 'in') { //callmatch must_match "$*" in #
+                } else if (txtArray[3] == 'in') { // callmatch must_match "$*" in #
                     scriptNum = txtArray[4];
                 } else {
+                    return;
+                }
+                if (isNaN(scriptNum)) { // Not a number
                     return;
                 }
                 while (scriptNum.length < 5) {
@@ -342,10 +343,10 @@ class documentHighlightProvider {
         this.endKeywords = /^\s*\.|(fastpop|pop)\b.*$/i;
         this.gslWords = /:|\.|if|ifnot|loop|when|is|default|else_ifnot|else_if|else|fastpush|fastpop|push|pop/i;
     }
-
+    
     provideDocumentHighlights(document, position, token) {
         let highlights = [];
-        let textRange = document.getWordRangeAtPosition(position);
+        let textRange = document.getWordRangeAtPosition(position, /[\S]+/);
         let lineNum = textRange.start.line;
         let starts = 0;
         let ends = 0;
@@ -354,10 +355,10 @@ class documentHighlightProvider {
             this.searchLinesAfter(document, lineNum, highlights, starts, ends);
         } else if (this.middleKeywords.test(document.getText(textRange))) {
             highlights.push(new vscode.DocumentHighlight(textRange, {kind: 0}));
-            // Check for the starting keyword.
+            // Check for the starting keyword
             ends = 1;
             this.searchLinesBefore(document, lineNum, highlights, starts, ends);
-            // Check for the ending keyword.
+            // Check for the ending keyword
             lineNum = textRange.start.line;
             starts = 1;
             ends = 0;
@@ -423,6 +424,19 @@ class documentHighlightProvider {
     }
 }
 
+class documentFormatProvider {
+    provideDocumentFormattingEdits(document) {
+        let firstLine = document.lineAt(0);
+        let lastLine = document.lineAt(document.lineCount - 1);
+        let textRange = new vscode.Range(0, 
+                                         firstLine.range.start.character, 
+                                         document.lineCount - 1, 
+                                         lastLine.range.end.character);
+        // Remove non-printable characters
+        return [vscode.TextEdit.replace(textRange, document.getText().replace(/[^\x00-\x7f]/g, ''))];
+    }
+}
+
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
@@ -432,7 +446,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 
-function str2ab(str) { //String to Array Buffer
+function str2ab(str) { // String to Array Buffer
     var buffer = new ArrayBuffer(str.length);
     var bufferView = new Uint8Array(buffer);
     for (let i = 0, strLen = str.length; i < strLen; i++) {
@@ -442,18 +456,21 @@ function str2ab(str) { //String to Array Buffer
 }
 
 function getGameChannel() {
-    if (gameChannel === undefined) {
-        gameChannel = vscode.window.createOutputChannel('Game');
+    if (gslEditor.gameChannel == null) {
+        gslEditor.gameChannel = vscode.window.createOutputChannel('Game');
     }
-    return gameChannel;
+    return gslEditor.gameChannel;
 }
 
 function outGameChannel(message) {
-    message = message.replace(/\n$/, ''); //Remove ending newline.
+    message = message.replace(/\n$/, ''); // Remove ending newline
     getGameChannel().appendLine(`${message}`);
 }
 
 function LogIntoGame() {
+    if (vscode.workspace.getConfiguration('gsl').get('disableLoginAttempts') == true) {
+        return __awaiter(this, void 0, void 0, function* (){Promise.reject});
+    }
     return __awaiter(this, void 0, void 0, function* () {
         if (!gameClient.connected) {
             let game = vscode.workspace.getConfiguration('gsl').get('game');
@@ -499,7 +516,7 @@ function activate(context) {
             return;
         }
         let doc = editor.document;
-        if (doc.languageId === "gsl") {
+        if (doc.languageId === 'gsl') {
             showGSLStatusBarItems(self);
         } else {
             this._DLstatusBarItem.hide();
@@ -530,28 +547,33 @@ function activate(context) {
         getGameChannel().show(true);
     }
 
-    vscode.languages.setLanguageConfiguration('gsl', {wordPattern: /[\S]+/});
-
     gslEditor.extContext.subscriptions.push(vscode.languages.registerDocumentSymbolProvider(
-        {language: "gsl"},
+        {scheme: '*', language: 'gsl'},
         new symbolProvider()
     ));
     gslEditor.extContext.subscriptions.push(vscode.languages.registerHoverProvider(
-        {language: "gsl"},
+        {scheme: '*', language: 'gsl'},
         new hoverProvider()
     ));
     gslEditor.extContext.subscriptions.push(vscode.languages.registerDefinitionProvider(
-        {language: "gsl"},
+        {scheme: '*', language: 'gsl'},
         new definitionProvider()
     ));
     gslEditor.extContext.subscriptions.push(vscode.languages.registerDocumentHighlightProvider(
-        {language: "gsl"},
+        {scheme: '*', language: 'gsl'},
         new documentHighlightProvider()
     ));
-    gslEditor.extContext.subscriptions.push(vscode.window.registerTreeDataProvider(
-        'matchMarkers',
-        new matchMarkersProvider()
+    gslEditor.extContext.subscriptions.push(vscode.languages.registerDocumentFormattingEditProvider(
+        {scheme: '*', language: 'gsl'},
+        new documentFormatProvider()
     ));
+    gslEditor.matchMarkersTree = new matchMarkersProvider();
+    gslEditor.matchMarkersView = vscode.window.createTreeView(
+        'matchmarkers',
+        {treeDataProvider: gslEditor.matchMarkersTree}
+    );
+    gslEditor.matchMarkersTree.lastLine = null;
+    gslEditor.matchMarkersTree.refresh();
 
     this.diagnostics = vscode.languages.createDiagnosticCollection();
 
@@ -560,31 +582,31 @@ function activate(context) {
 exports.activate = activate;
 
 function checkForUpdatedVersion() {
-    // Check for new install.
-    let newInstallFlag = gslEditor.extContext.globalState.get("newInstallFlag");
+    // Check for new install
+    let newInstallFlag = gslEditor.extContext.globalState.get('newInstallFlag');
     if (!newInstallFlag) {
-        let applyTheme = "Apply Theme"
+        let applyTheme = 'Apply Theme'
         vscode.window
-            .showInformationMessage(`For the best experience, the GSL Vibrant theme is recommended for the GSL Editor.`, applyTheme)
+            .showInformationMessage('For the best experience, the GSL Vibrant theme is recommended for the GSL Editor.', applyTheme)
             .then(choice => {
             if (choice === applyTheme) {
-                vscode.workspace.getConfiguration().update("workbench.colorTheme", "GSL Vibrant", true);
+                vscode.workspace.getConfiguration().update('workbench.colorTheme', 'GSL Vibrant', true);
             }
         });
-        gslEditor.extContext.globalState.update("newInstallFlag", true);
+        gslEditor.extContext.globalState.update('newInstallFlag', true);
     }
 
-    // Check for new Release Notes.
-    let showReleaseNotes = "Show Release Notes";
+    // Check for new Release Notes
+    let showReleaseNotes = 'Show Release Notes';
     let gslExtensionVersionKey = 'gslExtensionVersion';
-    let extensionVersion = vscode.extensions.getExtension("patricktrant.gsl").packageJSON.version;
+    let extensionVersion = vscode.extensions.getExtension('patricktrant.gsl').packageJSON.version;
     let storedVersion = gslEditor.extContext.globalState.get(gslExtensionVersionKey);
     if (storedVersion && (extensionVersion !== storedVersion)) {
         vscode.window
             .showInformationMessage(`The GSL Editor extension has been updated to version ${extensionVersion}!`, showReleaseNotes)
             .then(choice => {
             if (choice === showReleaseNotes) {
-                vscode.commands.executeCommand('markdown.showPreview', vscode.Uri.file(path.resolve(__dirname, "./CHANGELOG.md")));
+                vscode.commands.executeCommand('markdown.showPreview', vscode.Uri.file(path.resolve(__dirname, './CHANGELOG.md')));
             }
         });
     }
@@ -611,26 +633,24 @@ function gslSendGameCommand(context) {
             return vscode.window.showErrorMessage('No input provided. Command aborted.');
         }
         LogIntoGame().then(function () {
-            vscode.window.setStatusBarMessage('Sending game command...', 2000);
             if (gameClient.connected) {
+                vscode.window.setStatusBarMessage('Sending game command...', 2000);
                 delayedGameCommand(input);
-            } else {
-                setTimeout(function () { delayedGameCommand(input) }, 2500)
             }
         });
     });
 }
 
 function gslListTokens() {
-    vscode.commands.executeCommand('markdown.showPreview', vscode.Uri.file(path.resolve(__dirname, "./syntaxes/tokens.md")));
+    vscode.commands.executeCommand('markdown.showPreview', vscode.Uri.file(path.resolve(__dirname, './syntaxes/tokens.md')));
 }
 
 function gslLogging() {
-    if (logging) {
-        logging = false;
+    if (gslEditor.logging) {
+        gslEditor.logging = false;
         vscode.window.setStatusBarMessage('Logging disabled.', 5000);
     } else {
-        logging = true;
+        gslEditor.logging = true;
         vscode.window.setStatusBarMessage('Logging enabled.', 5000);
     }
 }
@@ -674,10 +694,10 @@ function gslUpload2(scriptNum) {
     gslEditor.getScript = 0;
     gslEditor.dateCheck = 0;
     diagnostics.clear();
-    vscode.window.setStatusBarMessage('Uploading script ' + scriptNum + '...', 5000);
     LogIntoGame().then(function () {
         if (gameClient.connected) {
-            uploadScript(' \nWelcome to \n \nAll Rights Reserved '); //Simulate initial login text
+            vscode.window.setStatusBarMessage('Uploading script ' + scriptNum + '...', 5000);
+            uploadScript(' \nWelcome to \n \nAll Rights Reserved '); // Simulate initial login text
         }
     });
 }
@@ -734,7 +754,7 @@ function uploadScript(receivedMsg) {
         gslEditor.sendScript = 0;
         gslEditor.scriptTxt = '';
         let diagnosticList = [];
-        let lines = receivedMsg.split("\r\n");
+        let lines = receivedMsg.split('\r\n');
         for (let i = 0; i < lines.length; i++) {
             if (lines[i] && (/^\s*(\d+)\s:\s(.+)$/.test(lines[i]))) {
                 let match = /^\s*(\d+)\s:\s(.+)$/.exec(lines[i]);
@@ -771,7 +791,7 @@ function gslDownload() {
             return vscode.window.showErrorMessage('No input provided. Script download aborted.');
         }
         gslEditor.scriptArray = [];
-        let inputArray = input.split(";");
+        let inputArray = input.split(';');
         let BreakException = {};
         try {
             for (let i = 0; i < inputArray.length; i++) {
@@ -810,17 +830,17 @@ function gslDownload2(script) {
     } else {
         type = 'script';
     }
-    vscode.window.setStatusBarMessage('Downloading ' + type + ' ' + gslEditor.input + '...', 5000);
     LogIntoGame().then(function () {
         if (gameClient.connected) {
-            downloadScript(' \nWelcome to \n \nAll Rights Reserved '); //Simulate initial login text
+            vscode.window.setStatusBarMessage('Downloading ' + type + ' ' + gslEditor.input + '...', 5000);
+            downloadScript(' \nWelcome to \n \nAll Rights Reserved '); // Simulate initial login text
         }
     });
 }
 
 function downloadScript(receivedMsg) {
-    if (gslEditor.getScript == 2) { //Downloading script now, may span multiple messages
-        gslEditor.scriptTxt += receivedMsg.replace(/Edt:$/, ''); //Remove ending Edt:
+    if (gslEditor.getScript == 2) { // Downloading script now, may span multiple messages
+        gslEditor.scriptTxt += receivedMsg.replace(/Edt:$/, ''); // Remove ending Edt:
     }
     if (/Welcome to.*\s\n.*\s\nAll Rights Reserved/.test(receivedMsg)) {
         if (isNaN(gslEditor.input)) {
@@ -852,10 +872,10 @@ function downloadScript(receivedMsg) {
         sendMsg('Q\n');
         return __awaiter(this, void 0, void 0, function* () {
             let fileName = path.join(getDownloadLocation(), gslEditor.scriptNum) + vscode.workspace.getConfiguration('gsl').get('fileExtension');
-            if (fs.existsSync(fileName)) { //Check for existing file
-                fs.unlinkSync(fileName); //Already exists, delete it
+            if (fs.existsSync(fileName)) { // Check for existing file
+                fs.unlinkSync(fileName); // Already exists, delete it
             }
-            fs.writeFileSync(fileName, gslEditor.scriptTxt); //Create new file with script text
+            fs.writeFileSync(fileName, gslEditor.scriptTxt); // Create new file with script text
             vscode.workspace.openTextDocument(fileName).then(document => {
                 vscode.window.showTextDocument(document, {preview: false});
             });
@@ -867,7 +887,7 @@ function downloadScript(receivedMsg) {
             for (let i = 0; i < doc.lineCount; i++) {
                 let line = doc.lineAt(i);
                 if (line.text.toLowerCase().startsWith(': ' + gslEditor.goToDefinition)) {
-                    vscode.commands.executeCommand('revealLine', {lineNumber: i, at: "top"})
+                    vscode.commands.executeCommand('revealLine', {lineNumber: i, at: 'top'})
                     break;
                 }
             }
@@ -900,13 +920,13 @@ function getDownloadLocation() {
     }
     if (!extPath) {
         let rootPath = path.resolve(__dirname, '../gsl');
-        if (!fs.existsSync(rootPath)) { //Directory doesn't exist
-            fs.mkdirSync(rootPath); //Create directory
+        if (!fs.existsSync(rootPath)) { // Directory doesn't exist
+            fs.mkdirSync(rootPath); // Create directory
         }
         extPath = path.resolve(__dirname, '../gsl/scripts');
     }
-    if (!fs.existsSync(extPath)) { //Directory doesn't exist
-        fs.mkdirSync(extPath); //Create directory
+    if (!fs.existsSync(extPath)) { // Directory doesn't exist
+        fs.mkdirSync(extPath); // Create directory
     }
     return extPath
 }
@@ -926,10 +946,10 @@ function gslDateCheck() {
     }
     gslEditor.scriptNum = scriptNum;
     gslEditor.dateCheck = 1;
-    vscode.window.setStatusBarMessage('Checking last modified date of script ' + scriptNum + '...', 5000);
     LogIntoGame().then(function () {
         if (gameClient.connected) {
-            dateCheck(' \nWelcome to \n \nAll Rights Reserved '); //Simulate initial login text
+            vscode.window.setStatusBarMessage('Checking last modified date of script ' + scriptNum + '...', 5000);
+            dateCheck(' \nWelcome to \n \nAll Rights Reserved '); // Simulate initial login text
         }
     });
 }
@@ -947,7 +967,7 @@ function dateCheck(receivedMsg) {
 }
 
 function sendMsg(msg) {
-    if (logging && (sgeClient.connected == false)) { // Don't log SGE connection data (account, password hash, etc)
+    if (gslEditor.logging && (sgeClient.connected == false)) { // Don't log SGE connection data (account, password hash, etc)
         fs.appendFile(path.join(getDownloadLocation(), 'GSL-Editor.log'), 'Sent: ' + msg);
     }
     outGameChannel('Sent: ' + msg);
@@ -960,7 +980,7 @@ function sendMsg(msg) {
 
 function onConnSGEData(data) {
     let receivedMsg = data.toString();
-    receivedMsg = receivedMsg.replace(/\n$/, ''); //Remove ending newline
+    receivedMsg = receivedMsg.replace(/\n$/, ''); // Remove ending newline
     let msgArray = receivedMsg.split('\t');
     outGameChannel(receivedMsg);
     gslEditor.lastMsg = receivedMsg;
@@ -1018,11 +1038,11 @@ function onConnSGEData(data) {
     } else if (/^L\tOK\t.*/.test(receivedMsg)) {
         for (let i = 0; i < msgArray.length; i++) {
             if (msgArray[i].includes('GAMEHOST=')) {
-                gslEditor.gameHost = msgArray[i].substring(msgArray[i].indexOf("=") + 1);
+                gslEditor.gameHost = msgArray[i].substring(msgArray[i].indexOf('=') + 1);
             } else if (msgArray[i].includes('GAMEPORT=')) {
-                gslEditor.gamePort = msgArray[i].substring(msgArray[i].indexOf("=") + 1);
+                gslEditor.gamePort = msgArray[i].substring(msgArray[i].indexOf('=') + 1);
             } else if (msgArray[i].includes('KEY=')) {
-                gslEditor.gameKey = msgArray[i].substring(msgArray[i].indexOf("=") + 1);
+                gslEditor.gameKey = msgArray[i].substring(msgArray[i].indexOf('=') + 1);
             }
         }
         sgeClient.destroy();
@@ -1043,15 +1063,15 @@ function onConnSGEData(data) {
 
 function onConnGameData(data) {
     let receivedMsg = data.toString();
-    if (logging) {
+    if (gslEditor.logging) {
         fs.appendFile(path.join(getDownloadLocation(), 'GSL-Editor.log'), 'Received: ' + receivedMsg);
     }
-    receivedMsg = receivedMsg.replace(/\n$/, ''); //Remove ending newline
+    receivedMsg = receivedMsg.replace(/\n$/, ''); // Remove ending newline
     outGameChannel(receivedMsg);
     gslEditor.lastMsg = receivedMsg;
     gslEditor.msgCount++;
 
-    if (receivedMsg.includes('Edt:')) { //Editing a script
+    if (receivedMsg.includes('Edt:')) { // Editing a script
         setTimeout(function () { checkState(receivedMsg, gslEditor.msgCount) }, 5000);
     }
 
@@ -1068,7 +1088,7 @@ function onConnGameData(data) {
 }
 
 function checkState(msg, count) {
-    if ((msg == gslEditor.lastMsg) && (count == gslEditor.msgCount)) { //Stuck on same last message after 5 seconds
+    if ((msg == gslEditor.lastMsg) && (count == gslEditor.msgCount)) { // Stuck on same last message after 5 seconds
         sendMsg('\n');
         setTimeout(function () { sendMsg('V\n') }, 200);
         setTimeout(function () { sendMsg('Y\n') }, 400);

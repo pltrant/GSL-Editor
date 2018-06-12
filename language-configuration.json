@@ -22,5 +22,6 @@
     "indentationRules": {
         "increaseIndentPattern": "^\\s*(:|(if|ifnot|else|else_if|else_ifnot|loop|when|is|default|fastpush|push)\\b).*$",
         "decreaseIndentPattern": "^\\s*(\\.|(fastpop|pop)\\b).*$"
-    }
+    },
+    "wordPattern": "[\\S]+"
 }

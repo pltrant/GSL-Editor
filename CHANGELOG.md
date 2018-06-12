@@ -1,6 +1,21 @@
 # Change Log
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.4.0] - 2018-06-11
+## Added
+- Scripts are now scanned when saved (which also happens on upload) to remove non-printable characters (usually the result from copy/pasting from a Word document or web browser).
+- There is a new 'disableLoginAttempts' setting.  When enabled, the editor will no longer try to log you into the game to perform various actions (such as to download/upload scripts) - this also means those actions will silently fail when invoked.
+
+## Changed
+- Updated the Matchmarkers view to use the new 'reveal' API (instead of the previous icon) to highlight the current matchmarker the cursor is in.
+- The Matchmarkers view is now only be visible while a GSL script file has focus and is hidden for other file types.
+- The 'new' snippet (for creating notes and comment history at the top of a script) will now default to today's date for the script modification entry.
+- GSL color themes: the Line Number and [Indent Guide](https://code.visualstudio.com/updates/v1_23#_highlighted-indent-guides) relative to the cursor's position will now be displayed in a more prominent color.
+
+## Fixed
+- Definitions (for Go To or Peek functionality) are now only valid on callmatch lines that end in a number.
+- Corrected remmenuitem snippet (removemenuitem => remmenuitem).
+
 ## [1.3.3] - 2018-02-16
 ## Changed
 - Rewrote some of the logic for the document highlighter (when the cursor is on an open/close control keyword, highlighting it and its counterpart).  This also fixed a bug when placing the cursor on the closing period of a matchmarker.  These changes should mostly be invisible to users.

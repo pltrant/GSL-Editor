@@ -2,14 +2,14 @@
     "name": "gsl",
     "displayName": "GSL",
     "description": "GSL Editor",
-    "version": "1.3.3",
+    "version": "1.4.0",
     "publisher": "patricktrant",
     "author": {
         "name": "Patrick Trant",
         "email": "estild@gmail.com"
     },
     "categories": [
-        "Languages"
+        "Programming Languages"
     ],
     "license": "GPL-3.0",
     "private": false,
@@ -25,7 +25,7 @@
         "*"
     ],
     "engines": {
-        "vscode": "^1.15.0"
+        "vscode": "^1.24.0"
     },
     "main": "extension",
     "contributes": {
@@ -105,6 +105,13 @@
                     "default": "",
                     "description": "Play.net character to log into."
                 },
+                "gsl.disableLoginAttempts": {
+                    "type": [
+                        "boolean"
+                    ],
+                    "default": false,
+                    "description": "Enable to permanently disable login attempts from various actions in the editor."
+                },
                 "gsl.alwaysEnabled": {
                     "type": [
                         "boolean"
@@ -161,7 +168,8 @@
                 "editor.tabSize": 2,
                 "editor.wordBasedSuggestions": false,
                 "editor.wordWrap": "wordWrapColumn",
-                "editor.wordWrapColumn": 118
+                "editor.wordWrapColumn": 118,
+                "editor.formatOnSave": true
             }
         },
         "grammars": [
@@ -240,8 +248,9 @@
         "views": {
             "explorer": [
                 {
-                    "id": "matchMarkers",
-                    "name": "Matchmarkers"
+                    "id": "matchmarkers",
+                    "name": "Matchmarkers",
+                    "when": "gsl.canShowTreeView"
                 }
             ]
         }
