@@ -1,6 +1,9 @@
 # Change Log
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.5.0] - 2018-06-11
+- No change.  Publish error bumped up to 1.5.0.
+
 ## [1.4.0] - 2018-06-11
 ## Added
 - Scripts are now scanned when saved (which also happens on upload) to remove non-printable characters (usually the result from copy/pasting from a Word document or web browser).
