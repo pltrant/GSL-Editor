@@ -1,258 +1,258 @@
 {
-    "name": "gsl",
-    "displayName": "GSL",
-    "description": "GSL Editor",
-    "version": "1.4.0",
-    "publisher": "patricktrant",
-    "author": {
-        "name": "Patrick Trant",
-        "email": "estild@gmail.com"
-    },
-    "categories": [
-        "Programming Languages"
+  "name": "gsl",
+  "displayName": "GSL",
+  "description": "GSL Editor",
+  "version": "1.5.0",
+  "publisher": "patricktrant",
+  "author": {
+    "name": "Patrick Trant",
+    "email": "estild@gmail.com"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "license": "GPL-3.0",
+  "private": false,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pltrant/GSL-Editor.git"
+  },
+  "homepage": "https://github.com/pltrant/GSL-Editor",
+  "bugs": {
+    "url": "https://github.com/pltrant/GSL-Editor/issues"
+  },
+  "activationEvents": [
+    "*"
+  ],
+  "engines": {
+    "vscode": "^1.24.0"
+  },
+  "main": "extension",
+  "contributes": {
+    "commands": [
+      {
+        "command": "extension.gslDownload",
+        "title": "Download",
+        "category": "GSL"
+      },
+      {
+        "command": "extension.gslUpload",
+        "title": "Upload",
+        "category": "GSL"
+      },
+      {
+        "command": "extension.gslSendGameCommand",
+        "title": "Send Game Command",
+        "category": "GSL"
+      },
+      {
+        "command": "extension.gslDateCheck",
+        "title": "Check Script Date",
+        "category": "GSL"
+      },
+      {
+        "command": "extension.gslListTokens",
+        "title": "List Tokens",
+        "category": "GSL"
+      },
+      {
+        "command": "extension.gslLogging",
+        "title": "Logging",
+        "category": "GSL"
+      }
     ],
-    "license": "GPL-3.0",
-    "private": false,
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/pltrant/GSL-Editor.git"
-    },
-    "homepage": "https://github.com/pltrant/GSL-Editor",
-    "bugs": {
-        "url": "https://github.com/pltrant/GSL-Editor/issues"
-    },
-    "activationEvents": [
-        "*"
-    ],
-    "engines": {
-        "vscode": "^1.24.0"
-    },
-    "main": "extension",
-    "contributes": {
-        "commands": [
-            {
-                "command": "extension.gslDownload",
-                "title": "Download",
-                "category": "GSL"
-            },
-            {
-                "command": "extension.gslUpload",
-                "title": "Upload",
-                "category": "GSL"
-            },
-            {
-                "command": "extension.gslSendGameCommand",
-                "title": "Send Game Command",
-                "category": "GSL"
-            },
-            {
-                "command": "extension.gslDateCheck",
-                "title": "Check Script Date",
-                "category": "GSL"
-            },
-            {
-                "command": "extension.gslListTokens",
-                "title": "List Tokens",
-                "category": "GSL"
-            },
-            {
-                "command": "extension.gslLogging",
-                "title": "Logging",
-                "category": "GSL"
-            }
-        ],
-        "configuration": {
-            "type": "object",
-            "title": "GSL",
-            "properties": {
-                "gsl.account": {
-                    "type": [
-                        "string"
-                    ],
-                    "default": "",
-                    "description": "Play.net account name."
-                },
-                "gsl.password": {
-                    "type": [
-                        "string"
-                    ],
-                    "default": "",
-                    "description": "Play.net account password."
-                },
-                "gsl.game": {
-                    "type": [
-                        "string"
-                    ],
-                    "enum": [
-                        "GemStone IV Development",
-                        "GemStone IV",
-                        "GemStone IV Platinum",
-                        "GemStone IV Shattered",
-                        "GemStone IV Prime Test",
-                        "DragonRealms Development",
-                        "DragonRealms",
-                        "DragonRealms Platinum",
-                        "DragonRealms The Fallen",
-                        "DragonRealms Prime Test"
-                    ],
-                    "default": "GemStone IV Development",
-                    "description": "Play.net game to log into."
-                },
-                "gsl.character": {
-                    "type": [
-                        "string"
-                    ],
-                    "default": "",
-                    "description": "Play.net character to log into."
-                },
-                "gsl.disableLoginAttempts": {
-                    "type": [
-                        "boolean"
-                    ],
-                    "default": false,
-                    "description": "Enable to permanently disable login attempts from various actions in the editor."
-                },
-                "gsl.alwaysEnabled": {
-                    "type": [
-                        "boolean"
-                    ],
-                    "default": true,
-                    "description": "Enable to always have the Download/Upload buttons."
-                },
-                "gsl.displayGameChannel": {
-                    "type": [
-                        "boolean"
-                    ],
-                    "default": false,
-                    "description": "Enable to display the Game channel when the editor starts."
-                },
-                "gsl.downloadPath": {
-                    "type": [
-                        "string"
-                    ],
-                    "default": "",
-                    "description": "Path to save downloaded scripts.  Window users: use double slashes when specifying, e.g. C:\\\\GemStone\\\\Scripts"
-                },
-                "gsl.downloadToWorkspace": {
-                    "type": [
-                        "boolean"
-                    ],
-                    "default": false,
-                    "description": "If enabled, will attempt to save downloaded scripts in the current open root workspace folder."
-                },
-                "gsl.fileExtension": {
-                    "type": [
-                        "string"
-                    ],
-                    "default": ".gsl",
-                    "description": "File extension to use for downloaded scripts."
-                },
-                "gsl.displayDateCheck": {
-                    "type": [
-                        "boolean"
-                    ],
-                    "default": false,
-                    "description": "Enable to display the 'Date Check' button to check last modified information for QC."
-                }
-            }
+    "configuration": {
+      "type": "object",
+      "title": "GSL",
+      "properties": {
+        "gsl.account": {
+          "type": [
+            "string"
+          ],
+          "default": "",
+          "description": "Play.net account name."
         },
-        "configurationDefaults": {
-            "[gsl]": {
-                "editor.insertSpaces": true,
-                "editor.minimap.enabled": false,
-                "editor.rulers": [
-                    118
-                ],
-                "editor.scrollBeyondLastLine": false,
-                "editor.selectionHighlight": false,
-                "editor.tabSize": 2,
-                "editor.wordBasedSuggestions": false,
-                "editor.wordWrap": "wordWrapColumn",
-                "editor.wordWrapColumn": 118,
-                "editor.formatOnSave": true
-            }
+        "gsl.password": {
+          "type": [
+            "string"
+          ],
+          "default": "",
+          "description": "Play.net account password."
         },
-        "grammars": [
-            {
-                "language": "gsl",
-                "scopeName": "source.gsl",
-                "path": "./syntaxes/gsl.tmLanguage.json"
-            }
-        ],
-        "keybindings": [
-            {
-                "command": "extension.gslDownload",
-                "key": "ctrl+d",
-                "mac": "cmd+d"
-            },
-            {
-                "command": "extension.gslUpload",
-                "key": "ctrl+u",
-                "mac": "cmd+u"
-            },
-            {
-                "command": "extension.gslSendGameCommand",
-                "key": "ctrl+alt+g",
-                "mac": "cmd+alt+g"
-            },
-            {
-                "command": "extension.gslDateCheck",
-                "key": "ctrl+alt+c",
-                "mac": "cmd+alt+c"
-            },
-            {
-                "command": "extension.gslListTokens",
-                "key": "ctrl+alt+l",
-                "mac": "cmd+alt+l"
-            }
-        ],
-        "languages": [
-            {
-                "id": "gsl",
-                "aliases": [
-                    "GSL",
-                    "gsl"
-                ],
-                "filenamePatterns": [
-                    "S[0-9][0-9][0-9][0-9][0-9].*"
-                ],
-                "extensions": [
-                    ".gsl"
-                ],
-                "configuration": "./language-configuration.json"
-            }
-        ],
-        "snippets": [
-            {
-                "language": "gsl",
-                "path": "./snippets/gsl.json"
-            }
-        ],
-        "themes": [
-            {
-                "label": "GSL Dark",
-                "uiTheme": "vs-dark",
-                "path": "./themes/gsl_dark.json"
-            },
-            {
-                "label": "GSL Light",
-                "uiTheme": "vs",
-                "path": "./themes/gsl_light.json"
-            },
-            {
-                "label": "GSL Vibrant",
-                "uiTheme": "vs-dark",
-                "path": "./themes/gsl_vibrant.json"
-            }
-        ],
-        "views": {
-            "explorer": [
-                {
-                    "id": "matchmarkers",
-                    "name": "Matchmarkers",
-                    "when": "gsl.canShowTreeView"
-                }
-            ]
+        "gsl.game": {
+          "type": [
+            "string"
+          ],
+          "enum": [
+            "GemStone IV Development",
+            "GemStone IV",
+            "GemStone IV Platinum",
+            "GemStone IV Shattered",
+            "GemStone IV Prime Test",
+            "DragonRealms Development",
+            "DragonRealms",
+            "DragonRealms Platinum",
+            "DragonRealms The Fallen",
+            "DragonRealms Prime Test"
+          ],
+          "default": "GemStone IV Development",
+          "description": "Play.net game to log into."
+        },
+        "gsl.character": {
+          "type": [
+            "string"
+          ],
+          "default": "",
+          "description": "Play.net character to log into."
+        },
+        "gsl.disableLoginAttempts": {
+          "type": [
+            "boolean"
+          ],
+          "default": false,
+          "description": "Enable to permanently disable login attempts from various actions in the editor."
+        },
+        "gsl.alwaysEnabled": {
+          "type": [
+            "boolean"
+          ],
+          "default": true,
+          "description": "Enable to always have the Download/Upload buttons."
+        },
+        "gsl.displayGameChannel": {
+          "type": [
+            "boolean"
+          ],
+          "default": false,
+          "description": "Enable to display the Game channel when the editor starts."
+        },
+        "gsl.downloadPath": {
+          "type": [
+            "string"
+          ],
+          "default": "",
+          "description": "Path to save downloaded scripts.  Window users: use double slashes when specifying, e.g. C:\\\\GemStone\\\\Scripts"
+        },
+        "gsl.downloadToWorkspace": {
+          "type": [
+            "boolean"
+          ],
+          "default": false,
+          "description": "If enabled, will attempt to save downloaded scripts in the current open root workspace folder."
+        },
+        "gsl.fileExtension": {
+          "type": [
+            "string"
+          ],
+          "default": ".gsl",
+          "description": "File extension to use for downloaded scripts."
+        },
+        "gsl.displayDateCheck": {
+          "type": [
+            "boolean"
+          ],
+          "default": false,
+          "description": "Enable to display the 'Date Check' button to check last modified information for QC."
         }
+      }
+    },
+    "configurationDefaults": {
+      "[gsl]": {
+        "editor.insertSpaces": true,
+        "editor.minimap.enabled": false,
+        "editor.rulers": [
+          118
+        ],
+        "editor.scrollBeyondLastLine": false,
+        "editor.selectionHighlight": false,
+        "editor.tabSize": 2,
+        "editor.wordBasedSuggestions": false,
+        "editor.wordWrap": "wordWrapColumn",
+        "editor.wordWrapColumn": 118,
+        "editor.formatOnSave": true
+      }
+    },
+    "grammars": [
+      {
+        "language": "gsl",
+        "scopeName": "source.gsl",
+        "path": "./syntaxes/gsl.tmLanguage.json"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "extension.gslDownload",
+        "key": "ctrl+d",
+        "mac": "cmd+d"
+      },
+      {
+        "command": "extension.gslUpload",
+        "key": "ctrl+u",
+        "mac": "cmd+u"
+      },
+      {
+        "command": "extension.gslSendGameCommand",
+        "key": "ctrl+alt+g",
+        "mac": "cmd+alt+g"
+      },
+      {
+        "command": "extension.gslDateCheck",
+        "key": "ctrl+alt+c",
+        "mac": "cmd+alt+c"
+      },
+      {
+        "command": "extension.gslListTokens",
+        "key": "ctrl+alt+l",
+        "mac": "cmd+alt+l"
+      }
+    ],
+    "languages": [
+      {
+        "id": "gsl",
+        "aliases": [
+          "GSL",
+          "gsl"
+        ],
+        "filenamePatterns": [
+          "S[0-9][0-9][0-9][0-9][0-9].*"
+        ],
+        "extensions": [
+          ".gsl"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "gsl",
+        "path": "./snippets/gsl.json"
+      }
+    ],
+    "themes": [
+      {
+        "label": "GSL Dark",
+        "uiTheme": "vs-dark",
+        "path": "./themes/gsl_dark.json"
+      },
+      {
+        "label": "GSL Light",
+        "uiTheme": "vs",
+        "path": "./themes/gsl_light.json"
+      },
+      {
+        "label": "GSL Vibrant",
+        "uiTheme": "vs-dark",
+        "path": "./themes/gsl_vibrant.json"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "matchmarkers",
+          "name": "Matchmarkers",
+          "when": "gsl.canShowTreeView"
+        }
+      ]
     }
+  }
 }
