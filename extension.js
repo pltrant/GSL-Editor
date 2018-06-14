@@ -126,14 +126,14 @@ class symbolProvider {
                     let matchMarker = /^:\s+"(.*?)"/.exec(line.text);
                     symbols.push({
                         name: matchMarker[1],
-                        kind: vscode.SymbolKind.Function,
+                        kind: vscode.SymbolKind.Method,
                         location: new vscode.Location(document.uri, line.range)
                     })
                 } else if (header && !line.text.startsWith('!')) {
                     header = false;
                     symbols.push({
                         name: '""',
-                        kind: vscode.SymbolKind.Function,
+                        kind: vscode.SymbolKind.Method,
                         location: new vscode.Location(document.uri, line.range)
                     });
                 }
