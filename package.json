@@ -244,15 +244,6 @@
         "uiTheme": "vs-dark",
         "path": "./themes/gsl_vibrant.json"
       }
-    ],
-    "views": {
-      "explorer": [
-        {
-          "id": "matchmarkers",
-          "name": "Matchmarkers",
-          "when": "gsl.canShowTreeView"
-        }
-      ]
-    }
+    ]
   }
 }

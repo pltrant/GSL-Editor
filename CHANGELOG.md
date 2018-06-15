@@ -1,6 +1,10 @@
 # Change Log
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.5.1] - 2018-06-15
+## Changed
+- The Matchmarkers view has been depreciated in favor of the new built-in [Outline view](https://code.visualstudio.com/updates/v1_24#_outline-view), which achieves the same goal, but has more options (follow cursor, sort type, filter, etc).  The referenced link has instructions on how to enable it.
+
 ## [1.5.0] - 2018-06-11
 - No change.  Publish error bumped up to 1.5.0.
 

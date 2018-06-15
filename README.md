@@ -7,7 +7,7 @@ The GSL Editor is an extension for a custom scripting language.  If you're unfam
 * Auto Indentation
 * Snippets for every GSL command
 * Go to/Peak Definitions (matchmarkers)
-* Matchmarkers view to see every matchmarker within a script and ability to click to go to directly to that line.
+* Outline view to see every matchmarker within a script and ability to click to go to directly to that line.
 
 ## Setup
 

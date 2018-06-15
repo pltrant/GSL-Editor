@@ -16,8 +16,6 @@ var gslEditor = {
     gameHost: '',
     gamePort: '',
     gameKey: '',
-    matchMarkersTree: null,
-    matchMarkersView: null,
     gameChannel: null,
     logging: false,
     msgCount: 0,
@@ -32,88 +30,6 @@ var gslEditor = {
     goToDefinition: ''
 }
 
-class matchMarkersProvider {
-    constructor() {
-        this._onDidChangeTreeData = new vscode.EventEmitter();
-        this.onDidChangeTreeData = this._onDidChangeTreeData.event;
-        vscode.window.onDidChangeActiveTextEditor((e) => {
-            this.refresh();
-        });
-        vscode.workspace.onDidChangeTextDocument((e) => {
-            this.refresh();
-        });
-        vscode.window.onDidChangeTextEditorSelection((e) => {
-            this.refresh();
-        });
-        this.refresh();
-    }
-
-    refresh() {
-        vscode.commands.executeCommand('setContext', 'gsl.canShowTreeView', true);
-        this.tree = []; // Array of tree nodes
-        this.dict = {}; // Key value of matchmarkers and the line number each can be found at
-        let editor = vscode.window.activeTextEditor;
-        if (!editor) {
-            vscode.commands.executeCommand('setContext', 'gsl.canShowTreeView', false);
-            return;
-        }
-        let currentLine = editor.selection.active.line;
-        if (this.lastLine && (this.lastLine == currentLine)) {
-            return; // Don't recalc if they're still on the same line
-        }
-        this.lastLine = currentLine;
-        this.getMatchMarkers(editor, currentLine);
-        this._onDidChangeTreeData.fire();
-    }
-
-    getMatchMarkers(editor, currentLine) {
-        let doc = editor.document;
-        if (doc.languageId != 'gsl') {
-            vscode.commands.executeCommand('setContext', 'gsl.canShowTreeView', false);
-            return;
-        }
-        let header = true;
-        for (let index = 1; index < doc.lineCount; index++) {
-            let text = doc.lineAt(index).text;
-            if (/^:\s+"(.*?)"/.test(text)) {
-                header = false;
-                let match = /^:\s+"(.*?)"/.exec(text);
-                this.tree.push(match[1]);
-                this.dict[match[1]] = index; // Store line number found at
-            } else if (header && !text.startsWith('!')) {
-                header = false;
-                this.tree.push('""');
-                this.dict['""'] = index; // Store line number found at
-            }
-            if ((index == currentLine) && (gslEditor.matchMarkersView) && (this.tree[this.tree.length - 1])) {
-                gslEditor.matchMarkersView.reveal({label: this.tree[this.tree.length - 1]});
-            }
-        }
-    }
-
-    getChildren(element) {
-        if (typeof this.tree != 'undefined') {
-            const nodes = this.tree.map(node => new vscode.TreeItem(node));
-            return nodes;
-        }
-    }
-
-    getParent(element) {
-        return;
-    }
-
-    getTreeItem(element) {
-        element.command = {
-            command: 'revealLine',
-            arguments: [{
-                lineNumber: this.dict[element.label],
-                at: 'top'
-            }]
-        }
-        return element;
-    }
-}
-
 class symbolProvider {
     provideDocumentSymbols(document, token) {
         return new Promise((resolve, reject) => {
@@ -124,17 +40,68 @@ class symbolProvider {
                 if (line.text.startsWith(': ')) {
                     header = false;
                     let matchMarker = /^:\s+"(.*?)"/.exec(line.text);
+                    let endLine = null;
+                    let endChar = null;
+                    for (let i = line.lineNumber; i < document.lineCount; i++) {
+                        let lineTxt = document.lineAt(i);
+                        if (lineTxt.text.startsWith('.')) {
+                            // Attribute any comments after the closing period to the current matchmarker
+                            for (let j = i + 1; j < document.lineCount; j++) {
+                                let lineTxt2 = document.lineAt(j);
+                                if (!lineTxt2.text.startsWith('!')) {
+                                    break;
+                                } else {
+                                    i++;
+                                }
+                            }
+                            endLine = i;
+                            endChar = document.lineAt(i).range.end.character;
+                            break;
+                        }
+                    }
+                    let symbolRange = null;
+                    if ((endLine == null) || (endChar == null)) {
+                        symbolRange = line.range;
+                    } else {
+                        symbolRange = new vscode.Range(
+                            line.lineNumber, 
+                            line.range.start.character, 
+                            endLine, 
+                            endChar
+                        );
+                    }
                     symbols.push({
                         name: matchMarker[1],
                         kind: vscode.SymbolKind.Method,
-                        location: new vscode.Location(document.uri, line.range)
+                        location: new vscode.Location(document.uri, symbolRange)
                     })
                 } else if (header && !line.text.startsWith('!')) {
                     header = false;
+                    let endLine = null;
+                    let endChar = null;
+                    for (let i = line.lineNumber; i < document.lineCount; i++) {
+                        let lineTxt = document.lineAt(i);
+                        if (lineTxt.text.startsWith(':')) {
+                            i--;
+                            endLine = i;
+                            endChar = document.lineAt(i).range.end.character;
+                            break;
+                        }
+                    }
+                    if ((endLine == null) || (endChar == null)) { // the whole script is in the empty matchmarker
+                        endLine = document.lineCount - 1;
+                        endChar = document.lineAt(document.lineCount - 1).range.end.character;
+                    }
+                    let symbolRange = new vscode.Range(
+                        line.lineNumber, 
+                        line.range.start.character, 
+                        endLine, 
+                        endChar
+                    );
                     symbols.push({
                         name: '""',
                         kind: vscode.SymbolKind.Method,
-                        location: new vscode.Location(document.uri, line.range)
+                        location: new vscode.Location(document.uri, symbolRange)
                     });
                 }
             }
@@ -428,10 +395,12 @@ class documentFormatProvider {
     provideDocumentFormattingEdits(document) {
         let firstLine = document.lineAt(0);
         let lastLine = document.lineAt(document.lineCount - 1);
-        let textRange = new vscode.Range(0, 
-                                         firstLine.range.start.character, 
-                                         document.lineCount - 1, 
-                                         lastLine.range.end.character);
+        let textRange = new vscode.Range(
+            0, 
+            firstLine.range.start.character, 
+            document.lineCount - 1, 
+            lastLine.range.end.character
+        );
         // Remove non-printable characters
         return [vscode.TextEdit.replace(textRange, document.getText().replace(/[^\x00-\x7f]/g, ''))];
     }
@@ -567,13 +536,6 @@ function activate(context) {
         {scheme: '*', language: 'gsl'},
         new documentFormatProvider()
     ));
-    gslEditor.matchMarkersTree = new matchMarkersProvider();
-    gslEditor.matchMarkersView = vscode.window.createTreeView(
-        'matchmarkers',
-        {treeDataProvider: gslEditor.matchMarkersTree}
-    );
-    gslEditor.matchMarkersTree.lastLine = null;
-    gslEditor.matchMarkersTree.refresh();
 
     this.diagnostics = vscode.languages.createDiagnosticCollection();
 
