@@ -403,6 +403,7 @@ class DocumentFormatProvider {
       lastLine.range.end.character
     )
     // Remove non-printable characters
+    // eslint-disable-next-line no-control-regex
     return [vscode.TextEdit.replace(textRange, document.getText().replace(/[^\x00-\x7f]/g, ''))]
   }
 }
