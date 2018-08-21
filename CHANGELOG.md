@@ -2,6 +2,12 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.6.0] - 2018-0-
+
+### Added
+
+- Trailing whitespace is now stripped from scripts when formatted (saved or uploaded).
+
 ## [1.5.1] - 2018-06-15
 
 ### Changed

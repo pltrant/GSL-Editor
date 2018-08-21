@@ -394,6 +394,7 @@ class DocumentHighlightProvider {
 
 class DocumentFormatProvider {
   provideDocumentFormattingEdits (document) {
+    let textEdits = []
     let firstLine = document.lineAt(0)
     let lastLine = document.lineAt(document.lineCount - 1)
     let textRange = new vscode.Range(
@@ -404,7 +405,10 @@ class DocumentFormatProvider {
     )
     // Remove non-printable characters
     // eslint-disable-next-line no-control-regex
-    return [vscode.TextEdit.replace(textRange, document.getText().replace(/[^\x00-\x7f]/g, ''))]
+    textEdits.push(vscode.TextEdit.replace(textRange, document.getText().replace(/[^\x00-\x7f]/g, '')))
+    // Remove ending whitespace
+    textEdits.push(vscode.TextEdit.replace(textRange, document.getText().replace(/\s+$/gm, '')))
+    return textEdits
   }
 }
 

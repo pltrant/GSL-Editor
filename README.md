@@ -1,4 +1,6 @@
-The GSL Editor is an extension for a custom scripting language.  If you're unfamiliar with GSL, you probably do not need this extension.
+# Description
+
+The GSL Editor is an extension for the GemStone Language for Simutronics' Interactive Fiction Engine games.
 
 ## Features
 
