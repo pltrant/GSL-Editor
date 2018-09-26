@@ -2,11 +2,20 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
-## [1.6.0] - 2018-0-
+## [1.6.0] - 2018-09-26
 
 ### Added
 
+- GSL button in the Status Bar to list all the available commands for the extension.
 - Trailing whitespace is now stripped from scripts when formatted (saved or uploaded).
+
+### Changed
+
+- Removed the Date Check setting to always display in the Status Bar since it's easily found in the GSL option now.
+
+### Fixed
+
+- Fixed snippets for infoitem, kill, and move to include NC0.
 
 ## [1.5.1] - 2018-06-15
 

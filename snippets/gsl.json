@@ -529,7 +529,7 @@
 	"infoitem": {
 		"prefix": "infoitem",
 		"body": [
-			"infoitem ${1|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|}"
+			"infoitem ${1|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|}"
 		],
 		"description": "infoitem {NOx|NCx|NEx}\n\nPopulate a system table with all varfields and added vargroups for that node."
 	},
@@ -564,14 +564,14 @@
 	"kill": {
 		"prefix": "kill",
 		"body": [
-			"kill ${1|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|}"
+			"kill ${1|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|}"
 		],
 		"description": "kill {node}\n\nDelete an existence."
 	},
 	"killallnp": {
 		"prefix": "killallnp",
 		"body": [
-			"killallnp ${1|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|}"
+			"killallnp ${1|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|}"
 		],
 		"description": "kilallnp {node}\n\nDelete an existence and all other existences attached to it."
 	},
@@ -636,7 +636,7 @@
 	"move": {
 		"prefix": "move",
 		"body": [
-			"move ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|} ${2|ground,inventory,in,on,behind,under|} ${3|NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9,NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|}"
+			"move ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|} ${2|ground,inventory,in,on,behind,under|} ${3|NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9,NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|}"
 		],
 		"description": "move {node} {value expression} {node}\n\nMove a node to another node."
 	},

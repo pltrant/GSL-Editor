@@ -476,8 +476,8 @@ function activate (context) {
   if (!this._ULstatusBarItem) {
     this._ULstatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50)
   }
-  if (!this._DCstatusBarItem) {
-    this._DCstatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50)
+  if (!this._GSLstatusBarItem) {
+    this._GSLstatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50)
   }
   let self = this
   if (vscode.workspace.getConfiguration('gsl').get('alwaysEnabled')) {
@@ -487,7 +487,7 @@ function activate (context) {
     if (!editor) {
       this._DLstatusBarItem.hide()
       this._ULstatusBarItem.hide()
-      this._DCstatusBarItem.hide()
+      this._GSLstatusBarItem.hide()
       return
     }
     let doc = editor.document
@@ -496,7 +496,7 @@ function activate (context) {
     } else {
       this._DLstatusBarItem.hide()
       this._ULstatusBarItem.hide()
-      this._DCstatusBarItem.hide()
+      this._GSLstatusBarItem.hide()
     }
   }
   gslEditor.extContext.subscriptions.push(vscode.commands.registerCommand('extension.gslDownload', () => {
@@ -504,6 +504,9 @@ function activate (context) {
   }))
   gslEditor.extContext.subscriptions.push(vscode.commands.registerCommand('extension.gslUpload', () => {
     gslUpload()
+  }))
+  gslEditor.extContext.subscriptions.push(vscode.commands.registerCommand('extension.gslCommands', () => {
+    gslCommands()
   }))
   gslEditor.extContext.subscriptions.push(vscode.commands.registerCommand('extension.gslDateCheck', () => {
     gslDateCheck()
@@ -588,11 +591,37 @@ function showGSLStatusBarItems (context) {
   context._ULstatusBarItem.text = '↑ Upload'
   context._ULstatusBarItem.command = 'extension.gslUpload'
   context._ULstatusBarItem.show()
-  if (vscode.workspace.getConfiguration('gsl').get('displayDateCheck')) {
-    context._DCstatusBarItem.text = 'Date Check'
-    context._DCstatusBarItem.command = 'extension.gslDateCheck'
-    context._DCstatusBarItem.show()
-  }
+  context._GSLstatusBarItem.text = 'GSL'
+  context._GSLstatusBarItem.command = 'extension.gslCommands'
+  context._GSLstatusBarItem.show()
+}
+
+function gslCommands (context) {
+  vscode.window.showQuickPick(['Download Script', 'Upload Script', 'Check Script Modification Date', 'List GSL Tokens', 'Show Game Output Channel', 'Send Game Command', 'Enable Logging'], { ignoreFocusOut: true, placeHolder: 'Select a command to execute.' }).then(input => {
+    switch (input) {
+      case 'Download Script':
+        gslDownload()
+        break
+      case 'Upload Script':
+        gslUpload()
+        break
+      case 'Check Script Modification Date':
+        gslDateCheck()
+        break
+      case 'List GSL Tokens':
+        gslListTokens()
+        break
+      case 'Show Game Output Channel':
+        getGameChannel().show(true);
+        break
+      case 'Send Game Command':
+        gslSendGameCommand()
+        break
+      case 'Enable Logging':
+        gslLogging()
+        break
+    }
+  })
 }
 
 function gslSendGameCommand (context) {
