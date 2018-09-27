@@ -2,6 +2,13 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.6.1] - 2018-09-26
+
+### Changed
+
+- A few prompts now close (instead of remaining open) when you click outside of the dialog.
+- Failing to provide input for a script download, upload, or a few other prompts now just display an error in the Status Bar instead of an error message.
+
 ## [1.6.0] - 2018-09-26
 
 ### Added
