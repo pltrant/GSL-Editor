@@ -4,7 +4,6 @@ const vscode = require('vscode')
 const net = require('net')
 const fs = require('fs')
 const path = require('path')
-const endOfLine = require('os').EOL
 
 const sgeClient = new net.Socket()
 const gameClient = new net.Socket()

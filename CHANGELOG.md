@@ -2,6 +2,12 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.6.3] - 2018-11-20
+
+### Changed
+
+- Removed an unnecessary node package.
+
 ## [1.6.2] - 2018-11-20
 
 ### Changed
