@@ -435,6 +435,11 @@
 				},
 				{
 					"name": "operator.gsl",
+					"begin": "!=",
+					"end": " then"
+				},
+				{
+					"name": "operator.gsl",
 					"match": "(?:-(?!\\d))"
 				},
 				{
@@ -471,8 +476,7 @@
 		},
 		"comments": {
 			"name": "comment.line.gsl",
-			"begin": "!",
-			"end": "$",
+			"match": "![^=]*$",
 			"patterns": [
 				{
 					"name": "comment.gsl.scan.index",

@@ -4,6 +4,7 @@ const vscode = require('vscode')
 const net = require('net')
 const fs = require('fs')
 const path = require('path')
+const endOfLine = require('os').EOL
 
 const sgeClient = new net.Socket()
 const gameClient = new net.Socket()
@@ -406,8 +407,6 @@ class DocumentFormatProvider {
     // Remove non-printable characters
     // eslint-disable-next-line no-control-regex
     textEdits.push(vscode.TextEdit.replace(textRange, document.getText().replace(/[^\x00-\x7f]/g, '')))
-    // Remove ending whitespace
-    textEdits.push(vscode.TextEdit.replace(textRange, document.getText().replace(/\s+$/gm, '')))
     return textEdits
   }
 }
@@ -958,7 +957,7 @@ function dateCheck (receivedMsg) {
     let modifier = /Last modified by: ([\w-_.]+)/.exec(receivedMsg)[1]
     let date = /\nOn \w+ (\w+) (\d+) (.+) (\d+)/.exec(receivedMsg)
     let data = 'Last modified by ' + modifier + ' on ' + date[1] + ' ' + date[2] + ', ' + date[4] + ' at ' + date[3] + '.'
-    vscode.window.showInformationMessage(data)
+    vscode.window.setStatusBarMessage(data, 5000)
     gslEditor.dateCheck = 0
   }
 }

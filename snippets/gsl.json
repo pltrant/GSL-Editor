@@ -476,7 +476,7 @@
 		],
 		"description": "ifnot statement"
 	},
-	"ifnot NC0 visibility check": {
+	"ifnot creature visibility check": {
 		"prefix": "ifnot",
 		"body": [
 			"ifnot (NC0:hidden | NC0:invisible) then",
@@ -485,7 +485,7 @@
 		],
 		"description": "ifnot NC0 visibility check"
 	},
-	"ifnot NP0 visibility check": {
+	"ifnot player visibility check": {
 		"prefix": "ifnot",
 		"body": [
 			"ifnot (NP0:hidden | NP0:invisible | NP0:nonexist) then",
@@ -494,7 +494,7 @@
 		],
 		"description": "ifnot NP0 visibility check"
 	},
-	"ifnot NP0/NC0 visibility check": {
+	"ifnot player and creature visibility check": {
 		"prefix": "ifnot",
 		"body": [
 			"ifnot (NP0:hidden | NP0:invisible | NP0:nonexist | NC0:hidden | NC0:invisible) then",

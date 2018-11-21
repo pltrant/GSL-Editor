@@ -2,6 +2,19 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.6.2] - 2018-11-20
+
+### Changed
+
+- Check Date now returns the results in the Status Bar instead of an information message.
+- Refreshed the default themes for VSC, which the custom GSL themes rely on.
+
+### Fixed
+
+- The NP0/NC0 snippets should now no longer show up for auto completion when just typing 'NP0' or 'NC0'.
+- Comment syntax highlighting should no longer happen on != condition checks.
+- The newline at the end of a script should no longer be removed when saving/formatting the file.
+
 ## [1.6.1] - 2018-09-26
 
 ### Changed
