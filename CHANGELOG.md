@@ -2,6 +2,12 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.6.4] - 2018-11-22
+
+### Fixed
+
+- Syntax highlighting for comments should now work more consistently.
+
 ## [1.6.3] - 2018-11-20
 
 ### Changed

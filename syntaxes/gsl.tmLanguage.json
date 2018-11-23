@@ -476,7 +476,7 @@
 		},
 		"comments": {
 			"name": "comment.line.gsl",
-			"match": "![^=]*$",
+			"match": "![^=].*$",
 			"patterns": [
 				{
 					"name": "comment.gsl.scan.index",
