@@ -2,6 +2,12 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.6.5] - 2018-12-03
+
+### Changed
+
+- Updated the Status Bar icons for the Download, Upload, and GSL buttons.
+
 ## [1.6.4] - 2018-11-22
 
 ### Fixed

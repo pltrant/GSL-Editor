@@ -583,13 +583,13 @@ function checkForUpdatedVersion () {
 }
 
 function showGSLStatusBarItems (context) {
-  context._DLstatusBarItem.text = '↓ Download'
+  context._DLstatusBarItem.text = '$(cloud-download) Download'
   context._DLstatusBarItem.command = 'extension.gslDownload'
   context._DLstatusBarItem.show()
-  context._ULstatusBarItem.text = '↑ Upload'
+  context._ULstatusBarItem.text = '$(cloud-upload) Upload'
   context._ULstatusBarItem.command = 'extension.gslUpload'
   context._ULstatusBarItem.show()
-  context._GSLstatusBarItem.text = 'GSL'
+  context._GSLstatusBarItem.text = '$(ruby) GSL'
   context._GSLstatusBarItem.command = 'extension.gslCommands'
   context._GSLstatusBarItem.show()
 }
@@ -610,7 +610,7 @@ function gslCommands (context) {
         gslListTokens()
         break
       case 'Show Game Output Channel':
-        getGameChannel().show(true);
+        getGameChannel().show(true)
         break
       case 'Send Game Command':
         gslSendGameCommand()
