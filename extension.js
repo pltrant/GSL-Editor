@@ -6,7 +6,23 @@ const fs = require('fs')
 const path = require('path')
 
 const sgeClient = new net.Socket()
+sgeClient.on('close', onConnSGEClose)
+sgeClient.on('disconnect', onConnSGEClose)
+sgeClient.on('data', onConnSGEData)
+sgeClient.on('error', onConnError)
+sgeClient.setEncoding('ascii')
+sgeClient.setKeepAlive(true)
+sgeClient.setNoDelay(true)
+
 const gameClient = new net.Socket()
+gameClient.on('close', onConnGameClose)
+gameClient.on('disconnect', onConnGameClose)
+gameClient.on('data', onConnGameData)
+gameClient.on('error', onConnError)
+gameClient.setEncoding('ascii')
+gameClient.setKeepAlive(true)
+gameClient.setNoDelay(true)
+
 var gslEditor = {
   extContext: null,
   hashKey: '',
@@ -455,13 +471,6 @@ function LogIntoGame () {
         outGameChannel('SGE connection established.')
         sendMsg('K\n')
       })
-      sgeClient.setEncoding('ascii')
-      sgeClient.on('close', onConnSGEClose)
-      sgeClient.on('disconnect', onConnSGEClose)
-      sgeClient.on('data', onConnSGEData)
-      sgeClient.on('error', onConnError)
-      sgeClient.setKeepAlive(true)
-      sgeClient.setNoDelay(true)
     }
   })
 }
@@ -1046,13 +1055,6 @@ function onConnSGEData (data) {
       outGameChannel('Game connection established.')
       sendMsg(gslEditor.gameKey + '\n')
     })
-    gameClient.setEncoding('ascii')
-    gameClient.on('close', onConnGameClose)
-    gameClient.on('disconnect', onConnGameClose)
-    gameClient.on('data', onConnGameData)
-    gameClient.on('error', onConnError)
-    gameClient.setKeepAlive(true)
-    gameClient.setNoDelay(true)
   }
 }
 
@@ -1093,32 +1095,30 @@ function checkState (msg, count) {
 
 function onConnSGEClose () {
   outGameChannel('SGE connection closed.')
-  sgeClient.destroy()
-  sgeClient.removeAllListeners()
   sgeClient.connected = false
+  sgeClient.destroy()
 }
 
 function onConnGameClose () {
+  vscode.window.showErrorMessage('Game connection closed.')
   outGameChannel('Game connection closed.')
-  gameClient.destroy()
-  gameClient.removeAllListeners()
   gameClient.connected = false
+  gameClient.destroy()
 }
 
 function onConnError (err) {
   if (sgeClient.connected) {
     outGameChannel('SGE connection error: ' + err.message)
-    sgeClient.destroy()
-    sgeClient.removeAllListeners()
     sgeClient.connected = false
+    sgeClient.destroy()
   }
   if (gameClient.connected) {
     outGameChannel('Game connection error: ' + err.message)
-    gameClient.destroy()
-    gameClient.removeAllListeners()
     gameClient.connected = false
+    gameClient.destroy()
   }
   if ((err.code === 'ECONNABORTED') || (err.code === 'ECONNRESET')) {
+    outGameChannel('Connection error: ' + err.message + ".  Attempting to reconnect...")
     if (gslEditor.sendScript) {
       gslUpload2(gslEditor.scriptNum)
       return

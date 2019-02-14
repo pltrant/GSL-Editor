@@ -2,6 +2,12 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.6.6] - 2019-02-14
+
+### Fixed
+
+- Resolved issue with reconnecting to the game after the client loses connection, due to to Visual Studio Code's recent update (v1.31) which was updated to use Node.js v10.2.
+
 ## [1.6.5] - 2018-12-03
 
 ### Changed
