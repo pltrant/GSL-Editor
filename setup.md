@@ -8,15 +8,15 @@ Use the below instructions to setup and use the GSL Editor.
 
     Visual Studio Code is a free, open source, cross-platform (Windows, Linux and macOS) code editor developed by Microsoft.  It is based the Electron framework, which is basically a self-contained version of the Chrome web browser for the frontend.
 
-2. Once installed, launch the application.  Then from the top menu, select View > Extensions (Ctrl+Shift+X).  In the new pane that opens up, there is a textbox at the top to search for extensions in the VSCode Marketplace. Search for "gsl", which should then list the "GSL Editor".  Click the "Install" button, then "Reload" once complete.
+2. Once installed, launch the application.  Then from the top menu, select View > Extensions (Ctrl+Shift+X).  In the new pane that opens up, there is a textbox at the top to search for extensions in the VSCode Marketplace. Search for "gsl", which should then list the "GSL Editor".  Click the "Install" button.
 
     ![](https://radiantglyph.com/gsiv/gsleditor/extension.jpg)
 
-3. At the minimum, 3 settings must be set before you can use the GSL Editor for downloading and uploading scripts.  To do this, from the top menu, select File > Preferences > Settings (Ctrl+Comma).  This will open up a split pane window.  On the left side are all settings available for VSCode itself.  The right side is your personal, saved settings.  In the top search textbox, search for "gsl", which will list the relevant settings for the GSL Editor.  Hover your mouse over the gsl.account setting, then a pencil icon will appear to the left - click on the icon, then select "Copy to settings".  This then copies the setting to the right pane, where you can enter your Play.net account name.  Do this for the gsl.account, gsl.password, and gsl.character.  The other settings are optional, but I recommend leaving them as is until you familiarize yourself with the base setup.  Once done, click the X on the "settings.json" tab to close the window.  If prompted, save the document.  You may not be prompted, as it periodically auto-saves.
+3. Once the extension is installed, you should see 3 new buttons on the bottom, left Status Bar: Download, Upload, and GSL.  Click the GSL button, then a new dialog will show all the available GSL commands.  Run the User Setup, which will prompt you for your Play.net account name, password, character to log in on, and game instance.
 
     ![](https://radiantglyph.com/gsiv/gsleditor/settings.jpg)
 
-4. You should now be ready to use the GSL Editor.  You can just start by downloading or uploading any script by using the buttons on the bottom, left status bar.
+4. You should now be ready to use the GSL Editor.  You can just start by downloading or uploading any script by using the previous referenced buttons.
 
     ![](https://radiantglyph.com/gsiv/gsleditor/buttons.jpg)
 

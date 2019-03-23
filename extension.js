@@ -4,6 +4,7 @@ const vscode = require('vscode')
 const net = require('net')
 const fs = require('fs')
 const path = require('path')
+const keytar = require(`${vscode.env.appRoot}/node_modules.asar/keytar`)
 
 const sgeClient = new net.Socket()
 sgeClient.on('close', onConnSGEClose)
@@ -527,6 +528,9 @@ function activate (context) {
   gslEditor.extContext.subscriptions.push(vscode.commands.registerCommand('extension.gslLogging', () => {
     gslLogging()
   }))
+  gslEditor.extContext.subscriptions.push(vscode.commands.registerCommand('extension.gslUserSetup', () => {
+    gslUserSetup()
+  }))
 
   if (vscode.workspace.getConfiguration('gsl').get('displayGameChannel')) {
     getGameChannel().show(true)
@@ -604,7 +608,7 @@ function showGSLStatusBarItems (context) {
 }
 
 function gslCommands (context) {
-  vscode.window.showQuickPick(['Download Script', 'Upload Script', 'Check Script Modification Date', 'List GSL Tokens', 'Show Game Output Channel', 'Send Game Command', 'Enable Logging'], { placeHolder: 'Select a command to execute.' }).then(input => {
+  vscode.window.showQuickPick(['Download Script', 'Upload Script', 'Check Script Modification Date', 'List GSL Tokens', 'Show Game Output Channel', 'Send Game Command', 'Enable Logging', 'User Setup'], { placeHolder: 'Select a command to execute.' }).then(input => {
     switch (input) {
       case 'Download Script':
         gslDownload()
@@ -626,6 +630,9 @@ function gslCommands (context) {
         break
       case 'Enable Logging':
         gslLogging()
+        break
+      case 'User Setup':
+        gslUserSetup()
         break
     }
   })
@@ -657,6 +664,33 @@ function gslLogging () {
     gslEditor.logging = true
     vscode.window.setStatusBarMessage('Logging enabled.', 5000)
   }
+}
+
+async function gslUserSetup() {
+  await vscode.window.showInputBox({ prompt: 'Play.net Account:', ignoreFocusOut: true }).then(input => {
+    if ((input == null) | (input === '')) {
+      return vscode.window.showErrorMessage('No input provided for Account.')
+    }
+    gslEditor.extContext.globalState.update('gslExtAccount', input)
+  })
+  await vscode.window.showInputBox({ prompt: 'Password:', password: true, ignoreFocusOut: true }).then(input => {
+    if ((input == null) | (input === '')) {
+      return vscode.window.showErrorMessage('No input provided for Password.')
+    }
+    keytar.setPassword('GSLEditor', gslEditor.extContext.globalState.get('gslExtAccount'), input)
+  })
+  await vscode.window.showInputBox({ prompt: 'Character:', ignoreFocusOut: true }).then(input => {
+    if ((input == null) | (input === '')) {
+      return vscode.window.showErrorMessage('No input provided for Character.')
+    }
+    gslEditor.extContext.globalState.update('gslExtCharacter', input)
+  })
+  await vscode.window.showQuickPick(['GemStone IV Development', 'GemStone IV', 'GemStone IV Platinum', 'GemStone IV Shattered', 'GemStone IV Prime Test', 'DragonRealms Development', 'DragonRealms', 'DragonRealms Platinum', 'DragonRealms The Fallen', 'DragonRealms Prime Test'], { placeHolder: 'Game Instance:', ignoreFocusOut: true }).then(input => {
+    if ((input == null) | (input === '')) {
+      return vscode.window.showErrorMessage('No input provided for Game Instance.')
+    }
+    gslEditor.extContext.globalState.update('gslExtGameInstance', input)
+  })
 }
 
 function delayedGameCommand (command) {
@@ -992,21 +1026,25 @@ function onConnSGEData (data) {
 
   if (/^.{32}$/gu.test(receivedMsg) && (gslEditor.msgCount === 1)) {
     gslEditor.hashKey = receivedMsg
-    let pw = vscode.workspace.getConfiguration('gsl').get('password')
-    if (pw === '') {
-      return vscode.window.showErrorMessage('Please use File > Preferences > Settings, then input your password in the GSL section.')
-    }
-    gslEditor.pwHash = ''
-    for (let i = 0; i < pw.length; i++) {
-      gslEditor.pwHash += String.fromCharCode(((pw.charCodeAt(i) - 32) ^ gslEditor.hashKey.charCodeAt(i)) + 32)
-    }
-    let account = vscode.workspace.getConfiguration('gsl').get('account')
-    if (account === '') {
-      return vscode.window.showErrorMessage('Please use File > Preferences > Settings, then input your account name in the GSL section.')
-    }
-    sendMsg('A\t' + account + '\t')
-    sendMsg(Buffer.from(str2ab(gslEditor.pwHash)))
-    sendMsg('\n')
+    keytar.getPassword('GSLEditor', vscode.workspace.getConfiguration('gsl').get('account')).then((result) => {
+      let pw = result
+      if (pw === '') {
+        sgeClient.end()
+        return vscode.window.showErrorMessage('No Character set.  Please run User Setup.')
+      }
+      gslEditor.pwHash = ''
+      for (let i = 0; i < pw.length; i++) {
+        gslEditor.pwHash += String.fromCharCode(((pw.charCodeAt(i) - 32) ^ gslEditor.hashKey.charCodeAt(i)) + 32)
+      }
+      let account = gslEditor.extContext.globalState.get('gslExtAccount')
+      if (typeof(account) === 'undefined') {
+        sgeClient.end()
+        return vscode.window.showErrorMessage('No Account set.  Please run User Setup.')
+      }
+      sendMsg('A\t' + account + '\t')
+      sendMsg(Buffer.from(str2ab(gslEditor.pwHash)))
+      sendMsg('\n')
+    })
   } else if (/^A\t\tNORECORD$/.test(receivedMsg)) {
     vscode.window.showErrorMessage('Invalid account name. Please recheck your credentials.')
   } else if (/^A\t\tPASSWORD$/.test(receivedMsg)) {
@@ -1014,9 +1052,10 @@ function onConnSGEData (data) {
   } else if (/^A\t.*\tKEY\t.*/.test(receivedMsg)) {
     sendMsg('M\n')
   } else if (/^M\t.*/.test(receivedMsg)) {
-    let game = vscode.workspace.getConfiguration('gsl').get('game')
-    if (game === '') {
-      return vscode.window.showErrorMessage('Please use File > Preferences > Settings, then select the game you want to log into under GSL section.')
+    let game = gslEditor.extContext.globalState.get('gslExtGameInstance')
+    if (typeof(game) === 'undefined') {
+      sgeClient.end()
+      return vscode.window.showErrorMessage('No Game Instance set.  Please run User Setup.')
     }
     gslEditor.gameCode = msgArray[msgArray.indexOf(game) - 1]
     sendMsg('N\t' + gslEditor.gameCode + '\n')
@@ -1032,9 +1071,10 @@ function onConnSGEData (data) {
     let lowerCaseMsgArray = msgArray.map(function (value) {
       return value.toLowerCase()
     })
-    let character = vscode.workspace.getConfiguration('gsl').get('character')
-    if (character === '') {
-      return vscode.window.showErrorMessage('Please use File > Preferences > Settings, then input the character name you want to log into under GSL section.')
+    let character = gslEditor.extContext.globalState.get('gslExtCharacter')
+    if (typeof(character) === 'undefined') {
+      sgeClient.end()
+      return vscode.window.showErrorMessage('No Character set.  Please run User Setup.')
     }
     let pos = (lowerCaseMsgArray.indexOf(character.toLowerCase()) - 1)
     gslEditor.characterID = msgArray[pos]
@@ -1100,7 +1140,7 @@ function onConnSGEClose () {
 }
 
 function onConnGameClose () {
-  vscode.window.showErrorMessage('Game connection closed.')
+  vscode.window.setStatusBarMessage('Game connection closed.', 5000)
   outGameChannel('Game connection closed.')
   gameClient.connected = false
   gameClient.destroy()
