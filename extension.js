@@ -559,28 +559,10 @@ function activate (context) {
 
   gslEditor.diagnostics = vscode.languages.createDiagnosticCollection()
 
-  checkForUpdatedVersion()
   checkForNewInstall()
+  checkForUpdatedVersion()
 }
 exports.activate = activate
-
-function checkForUpdatedVersion() {
-  // Check for new Release Notes
-  let showReleaseNotes = 'Show Release Notes'
-  let gslExtensionVersionKey = 'gslExtVersion'
-  let extensionVersion = vscode.extensions.getExtension('patricktrant.gsl').packageJSON.version
-  let storedVersion = gslEditor.extContext.globalState.get(gslExtensionVersionKey)
-  if (storedVersion && (extensionVersion !== storedVersion)) {
-    vscode.window
-      .showInformationMessage(`The GSL Editor extension has been updated to version ${extensionVersion}!`, showReleaseNotes)
-      .then(choice => {
-        if (choice === showReleaseNotes) {
-          vscode.commands.executeCommand('markdown.showPreview', vscode.Uri.file(path.resolve(__dirname, './CHANGELOG.md')))
-        }
-      })
-  }
-  gslEditor.extContext.globalState.update(gslExtensionVersionKey, extensionVersion)
-}
 
 function checkForNewInstall() {
   // Check for new install
@@ -599,8 +581,24 @@ function checkForNewInstall() {
         }
       })
     })
-    gslEditor.extContext.globalState.update('newInstallFlag', true)
+    gslEditor.extContext.globalState.update('gslExtNewInstallFlag', true)
   }
+}
+
+function checkForUpdatedVersion() {
+  // Check for new Release Notes
+  let showReleaseNotes = 'Show Release Notes'
+  let gslExtensionVersionKey = 'gslExtVersion'
+  let extensionVersion = vscode.extensions.getExtension('patricktrant.gsl').packageJSON.version
+  let storedVersion = gslEditor.extContext.globalState.get(gslExtensionVersionKey)
+  if (storedVersion && (extensionVersion !== storedVersion)) {
+    vscode.window.showInformationMessage(`The GSL Editor extension has been updated to version ${extensionVersion}!`, showReleaseNotes).then(choice => {
+      if (choice === showReleaseNotes) {
+        vscode.commands.executeCommand('markdown.showPreview', vscode.Uri.file(path.resolve(__dirname, './CHANGELOG.md')))
+      }
+    })
+  }
+  gslEditor.extContext.globalState.update(gslExtensionVersionKey, extensionVersion)
 }
 
 function showGSLStatusBarItems (context) {
@@ -1123,6 +1121,8 @@ function onConnGameData (data) {
   if (/^<mode id="GAME"\/>$/.test(receivedMsg)) {
     setTimeout(function () { sendMsg('<c>\n') }, 300)
     setTimeout(function () { sendMsg('<c>\n') }, 600)
+    gameClient.pause()
+    setTimeout(function () {gameClient.resume()}, 2000)
   } else if (gslEditor.getScript) {
     downloadScript(receivedMsg)
   } else if (gslEditor.sendScript) {
@@ -1182,6 +1182,6 @@ function onConnError (err) {
 }
 
 function showError (err) {
-  vscode.window.showErrorMessage('Error: ' + err.message)
+  vscode.window.setStatusBarMessage('Error: ' + err.message, 30000)
   getGameChannel().show(true)
 }

@@ -2,6 +2,13 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.7.2] - 2019-03-24
+
+### Fixed
+
+- Resolved issue that was causing the new Setup User prompt to appear on every restart of Visual Studio Code.
+- Resolved issue that would sometimes cause an upload/download to fail when it first had to connect to the game.
+
 ## [1.7.1] - 2019-03-23
 
 ### Added
