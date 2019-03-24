@@ -12,7 +12,7 @@ Use the below instructions to setup and use the GSL Editor.
 
     ![](https://radiantglyph.com/gsiv/gsleditor/extension.jpg)
 
-3. Once the extension is installed, you should see 3 new buttons on the bottom, left Status Bar: Download, Upload, and GSL.  Click the GSL button, then a new dialog will show all the available GSL commands.  Run the User Setup, which will prompt you for your Play.net account name, password, character to log in on, and game instance.
+3. Once the extension is installed, you will be prompted to run the User Setup process.  It will securely store your Play.net account credentials so you can log into the game to download and upload scripts.
 
     ![](https://radiantglyph.com/gsiv/gsleditor/settings.jpg)
 
@@ -20,7 +20,7 @@ Use the below instructions to setup and use the GSL Editor.
 
     ![](https://radiantglyph.com/gsiv/gsleditor/buttons.jpg)
 
-5. A Google Group has been created for anyone to submit bugs, enhancements, or general feedback.  You can request to join at [https://groups.google.com/forum/#!forum/gsl-editor/join](https://groups.google.com/forum/#!forum/gsl-editor/join).
+5. Join the [#gsl-editor](https://discord.gg/kjX79pB) channel on the official GemStone IV Discord server to discuss any issues, feedback, or enhancements.  There's also a [Google Group](https://groups.google.com/forum/#!forum/gsl-editor/join) for email discussions.
 
 ## Tips
 

@@ -463,8 +463,8 @@ function LogIntoGame () {
   }
   return __awaiter(this, void 0, void 0, function * () {
     if (!gameClient.connected) {
-      let game = vscode.workspace.getConfiguration('gsl').get('game')
-      let character = vscode.workspace.getConfiguration('gsl').get('character')
+      let game = gslEditor.extContext.globalState.get('gslExtGameInstance')
+      let character = gslEditor.extContext.globalState.get('gslExtCharacter')
       vscode.window.setStatusBarMessage('Logging into ' + game + ' with ' + character + '...', 5000)
       sgeClient.connect(7900, 'eaccess.play.net', function () {
         sgeClient.connected = true
@@ -560,27 +560,14 @@ function activate (context) {
   gslEditor.diagnostics = vscode.languages.createDiagnosticCollection()
 
   checkForUpdatedVersion()
+  checkForNewInstall()
 }
 exports.activate = activate
 
-function checkForUpdatedVersion () {
-  // Check for new install
-  let newInstallFlag = gslEditor.extContext.globalState.get('newInstallFlag')
-  if (!newInstallFlag) {
-    let applyTheme = 'Apply Theme'
-    vscode.window
-      .showInformationMessage('For the best experience, the GSL Vibrant theme is recommended for the GSL Editor.', applyTheme)
-      .then(choice => {
-        if (choice === applyTheme) {
-          vscode.workspace.getConfiguration().update('workbench.colorTheme', 'GSL Vibrant', true)
-        }
-      })
-    gslEditor.extContext.globalState.update('newInstallFlag', true)
-  }
-
+function checkForUpdatedVersion() {
   // Check for new Release Notes
   let showReleaseNotes = 'Show Release Notes'
-  let gslExtensionVersionKey = 'gslExtensionVersion'
+  let gslExtensionVersionKey = 'gslExtVersion'
   let extensionVersion = vscode.extensions.getExtension('patricktrant.gsl').packageJSON.version
   let storedVersion = gslEditor.extContext.globalState.get(gslExtensionVersionKey)
   if (storedVersion && (extensionVersion !== storedVersion)) {
@@ -593,6 +580,27 @@ function checkForUpdatedVersion () {
       })
   }
   gslEditor.extContext.globalState.update(gslExtensionVersionKey, extensionVersion)
+}
+
+function checkForNewInstall() {
+  // Check for new install
+  let newInstallFlag = gslEditor.extContext.globalState.get('gslExtNewInstallFlag')
+  if (!newInstallFlag) {
+    let applyTheme = 'Apply Theme'
+    vscode.window.showInformationMessage('For the best experience, the GSL Vibrant theme is recommended for the GSL Editor.', applyTheme).then(choice => {
+      if (choice === applyTheme) {
+        vscode.workspace.getConfiguration().update('workbench.colorTheme', 'GSL Vibrant', true)
+      }
+    }).then(function () {
+      let userSetup = 'Start User Setup'
+      vscode.window.showInformationMessage('To start using the GSL Editor, you must run the User Setup process to store your Play.net account credentials.', userSetup).then(choice => {
+        if (choice === userSetup) {
+          gslUserSetup()
+        }
+      })
+    })
+    gslEditor.extContext.globalState.update('newInstallFlag', true)
+  }
 }
 
 function showGSLStatusBarItems (context) {
@@ -1026,7 +1034,7 @@ function onConnSGEData (data) {
 
   if (/^.{32}$/gu.test(receivedMsg) && (gslEditor.msgCount === 1)) {
     gslEditor.hashKey = receivedMsg
-    keytar.getPassword('GSLEditor', vscode.workspace.getConfiguration('gsl').get('account')).then((result) => {
+    keytar.getPassword('GSLEditor', gslEditor.extContext.globalState.get('gslExtAccount')).then((result) => {
       let pw = result
       if (pw === '') {
         sgeClient.end()

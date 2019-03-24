@@ -2,11 +2,17 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
-## [1.7] - 2019-03-23
+## [1.7.1] - 2019-03-23
+
+### Added
+
+- The first time a user installs the GSL Editor extension, they will be prompted to run the User Setup process.
+
+## [1.7.0] - 2019-03-23
 
 ### Changed
 
-- Going forward, the GSL Editor extension will no longer use Visual Studio Code's settings.json file to store your login credentials.  Such information, except your password, is now stored in a separate storage object provided by the extension API.  More importantly, your password is stored in your system's keychain (Credential Vault on Windows, Keychain on macOS, etc).  For more information see [node-keytar](https://github.com/atom/node-keytar).  __All users must run the new User Setup process__ which will prompt you for this information, then store it as noted above.  To run the new User Setup, click the GSL button from the Status Bar, then select User Setup.
+- Going forward, the GSL Editor extension will no longer use Visual Studio Code's settings.json file to store your login credentials.  Such information, except your password, is now stored in a separate storage object provided by the extension API.  More importantly, your password is stored in your operating system's secure keychain (Credential Vault on Windows, Keychain on macOS, etc).  For more information see [node-keytar](https://github.com/atom/node-keytar).  __All users must run the new User Setup process__ which will prompt you for this information, then store it as noted above.  To run the new User Setup, click the GSL button from the Status Bar, then select User Setup.
 
 ## [1.6.8] - 2019-02-14
 
