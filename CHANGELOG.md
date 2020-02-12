@@ -2,6 +2,17 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.7.3] - 2020-02-12
+
+### Added
+
+- The extension will now check for and prompt users to run the User Setup when their settings are not detected.
+- Blank lines are removed when a file is formatted (which automatically happens upon save and script upload).
+
+### Fixed
+
+- Syntax highlighting now recognizes underscores in numbers.
+
 ## [1.7.2] - 2019-03-24
 
 ### Fixed
