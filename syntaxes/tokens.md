@@ -1,4 +1,5 @@
 # Tokens
+
 [Players](#players)  
 [Objects](#objects)  
 [Creatures](#creatures)  
@@ -6,6 +7,7 @@
 [General](#general)  
 
 ## Players
+
 Token | Description
 ---  | ---  
 $P#  | Inserts the player's name.  
@@ -29,6 +31,7 @@ $X#H | Inserts "his" or "her" based on gender of creature. If not NULL, otherwis
 $X#I | Inserts "him" or "her" based on gender of creature. If not NULL, otherwise as $P#I.  
 
 ## Objects
+
 Token | Description
 ---  | ---  
 $O#A | Inserts the article of the existence.  
@@ -43,6 +46,7 @@ $O#M | Inserts :pronoun field if it is set, otherwise as $O#N.
 $O#  | Inserts the field you indicate after the : such as $O#:text_language.  
 
 ## Creatures
+
 Token | Description
 ---  | ---  
 $C#A | Inserts the article of the creature.  
@@ -61,6 +65,7 @@ $X#H | Inserts "his" or "her" based on gender of creature. If not NULL, otherwis
 $X#I | Inserts "him" or "her" based on gender of creature. If not NULL, otherwise as $P#I.  
 
 ## Events
+
 Token | Description
 ---  | ---  
 $E#A | Inserts the article of the event.  
@@ -73,6 +78,7 @@ $E#M | Inserts :pronoun field if it is set, otherwise as $E#N.
 $E#  | Inserts the field you indicate after the : such as $E#:data1.  
 
 ## General
+
 Token | Description
 ---  | ---  
 $$   | Causes a single $ to be inserted.  

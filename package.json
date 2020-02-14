@@ -191,6 +191,11 @@
     ],
     "themes": [
       {
+        "label": "GSL Vibrant",
+        "uiTheme": "vs-dark",
+        "path": "./themes/gsl_vibrant.json"
+      },
+      {
         "label": "GSL Dark",
         "uiTheme": "vs-dark",
         "path": "./themes/gsl_dark.json"
@@ -199,11 +204,6 @@
         "label": "GSL Light",
         "uiTheme": "vs",
         "path": "./themes/gsl_light.json"
-      },
-      {
-        "label": "GSL Vibrant",
-        "uiTheme": "vs-dark",
-        "path": "./themes/gsl_vibrant.json"
       }
     ]
   }
