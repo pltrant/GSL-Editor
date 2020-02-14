@@ -466,7 +466,7 @@
 			"patterns": [
 				{
 					"name": "constant.numeric.gsl",
-					"match": "(?:-?(?:\\d+_?\\d*)+\b)",
+					"match": "(?:-?(?:\\d+_?\\d*)+\\b)",
 					"patterns": []
 				},
 				{
