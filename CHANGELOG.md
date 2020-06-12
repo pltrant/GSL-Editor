@@ -2,6 +2,12 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.7.4] - 2020-
+
+### Changed
+
+- New script heading snippet now uses ISO 8601 date format.
+
 ## [1.7.3-5] - 2020-02-14
 
 ### Added

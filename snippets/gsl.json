@@ -926,7 +926,7 @@
 			"! Keywords: ${2:text}",
 			"!",
 			"! Modification History:",
-			"! $CURRENT_MONTH/$CURRENT_DATE/$CURRENT_YEAR_SHORT - ${6:text} - Initial script creation/code.",
+			"! $CURRENT_YEAR-$CURRENT_MONTH-$CURRENT_DATE - ${6:text} - Initial script creation/code.",
 			"!",
 			"!*********************************************************************************************************************",
 			"!"
