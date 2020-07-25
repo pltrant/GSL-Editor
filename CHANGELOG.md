@@ -2,7 +2,21 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
-## [1.7.6] - 2020-07-13
+## [1.7.10] - 2020-07-24
+
+### Added
+
+- Support for highlighting system variable string tokens (e.g. $:$THISSCRIPT)
+- Missing gsl keywords as keyword.gsl.misc
+- More detail to the callmatch statement to cover some more weird cases
+- Support for msgrgm named modes as keyword.gsl.msgrgm.modes scope
+- Naos In The Sky theme
+
+### Fixed
+
+- Effects param scopes to be keyword.gsl.effects.param instead of keyword.gsl.param.effects
+
+## [1.7.6-9] - 2020-07-13
 
 ### Changed
 
