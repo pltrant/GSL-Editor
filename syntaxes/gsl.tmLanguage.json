@@ -88,6 +88,10 @@
 							"name": "keyword.gsl.messaging.special",
 							"match": "\\b(?i)(?:mode)\\b"
 						},
+						{
+							"name": "keyword.gsl.msgrgm.modes",
+							"match": "\\b(?i)(?:dbg|debugging|tongues|signal|whisper|sneaking|info|experience|combat|creature|infra|infrastructure|magic|crafting|guild)\\b"
+						},
 						{ "include": "#node_vars" },
 						{ "include": "#numbers" },
 						{ "include": "#strings" },
@@ -110,7 +114,7 @@
 				},
 				{
 					"name": "statement.gsl.messaging.targeted",
-					"begin": "\\b(?i)(msg)\\s?(n[pr]\\d)?",
+					"begin": "\\b(?i)(msg|prempt)\\s?(n[pr]\\d)?",
 					"beginCaptures": {
 						"1": { "name": "keyword.gsl.messaging" },
 						"2": { "name": "variable.gsl.node" }
@@ -123,7 +127,7 @@
 				},
 				{
 					"name": "statement.gsl.callmatch",
-					"match": "(?ix) \\b (callmatch) \\s+? (?: (must_match|may_match|check)? \\s+? ( \\$\\w* | \"[^\"]*?\" )? \\s+? (in)? )?",
+					"match": "(?ix) \\b (callmatch) \\s+? (?: (must_match|may_match|check)? \\s+? \\(?( \\$\\w* | [s|t][0-9] | \"[^\"]*?\" )?\\)? \\s+? (in)? )?",
 					"captures": {
 						"1": { "name": "keyword.gsl.callmatch" },
 						"2": { "name": "keyword.gsl.callmatch.param" },
@@ -154,7 +158,7 @@
 					"end": "$",
 					"patterns": [
 						{
-							"name": "keyword.gsl.param.effects",
+							"name": "keyword.gsl.effects.param",
 							"match": "\\b(?i:code|value1|value2|flags|with|in|script)\\b"
 						},
 						{ "include": "#expression" }
@@ -162,14 +166,14 @@
 				},
 				{
 					"name": "statement.gsl.effects",
-					"begin": "\\b(?i)((?:test|rem)2?(?:effect))\\b",
+					"begin": "\\b(?i)((?:test2?|rem(n|2)?)(?:effect))\\b",
 					"beginCaptures": {
 						"1": { "name": "keyword.gsl.effects" }
 					},
 					"end": "$",
 					"patterns": [
 						{
-							"name": "keyword.gsl.param.effects",
+							"name": "keyword.gsl.effects.param",
 							"match": "\\b(?i)(code|value2|from)\\b"
 						},
 						{ "include": "#expression" }
@@ -245,6 +249,39 @@
 							"match": "\\b(?i)(call|callback|donematch)\\b"
 						},
 						{ "include": "#variables" },
+						{ "include": "#comments" }
+					]
+				},
+				{
+					"name": "statement.gsl.combat",
+					"begin": "\\b(?i)(hurt|injure)\\b",
+					"beginCaptures": {
+						"1": { "name": "keyword.gsl.combat" }
+					},
+					"end": "$",
+					"patterns": [
+						{
+							"name": "keyword.gsl.combat.param",
+							"match": "\\b(?i:hits)\\b"
+						},
+						{ "include": "#variables" },
+						{ "include": "#comments" }
+					]
+				},
+				{
+					"name": "statement.gsl.assignment",
+					"begin": "\\b(?i)(index|random)\\b",
+					"beginCaptures": {
+						"1": { "name": "keyword.gsl.assignment" }
+					},
+					"end": "$",
+					"patterns": [
+						{
+							"name": "keyword.gsl.assignment.param",
+							"match": "\\b(?i:for|to)\\b"
+						},
+						{ "include": "#variables" },
+						{ "include": "#numbers" },
 						{ "include": "#comments" }
 					]
 				}
@@ -328,7 +365,7 @@
 				},
 				{
 					"name": "keyword.gsl.info",
-					"match": "\\b(?i:index|info|getnameof|table|profile|script)\\b"
+					"match": "\\b(?i:info|getnameof|table|profile|script)\\b"
 				},
 				{
 					"name": "keyword.gsl.table",
@@ -365,6 +402,14 @@
 				{
 					"name": "keyword.gsl.dangerous",
 					"match": "\\b(?i:kill|killallnp|removevargroup|removevarfield)\\b"
+				},
+				{
+					"name": "keyword.gsl.misc",
+					"match": "\\b(?i:lookroom|dolook|diradd|dirsend)\\b"
+				},
+				{
+					"name": "keyword.gsl.assignment",
+					"match": "\\b(?i:random|index)\\b"
 				}
 			]
 		},
@@ -409,6 +454,15 @@
 				{
 					"name": "token.gsl.misc",
 					"match": "\\$(\\$|\\\\|\\^|\\*|\\+|'|Q|R|ZE)"
+				},
+				{
+					"name": "token.gsl.sysvar",
+					"begin": "\\$\\:\\$(?=\\w)",
+					"end": "(?=\\W)",
+					"patterns": [
+						{ "include": "#number_system_vars" },
+						{ "include": "#string_system_vars" }
+					]
 				},
 				{
 					"name": "token.gsl.xml",
@@ -497,6 +551,15 @@
 					"captures": {
 						"1": { "name": "variable.gsl.table" }
 					}
+				},
+				{
+					"name": "variable.gsl.system",
+					"begin": "\\$(?=\\w)",
+					"end": "(?=\\W)",
+					"patterns": [
+						{ "include": "#number_system_vars" },
+						{ "include": "#string_system_vars" }
+					]
 				}
 			]
 		},
@@ -511,15 +574,17 @@
 				}
 			]
 		},
+		"number_system_vars": {
+			"match": "(?i:ERROR|BREAK|THISSCRIPT|CALLEDBY|INTTABLE|STRTABLE|DESCMODE|LOADINGFROMSAVE|USERS|MAXUOBJS|MAXTEXTCHANGES|SYSTIME|TIME)\\b"
+		},
+		"string_system_vars": {
+			"match": "(?i:MATCH|GAMECODE|GAMENAME|REPLYADDRESS|SHORTNAME|TIMES)\\b"
+		},
 		"string_vars": {
 			"patterns": [
 				{
 					"name": "variable.gsl.register.string",
 					"match": "\\b(?i)[ST]\\d\\b"
-				},
-				{
-					"name": "variable.gsl.system.string",
-					"match": "\\$(?i:MATCH|GAMECODE|GAMENAME|REPLYADDRESS|SHORTNAME|TIMES)\\b"
 				}
 			]
 		},
@@ -528,10 +593,6 @@
 				{
 					"name": "variable.gsl.register.number",
 					"match": "\\b(?i)[ABV]\\d\\b"
-				},
-				{
-					"name": "variable.gsl.system.number",
-					"match": "\\$(?i:ERROR|BREAK|THISSCRIPT|CALLEDBY|INTTABLE|STRTABLE|DESCMODE|LOADINGFROMSAVE|USERS|MAXUOBJS|MAXTEXTCHANGES|SYSTIME|TIME)\\b"
 				}
 			]
 		}

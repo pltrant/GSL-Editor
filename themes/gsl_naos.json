@@ -1,0 +1,185 @@
+{
+    "name": "Naos In The Sky",
+	"type": "dark",
+	"$schema": "vscode://schemas/color-theme",
+	"include": "./dark_plus.json",
+	"tokenColors": [
+        {
+            "scope": "comment.gsl.scan.index",
+            "settings": {
+                "foreground": "#ABA77A"
+            }
+        },
+        {
+            "scope": "comment.gsl.scan.index.ten",
+            "settings": {
+                "foreground": "#A97354"
+            }
+        },
+        {
+            "scope": "string.quoted.double.gsl",
+            "settings": {
+                "foreground": "#83AE6E"
+            }
+        },
+        {
+            "scope": "constant.numeric.gsl",
+            "settings": {
+                "foreground": "#A9977E"
+            }
+        },
+        {
+            "scope": "source.gsl",
+            "settings": {
+                "foreground": "#D3D3D3"
+            }
+        },
+        {
+            "scope": "keyword.gsl.stop",
+            "settings": {
+                "foreground": "#CB8B15",
+                "fontStyle": "bold"
+            }
+        },
+        {
+            "scope": "keyword.gsl.dangerous",
+            "settings": {
+                "foreground": "#C12C27",
+                "fontStyle": "bold"
+            }
+        },
+        {
+            "scope": "keyword.gsl.assert",
+            "settings": {
+                "foreground": "#BD5B58",
+                "fontStyle": "bold"
+            }
+        },
+        {
+            "scope": "matchmarker.gsl",
+            "settings": {
+                "foreground": "#D7A738",
+                "fontStyle": "bold"
+            }
+        },
+        {
+            "scope": "keyword.gsl.stack",
+            "settings": {
+                "foreground": "#D9B86C",
+                "fontStyle": "bold"
+            }
+        },
+        {
+            "scope": "token.gsl",
+            "settings": {
+                "foreground": "#2A992A"
+            }
+        },
+        {
+            "scope": "token.gsl.sysvar",
+            "settings": {
+                "foreground": "#1b631b"
+            }
+        },
+        {
+            "scope": "token.gsl.xml.attribute.name",
+            "settings": {
+                "foreground": "#144714"
+            }
+        },
+        {
+            "scope": "keyword.gsl",
+            "settings": {
+                "foreground": "#999999"
+            }
+        },
+        {
+            "scope": "keyword.gsl.control",
+            "settings": {
+                "foreground": "#6980AF"
+            }
+        },
+        {
+            "scope": "keyword.gsl.gathering",
+            "settings": {
+                "foreground": "#BAA364"
+            }
+        },
+        {
+            "scope": "keyword.gsl.callmatch",
+            "settings": {
+                "foreground": "#5E6D89"
+            }
+        },
+        {
+            "scope": "keyword.gsl.messaging",
+            "settings": {
+                "foreground": "#588B8A"
+            }
+        },
+        {
+            "scope": "keyword.gsl.assignment",
+            "settings": {
+                "foreground": "#6C3794"
+            }
+        },
+        {
+            "scope": "keyword.gsl.table",
+            "settings": {
+                "foreground": "#9254c2"
+            }
+        },
+        {
+            "scope": "keyword.gsl.effects",
+            "settings": {
+                "foreground": "#497897"
+            }
+        },
+        {
+            "scope": "operator.gsl.special",
+            "settings": {
+                "foreground": "#8AACEC"
+            }
+        },
+        {
+            "scope": "variable.gsl",
+            "settings": {
+                "foreground": "#8B70A6"
+            }
+        },
+        {
+            "scope": "variable.gsl.system",
+            "settings": {
+                "foreground": "#0068FF"
+            }
+        },
+        {
+            "scope": "variable.gsl.node",
+            "settings": {
+                "foreground": "#967D38"
+            }
+        },
+        {
+            "scope": "variable.gsl.field",
+            "settings": {
+                "foreground": "#C3A348"
+            }
+        },
+        {
+            "scope": "keyword.gsl.addgroup",
+            "settings": {
+                "foreground": "#C3A348"
+            }
+        },
+        {
+            "scope": "keyword.gsl.msgrgm.modes",
+            "settings": {
+                "foreground": "#7a738a"
+            }
+        }
+   ],
+    "colors": {
+        "editorLineNumber.activeForeground": "#999999",
+        "editorIndentGuide.activeBackground": "#999999"  
+    }
+}
