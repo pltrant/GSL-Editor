@@ -27,42 +27,70 @@
   "engines": {
     "vscode": "^1.24.0"
   },
+  "dependencies": {
+    "vscode-languageclient": "^6.1.3"
+  },
+  "devDependencies": {
+    "@types/mocha": "^7.0.2",
+    "@types/node": "^12.12.53",
+    "@types/vscode": "1.43.0",
+    "@typescript-eslint/parser": "^2.3.0",
+    "eslint": "^6.4.0",
+    "mocha": "^8.0.1",
+    "typescript": "^3.9.7",
+    "vscode-test": "^1.3.0"
+  },
+  "scripts": {
+    "vscode:prepublish": "cd gsl-language-server && npm run compile",
+    "postinstall": "cd gsl-language-server && npm install && cd ..",
+    "compile": "tsc -b"
+  },
   "main": "extension",
   "contributes": {
     "commands": [
       {
-        "command": "extension.gslDownload",
-        "title": "Download",
+        "command": "gsl.downloadScript",
+        "title": "Download Script",
         "category": "GSL"
       },
       {
-        "command": "extension.gslUpload",
-        "title": "Upload",
+        "command": "gsl.uploadScript",
+        "title": "Upload Script",
         "category": "GSL"
       },
       {
-        "command": "extension.gslSendGameCommand",
-        "title": "Send Game Command",
+        "command": "gsl.sendGame",
+        "title": "Send Command to Game",
         "category": "GSL"
       },
       {
-        "command": "extension.gslDateCheck",
-        "title": "Check Script Date",
+        "command": "gsl.checkDate",
+        "title": "Check Script Modification Date",
         "category": "GSL"
       },
       {
-        "command": "extension.gslListTokens",
+        "command": "gsl.listTokens",
         "title": "List Tokens",
         "category": "GSL"
       },
       {
-        "command": "extension.gslLogging",
-        "title": "Logging",
+        "command": "gsl.toggleLogging",
+        "title": "Toggle Game Output Logging",
         "category": "GSL"
       },
       {
-        "command": "extension.gslUserSetup",
+        "command": "gsl.userSetup",
         "title": "User Setup",
+        "category": "GSL"
+      },
+      {
+        "command": "gsl.openTerminal",
+        "title": "Open Game Terminal",
+        "category": "GSL"
+      },
+      {
+        "command": "gsl.openConnection",
+        "title": "Open Development Server Connection",
         "category": "GSL"
       }
     ],
@@ -70,6 +98,12 @@
       "type": "object",
       "title": "GSL",
       "properties": {
+        "gslLanguageServer.maxNumberOfProblems": {
+          "scope": "resource",
+          "type": "number",
+          "default": 100,
+          "description": "Maximum number of problems reported for document"
+        },
         "gsl.disableLoginAttempts": {
           "type": [
             "boolean"

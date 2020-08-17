@@ -1,1236 +1,512 @@
-'use strict'
-
-const vscode = require('vscode')
-const net = require('net')
-const fs = require('fs')
-const path = require('path')
-const keytar = require(`${vscode.env.appRoot}/node_modules.asar/keytar`)
-// const writeEmitter = new vscode.EventEmitter();
-// const pty = vscode.Pseudoterminal = {
-//   onDidWrite: writeEmitter.event,
-//   open: () => {},
-//   close: () => {},
-//   handleInput: data => writeEmitter.fire(data === '\r' ? '\r\n' : data)
-// };
-
-const sgeClient = new net.Socket()
-sgeClient.on('close', onConnSGEClose)
-sgeClient.on('disconnect', onConnSGEClose)
-sgeClient.on('data', onConnSGEData)
-sgeClient.on('error', onConnError)
-sgeClient.setEncoding('ascii')
-sgeClient.setKeepAlive(true)
-sgeClient.setNoDelay(true)
-
-const gameClient = new net.Socket()
-gameClient.on('close', onConnGameClose)
-gameClient.on('disconnect', onConnGameClose)
-gameClient.on('data', onConnGameData)
-gameClient.on('error', onConnError)
-gameClient.setEncoding('ascii')
-gameClient.setKeepAlive(true)
-gameClient.setNoDelay(true)
-
-var gslEditor = {
-  extContext: null,
-  hashKey: '',
-  pwHash: '',
-  gameCode: '',
-  characterID: '',
-  gameHost: '',
-  gamePort: '',
-  gameKey: '',
-  gameChannel: null,
-  gameTerminal: null,
-  logging: false,
-  msgCount: 0,
-  getScript: 0,
-  sendScript: 0,
-  scriptNum: 0,
-  scriptArray: [],
-  scriptTxt: '',
-  debug: '',
-  diagnostic: null,
-  input: '',
-  lastMsg: '',
-  goToDefinition: ''
-}
-
-class SymbolProvider {
-  provideDocumentSymbols (document, token) {
-    return new Promise((resolve, reject) => {
-      let header = true
-      let symbols = []
-      for (let i = 0; i < document.lineCount; i++) {
-        let line = document.lineAt(i)
-        if (line.text.startsWith(': ')) {
-          header = false
-          let matchMarker = /^:\s+"(.*?)"/.exec(line.text)
-          let endLine = null
-          let endChar = null
-          for (let i = line.lineNumber; i < document.lineCount; i++) {
-            let lineTxt = document.lineAt(i)
-            if (lineTxt.text.startsWith('.')) {
-              // Attribute any comments after the closing period to the current matchmarker
-              for (let j = i + 1; j < document.lineCount; j++) {
-                let lineTxt2 = document.lineAt(j)
-                if (!lineTxt2.text.startsWith('!')) {
-                  break
-                } else {
-                  i++
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.deactivate = exports.activate = exports.GSLExtension = void 0;
+const path = require("path");
+const fs = require("fs");
+const vscode_1 = require("vscode");
+const vscode_2 = require("vscode");
+const vscode_languageclient_1 = require("vscode-languageclient");
+const gsl_1 = require("./gsl");
+const uaccessClient_1 = require("./gsl/uaccessClient");
+const gameTerminal_1 = require("./gsl/gameTerminal");
+const editorClient_1 = require("./gsl/editorClient");
+const GSLX_DEV_ACCOUNT = 'developmentAccount';
+const GSLX_DEV_INSTANCE = 'developmentInstance';
+const GSLX_DEV_CHARACTER = 'developmentCharacter';
+const GSLX_NEW_INSTALL_FLAG = 'gslExtNewInstallFlag';
+const GSLX_SAVED_VERSION = 'savedVersion';
+const GSLX_DISABLE_LOGIN = 'disableLoginAttempts';
+const GSLX_KEYTAR_KEY = 'GSL-Editor';
+class GSLExtension {
+    static init(vsc) {
+        this.diagnostics = vscode_2.languages.createDiagnosticCollection();
+        this.vsc = vsc;
+    }
+    static getDownloadLocation() {
+        let extPath = null;
+        let useWorkspaceFolder = vscode_2.workspace.getConfiguration('gsl').get('downloadToWorkspace');
+        if (useWorkspaceFolder && vscode_2.workspace.workspaceFolders) {
+            extPath = vscode_2.workspace.workspaceFolders[0].uri.fsPath;
+        }
+        else {
+            extPath = vscode_2.workspace.getConfiguration('gsl').get('downloadPath');
+        }
+        if (!extPath) {
+            let rootPath = path.resolve(__dirname, '../gsl');
+            if (!fs.existsSync(rootPath)) { // Directory doesn't exist
+                fs.mkdirSync(rootPath); // Create directory
+            }
+            extPath = path.resolve(__dirname, '../gsl/scripts');
+        }
+        if (!fs.existsSync(extPath)) { // Directory doesn't exist
+            fs.mkdirSync(extPath); // Create directory
+        }
+        return extPath;
+    }
+    static async downloadScript(script, gotoDef) {
+        const error = (e) => { error.caught = e; };
+        const downloadPath = this.getDownloadLocation();
+        const fileExtension = vscode_2.workspace.getConfiguration('gsl').get('fileExtension');
+        const client = await this.vsc.ensureGameConnection().catch(error);
+        if (error.caught) {
+            return void vscode_2.window.showErrorMessage(`Failed to connect to game: ${error.caught.message}`);
+        }
+        if (client) {
+            const scriptProperties = await client.modifyScript(script).catch(error);
+            if (error.caught) {
+                return void vscode_2.window.showErrorMessage(error.caught.message);
+            }
+            const content = await client.captureScript().catch(error);
+            if (error.caught) {
+                return void vscode_2.window.showErrorMessage(`Failed to download script: ${error.caught.message}`);
+            }
+            if (content) {
+                const scriptFile = scriptProperties.path.split('/').pop();
+                const scriptPath = path.join(downloadPath, scriptFile);
+                fs.writeFileSync(scriptPath, content);
+                const document = await vscode_2.workspace.openTextDocument(scriptPath);
+                const editor = await vscode_2.window.showTextDocument(document, { preview: false });
+                if (gotoDef) {
+                    const gotoRegExp = new RegExp(`:\s+${gotoDef}`);
+                    for (let n = 0, nn = document.lineCount; n < nn; n++) {
+                        const line = document.lineAt(n);
+                        if (line.text.match(gotoRegExp)) {
+                            vscode_2.commands.executeCommand('revealLine', { lineNumber: n, at: 'center' });
+                            break;
+                        }
+                    }
                 }
-              }
-              endLine = i
-              endChar = document.lineAt(i).range.end.character
-              break
             }
-          }
-          let symbolRange = null
-          if ((endLine == null) || (endChar == null)) {
-            symbolRange = line.range
-          } else {
-            symbolRange = new vscode.Range(
-              line.lineNumber,
-              line.range.start.character,
-              endLine,
-              endChar
-            )
-          }
-          symbols.push({
-            name: matchMarker[1],
-            kind: vscode.SymbolKind.Method,
-            location: new vscode.Location(document.uri, symbolRange)
-          })
-        } else if (header && !line.text.startsWith('!')) {
-          header = false
-          let endLine = null
-          let endChar = null
-          for (let i = line.lineNumber; i < document.lineCount; i++) {
-            let lineTxt = document.lineAt(i)
-            if (lineTxt.text.startsWith(':')) {
-              i--
-              endLine = i
-              endChar = document.lineAt(i).range.end.character
-              break
+            vscode_2.window.setStatusBarMessage("Script download complete!", 5000);
+        }
+        else {
+            vscode_2.window.showErrorMessage("Could not connect to game?");
+        }
+    }
+    static async uploadScript(script, document) {
+        const error = (e) => { error.caught = e; };
+        const client = await this.vsc.ensureGameConnection().catch(error);
+        if (error.caught) {
+            return void vscode_2.window.showErrorMessage(`Failed to connect to game: ${error.caught.message}`);
+        }
+        if (client) {
+            const lines = [];
+            for (let n = 0, nn = document.lineCount; n < nn; n++) {
+                lines.push(document.lineAt(n).text);
             }
-          }
-          if ((endLine == null) || (endChar == null)) { // the whole script is in the empty matchmarker
-            endLine = document.lineCount - 1
-            endChar = document.lineAt(document.lineCount - 1).range.end.character
-          }
-          let symbolRange = new vscode.Range(
-            line.lineNumber,
-            line.range.start.character,
-            endLine,
-            endChar
-          )
-          symbols.push({
-            name: '""',
-            kind: vscode.SymbolKind.Method,
-            location: new vscode.Location(document.uri, symbolRange)
-          })
-        }
-      }
-      resolve(symbols)
-    })
-  }
-}
-
-class HoverProvider {
-  constructor () {
-    this.nodeInfo = {
-      'O': {
-        'A': 'article',
-        'J': 'adjective',
-        'N': 'noun',
-        'D': 'article adjective noun',
-        'S': 'adjective noun',
-        'C': 'opened/closed',
-        'O': 'an opened/a closed',
-        'T': "'the' followed by noun",
-        'M': "'pronoun' field if set, otherwise noun"
-      },
-      'C': {
-        'A': 'article',
-        'J': 'adjective',
-        'N': 'noun',
-        'D': 'article adjective noun',
-        'S': 'adjective noun',
-        'T': "'crtr_name' field if set, otherwise 'the' followed by noun",
-        'U': "'the' followed by adjective and noun",
-        'M': "'pronoun' field if set, otherwise noun"
-      },
-      'P': {
-        '': 'First name',
-        'A': 'Master/Mistress',
-        'B': 'First and last name',
-        'F': 'himself/herself',
-        'G': 'he/she',
-        'H': 'his/her',
-        'I': 'him/her',
-        'L': 'Last name',
-        'M': 'man/woman',
-        'P': 'profession',
-        'R': 'race',
-        'S': 'sir/madam'
-      },
-      'X': {
-        '': 'article adjective noun of creature OR first name of player.',
-        'F': 'himself/herself of creature or player.',
-        'G': 'he/she of creature or player.',
-        'H': 'his/her of creature or player.',
-        'I': 'him/her of creature or player.'
-      },
-      'E': {
-        'A': 'article',
-        'J': 'adjective',
-        'N': 'noun',
-        'D': 'article adjective noun',
-        'S': 'adjective noun',
-        'T': "'the' followed by noun",
-        'M': "'pronoun' field if set, otherwise noun"
-      },
-      'r': {
-        '': 'Room number.'
-      }
-    }
-    this.varInfo = {
-      'A': 'value',
-      'B': 'value',
-      'D': 'value / 100 with remainder as decimal',
-      'V': 'value',
-      'L': 'value right aligned to 7 characters',
-      'S': 'value',
-      'K': 'value right aligned to 16 characters',
-      'T': 'value'
-    }
-    this.tokenInfo = {
-      '$': '$ symbol',
-      '\\': 'Suppresses automatic linefeed',
-      '^': 'Uppercase first letter of string',
-      'Q': '" symbol',
-      'R': 'Linefeed',
-      '*': 'ESC code (ASCII 27)',
-      '+': 'Capitalizes first letter of next string token',
-      "'": "Adds 's to next string token, properly XML wrapped",
-      'ZE': 'Outputs timestamp for token that follows'
-    }
-    this.baseHoverRegex = /\$(:\$[A-Z]+|:\d+\[\d+,\d+,\d+\]|[\w\d:_-]+|[ABDVLSKT]\d|[$\\^QR*+'])/
-    this.stringTokenRegex = /\$([POCEXr])(\d)([A-Z]?)$/
-    this.fieldRegex = /\$([POCEXr]\d):([\w\d_]+)$/
-    this.varRegex = /\$([ABDVLSKT])(\d)/
-    this.tokenRegex = /\$([$\\^QR*+']|ZE)/
-    this.systemRegex = /\$:(\$[A-Z]+)/
-    this.tableRegex = /\$:(\d+)(\[\d+,\d+,\d+\])/
-  }
-
-  provideHover (document, position, token) {
-    let wordRange = document.getWordRangeAtPosition(position, this.baseHoverRegex)
-    if (!wordRange) return
-
-    let word = document.getText(wordRange)
-    if (this.stringTokenRegex.test(word)) {
-      return this.stringTokenHover(word)
-    } else if (this.fieldRegex.test(word)) {
-      return this.fieldHover(word)
-    } else if (this.varRegex.test(word)) {
-      return this.varHover(word)
-    } else if (this.tokenRegex.test(word)) {
-      return this.tokenHover(word)
-    } else if (this.systemRegex.test(word)) {
-      return this.systemHover(word)
-    } else if (this.tableRegex.test(word)) {
-      return this.tableHover(word)
-    }
-  }
-
-  stringTokenHover (token) {
-    let tokenTypes = this.stringTokenRegex.exec(token)
-    if (tokenTypes[1] in this.nodeInfo && tokenTypes[3] in this.nodeInfo[tokenTypes[1]]) {
-      return new vscode.Hover('N' + tokenTypes[1].toUpperCase() + tokenTypes[2] + ': ' + this.nodeInfo[tokenTypes[1]][tokenTypes[3]])
-    }
-  }
-
-  fieldHover (token) {
-    let tokenTypes = this.fieldRegex.exec(token)
-    return new vscode.Hover('N' + tokenTypes[1].toUpperCase() + ": '" + tokenTypes[2] + "' field")
-  }
-
-  varHover (token) {
-    let tokenTypes = this.varRegex.exec(token)
-    let varName = tokenTypes[1]
-    if (varName === 'D' || varName === 'L') varName = 'V'
-    if (varName === 'K') varName = 'S'
-    return new vscode.Hover(varName + tokenTypes[2] + ': ' + this.varInfo[tokenTypes[1]])
-  }
-
-  tokenHover (word) {
-    let token = this.tokenRegex.exec(word)[1]
-    return new vscode.Hover(this.tokenInfo[token])
-  }
-
-  systemHover (word) {
-    let token = this.systemRegex.exec(word)[1]
-    return new vscode.Hover('System variable ' + token)
-  }
-
-  tableHover (word) {
-    let tokenTypes = this.tableRegex.exec(word)
-    return new vscode.Hover('table #' + tokenTypes[1] + ': value in ' + tokenTypes[2])
-  }
-}
-
-class DefinitionProvider {
-  provideDefinition (document, position, token) {
-    let txt = document.lineAt(position.line).text.trim().toLowerCase()
-    if (txt.includes('call')) {
-      let txtArray = txt.split(' ')
-      if (txtArray[4] === '$thisscript') {
-        for (let i = 0; i < document.lineCount; i++) {
-          let line = document.lineAt(i)
-          if (line.text.toLowerCase().startsWith(': ' + txtArray[2])) {
-            return new vscode.Location(document.uri, new vscode.Position(i, 0))
-          }
-        }
-      } else {
-        let scriptNum = ''
-        if (txtArray.length === 2) { // call #
-          scriptNum = txtArray[1]
-        } else if (txtArray[3] === 'in') { // callmatch must_match "$*" in #
-          scriptNum = txtArray[4]
-        } else {
-          return
-        }
-        if (isNaN(scriptNum)) { // Not a number
-          return
-        }
-        while (scriptNum.length < 5) {
-          scriptNum = '0' + scriptNum
-        }
-        let scriptFile = path.join(getDownloadLocation(), 'S' + scriptNum) + vscode.workspace.getConfiguration('gsl').get('fileExtension')
-        if (fs.existsSync(scriptFile)) {
-          let idx = 0
-          if (txtArray[4]) {
-            let fileTxt = fs.readFileSync(scriptFile).toString().split('\r\n')
-            for (let i = 0; i < fileTxt.length; i++) {
-              if (fileTxt[i].toLowerCase().startsWith(': ' + txtArray[2])) {
-                idx = i
-                break
-              }
+            let scriptProperties = await client.modifyScript(script).catch(error);
+            if (error.caught) {
+                return void vscode_2.window.showErrorMessage(error.caught.message);
             }
-          }
-          return new vscode.Location(vscode.Uri.file(scriptFile), new vscode.Position(idx, 0))
-        } else {
-          gslEditor.goToDefinition = txtArray[2]
-          gslDownload2(scriptNum)
+            let compileResults = await client.sendScript(lines).catch(error);
+            if (error.caught) {
+                return vscode_2.window.showErrorMessage(error.caught.message);
+            }
+            if (compileResults.status === editorClient_1.ScriptCompileStatus.Failed) {
+                const problems = compileResults.errorList.map((error) => {
+                    const line = document.lineAt(error.line - 1);
+                    return new vscode_1.Diagnostic(line.range, error.message, vscode_languageclient_1.DiagnosticSeverity.Error);
+                });
+                this.diagnostics.set(document.uri, problems);
+                vscode_2.window.showErrorMessage(`Script ${compileResults.script}: Compile failed; ${compileResults.errors} error(s), ${compileResults.warnings} warning(s).`);
+                vscode_2.commands.executeCommand('workbench.actions.view.problems');
+            }
+            else {
+                this.diagnostics.clear();
+                vscode_2.window.setStatusBarMessage(`Script ${compileResults.script}: Compile OK; ${compileResults.bytes} bytes`, 5000);
+            }
         }
-      }
-    }
-  }
-}
-
-class DocumentHighlightProvider {
-  constructor () {
-    this.startKeywords = /^:|^\s*(if|ifnot|loop|when|is|default|fastpush|push)\b.*$/i
-    this.middleKeywords = /^\s*(else|else_if|else_ifnot)\b.*$/i
-    this.endKeywords = /^\s*\.|(fastpop|pop)\b.*$/i
-    this.gslWords = /:|\.|if|ifnot|loop|when|is|default|else_ifnot|else_if|else|fastpush|fastpop|push|pop/i
-  }
-
-  provideDocumentHighlights (document, position, token) {
-    let highlights = []
-    let textRange = document.getWordRangeAtPosition(position, /[\S]+/)
-    let lineNum = textRange.start.line
-    let starts = 0
-    let ends = 0
-    if (this.startKeywords.test(document.getText(textRange))) {
-      highlights.push(new vscode.DocumentHighlight(textRange, {kind: 0}))
-      this.searchLinesAfter(document, lineNum, highlights, starts, ends)
-    } else if (this.middleKeywords.test(document.getText(textRange))) {
-      highlights.push(new vscode.DocumentHighlight(textRange, {kind: 0}))
-      // Check for the starting keyword
-      ends = 1
-      this.searchLinesBefore(document, lineNum, highlights, starts, ends)
-      // Check for the ending keyword
-      lineNum = textRange.start.line
-      starts = 1
-      ends = 0
-      this.searchLinesAfter(document, lineNum, highlights, starts, ends)
-    } else if (this.endKeywords.test(document.getText(textRange))) {
-      highlights.push(new vscode.DocumentHighlight(textRange, {kind: 0}))
-      this.searchLinesBefore(document, lineNum, highlights, starts, ends)
-    }
-    return highlights
-  }
-
-  searchLinesAfter (document, lineNum, highlights, starts, ends) {
-    let foundEnd = false
-    let textLine = ''
-    while (foundEnd === false) {
-      textLine = document.lineAt(lineNum).text
-      if (this.startKeywords.test(textLine)) {
-        starts++
-      } else if ((starts === ends + 1) && (this.middleKeywords.test(textLine))) {
-        this.addHighlight(highlights, document, lineNum, textLine)
-      } else if (this.endKeywords.test(textLine)) {
-        ends++
-      }
-      if (starts === ends) {
-        this.addHighlight(highlights, document, lineNum, textLine)
-        foundEnd = true
-      }
-      lineNum++
-    }
-  }
-
-  searchLinesBefore (document, lineNum, highlights, starts, ends) {
-    let foundEnd = false
-    let textLine = ''
-    while (foundEnd === false) {
-      textLine = document.lineAt(lineNum).text
-      if (this.startKeywords.test(textLine)) {
-        starts++
-      } else if ((starts + 1 === ends) && (this.middleKeywords.test(textLine))) {
-        this.addHighlight(highlights, document, lineNum, textLine)
-      } else if (this.endKeywords.test(textLine)) {
-        ends++
-      }
-      if (starts === ends) {
-        this.addHighlight(highlights, document, lineNum, textLine)
-        foundEnd = true
-      }
-      lineNum--
-    }
-  }
-
-  addHighlight (highlights, document, lineNum, textLine) {
-    let startIdx = textLine.search(/\S|$/)
-    if (startIdx > -1) {
-      let endPos = new vscode.Position(lineNum, startIdx)
-      if (endPos) {
-        let endRange = document.getWordRangeAtPosition(endPos, this.gslWords)
-        if (endRange) {
-          highlights.push(new vscode.DocumentHighlight(endRange))
+        else {
+            vscode_2.window.showErrorMessage("Could not connect to game?");
         }
-      }
     }
-  }
-}
-
-class DocumentFormatProvider {
-  provideDocumentFormattingEdits (document) {
-    let textEdits = []
-    let firstLine = document.lineAt(0)
-    let lastLine = document.lineAt(document.lineCount - 1)
-    let textRange = new vscode.Range(
-      0,
-      firstLine.range.start.character,
-      document.lineCount - 1,
-      lastLine.range.end.character
-    )
-    // Remove non-printable characters
-    // eslint-disable-next-line no-control-regex
-    textEdits.push(vscode.TextEdit.replace(textRange, document.getText().replace(/[^\x00-\x7f]/g, '')))
-    // Remove blank lines
-    textEdits.push(vscode.TextEdit.replace(textRange, document.getText().replace(/(\r\n){2,}/g, '\r\n')))
-    return textEdits
-  }
-}
-
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-  return new (P || (P = Promise))(function (resolve, reject) {
-    function fulfilled (value) { try { step(generator.next(value)) } catch (e) { reject(e) } }
-    function rejected (value) { try { step(generator.throw(value)) } catch (e) { reject(e) } }
-    function step (result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value) }).then(fulfilled, rejected) }
-    step((generator = generator.apply(thisArg, _arguments)).next())
-  })
-}
-
-function str2ab (str) { // String to Array Buffer
-  var buffer = new ArrayBuffer(str.length)
-  var bufferView = new Uint8Array(buffer)
-  for (let i = 0, strLen = str.length; i < strLen; i++) {
-    bufferView[i] = str.charCodeAt(i)
-  }
-  return buffer
-}
-
-function getGameChannel () {
-  if (gslEditor.gameChannel == null) {
-    gslEditor.gameChannel = vscode.window.createOutputChannel('Game')
-  }
-  return gslEditor.gameChannel
-}
-
-function outGameChannel (message) {
-  message = message.replace(/\n$/, '') // Remove ending newline
-  getGameChannel().appendLine(`${message}`)
-  //gslEditor.gameTerminal.sendText(`${message}`)
-}
-
-function LogIntoGame () {
-  if (vscode.workspace.getConfiguration('gsl').get('disableLoginAttempts') === true) {
-    return __awaiter(this, void 0, void 0, function * () { return Promise.reject })
-  }
-  return __awaiter(this, void 0, void 0, function * () {
-    if (!gameClient.connected) {
-      let game = gslEditor.extContext.globalState.get('gslExtGameInstance')
-      if (!game) {
-        sgeClient.end()
-        vscode.window.showErrorMessage('No Game Instance set.  Please run User Setup.')
-        PromptToRunUserSetup()
-        return
-      }
-      let character = gslEditor.extContext.globalState.get('gslExtCharacter')
-      if (!character) {
-        sgeClient.end()
-        vscode.window.showErrorMessage('No Character set.  Please run User Setup.')
-        PromptToRunUserSetup()
-        return
-      }
-      vscode.window.setStatusBarMessage('Logging into ' + game + ' with ' + character + '...', 5000)
-      sgeClient.connect(7900, 'eaccess.play.net', function () {
-        sgeClient.connected = true
-        gslEditor.msgCount = 0
-        outGameChannel('SGE connection established.')
-        sendMsg('K\n')
-      })
-    }
-  })
-}
-
-function activate (context) {
-  gslEditor.extContext = context
-
-  //gslEditor.gameTerminal = vscode.window.createTerminal({ name: 'Game', pty })
-
-  if (!this._DLstatusBarItem) {
-    this._DLstatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50)
-  }
-  if (!this._ULstatusBarItem) {
-    this._ULstatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50)
-  }
-  if (!this._GSLstatusBarItem) {
-    this._GSLstatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50)
-  }
-  let self = this
-  if (vscode.workspace.getConfiguration('gsl').get('alwaysEnabled')) {
-    showGSLStatusBarItems(self)
-  } else {
-    let editor = vscode.window.activeTextEditor
-    if (!editor) {
-      this._DLstatusBarItem.hide()
-      this._ULstatusBarItem.hide()
-      this._GSLstatusBarItem.hide()
-      return
-    }
-    let doc = editor.document
-    if (doc.languageId === 'gsl') {
-      showGSLStatusBarItems(self)
-    } else {
-      this._DLstatusBarItem.hide()
-      this._ULstatusBarItem.hide()
-      this._GSLstatusBarItem.hide()
-    }
-  }
-  gslEditor.extContext.subscriptions.push(vscode.commands.registerCommand('extension.gslDownload', () => {
-    gslDownload()
-  }))
-  gslEditor.extContext.subscriptions.push(vscode.commands.registerCommand('extension.gslUpload', () => {
-    gslUpload()
-  }))
-  gslEditor.extContext.subscriptions.push(vscode.commands.registerCommand('extension.gslCommands', () => {
-    gslCommands()
-  }))
-  gslEditor.extContext.subscriptions.push(vscode.commands.registerCommand('extension.gslDateCheck', () => {
-    gslDateCheck()
-  }))
-  gslEditor.extContext.subscriptions.push(vscode.commands.registerCommand('extension.gslSendGameCommand', () => {
-    gslSendGameCommand()
-  }))
-  gslEditor.extContext.subscriptions.push(vscode.commands.registerCommand('extension.gslListTokens', () => {
-    gslListTokens()
-  }))
-  gslEditor.extContext.subscriptions.push(vscode.commands.registerCommand('extension.gslLogging', () => {
-    gslLogging()
-  }))
-  gslEditor.extContext.subscriptions.push(vscode.commands.registerCommand('extension.gslUserSetup', () => {
-    gslUserSetup()
-  }))
-
-  if (vscode.workspace.getConfiguration('gsl').get('displayGameChannel')) {
-    getGameChannel().show(true)
-  }
-
-  gslEditor.extContext.subscriptions.push(vscode.languages.registerDocumentSymbolProvider(
-    {scheme: '*', language: 'gsl'},
-    new SymbolProvider()
-  ))
-  gslEditor.extContext.subscriptions.push(vscode.languages.registerHoverProvider(
-    {scheme: '*', language: 'gsl'},
-    new HoverProvider()
-  ))
-  gslEditor.extContext.subscriptions.push(vscode.languages.registerDefinitionProvider(
-    {scheme: '*', language: 'gsl'},
-    new DefinitionProvider()
-  ))
-  gslEditor.extContext.subscriptions.push(vscode.languages.registerDocumentHighlightProvider(
-    {scheme: '*', language: 'gsl'},
-    new DocumentHighlightProvider()
-  ))
-  gslEditor.extContext.subscriptions.push(vscode.languages.registerDocumentFormattingEditProvider(
-    {scheme: '*', language: 'gsl'},
-    new DocumentFormatProvider()
-  ))
-
-  gslEditor.diagnostics = vscode.languages.createDiagnosticCollection()
-
-  checkForNewInstall()
-  checkForUpdatedVersion()
-}
-exports.activate = activate
-
-function checkForNewInstall() {
-  // Check for new install
-  let newInstallFlag = gslEditor.extContext.globalState.get('gslExtNewInstallFlag')
-  if (!newInstallFlag) {
-    let applyTheme = 'Apply Theme'
-    vscode.window.showInformationMessage('For the best experience, the GSL Vibrant theme is recommended for the GSL Editor.', applyTheme).then(choice => {
-      if (choice === applyTheme) {
-        vscode.workspace.getConfiguration().update('workbench.colorTheme', 'GSL Vibrant', true)
-      }
-    }).then(function () {
-      PromptToRunUserSetup()
-    })
-    gslEditor.extContext.globalState.update('gslExtNewInstallFlag', true)
-  }
-}
-
-function checkForUpdatedVersion() {
-  // Check for new Release Notes
-  let showReleaseNotes = 'Show Release Notes'
-  let gslExtensionVersionKey = 'gslExtVersion'
-  let extensionVersion = vscode.extensions.getExtension('patricktrant.gsl').packageJSON.version
-  let storedVersion = gslEditor.extContext.globalState.get(gslExtensionVersionKey)
-  if (storedVersion && (extensionVersion !== storedVersion)) {
-    vscode.window.showInformationMessage(`The GSL Editor extension has been updated to version ${extensionVersion}!`, showReleaseNotes).then(choice => {
-      if (choice === showReleaseNotes) {
-        vscode.commands.executeCommand('markdown.showPreview', vscode.Uri.file(path.resolve(__dirname, './CHANGELOG.md')))
-      }
-    })
-  }
-  gslEditor.extContext.globalState.update(gslExtensionVersionKey, extensionVersion)
-}
-
-function showGSLStatusBarItems (context) {
-  context._DLstatusBarItem.text = '$(cloud-download) Download'
-  context._DLstatusBarItem.command = 'extension.gslDownload'
-  context._DLstatusBarItem.show()
-  context._ULstatusBarItem.text = '$(cloud-upload) Upload'
-  context._ULstatusBarItem.command = 'extension.gslUpload'
-  context._ULstatusBarItem.show()
-  context._GSLstatusBarItem.text = '$(ruby) GSL'
-  context._GSLstatusBarItem.command = 'extension.gslCommands'
-  context._GSLstatusBarItem.show()
-}
-
-function gslCommands (context) {
-  vscode.window.showQuickPick(['Download Script', 'Upload Script', 'Check Script Modification Date', 'List GSL Tokens', 'Show Game Output Channel', 'Send Game Command', 'Enable Logging', 'User Setup'], { placeHolder: 'Select a command to execute.' }).then(input => {
-    switch (input) {
-      case 'Download Script':
-        gslDownload()
-        break
-      case 'Upload Script':
-        gslUpload()
-        break
-      case 'Check Script Modification Date':
-        gslDateCheck()
-        break
-      case 'List GSL Tokens':
-        gslListTokens()
-        break
-      case 'Show Game Output Channel':
-        getGameChannel().show(true)
-        break
-      case 'Send Game Command':
-        gslSendGameCommand()
-        break
-      case 'Enable Logging':
-        gslLogging()
-        break
-      case 'User Setup':
-        gslUserSetup()
-        break
-    }
-  })
-}
-
-function gslSendGameCommand (context) {
-  vscode.window.showInputBox({ prompt: 'Command to send to game?' }).then(input => {
-    if (!input) {
-      return vscode.window.setStatusBarMessage('No input provided. Command aborted.', 2000)
-    }
-    LogIntoGame().then(function () {
-      if (gameClient.connected) {
-        vscode.window.setStatusBarMessage('Sending game command...', 2000)
-        delayedGameCommand(input)
-      }
-    })
-  })
-}
-
-function gslListTokens () {
-  vscode.commands.executeCommand('markdown.showPreview', vscode.Uri.file(path.resolve(__dirname, './syntaxes/tokens.md')))
-}
-
-function gslLogging () {
-  if (gslEditor.logging) {
-    gslEditor.logging = false
-    vscode.window.setStatusBarMessage('Logging disabled.', 5000)
-  } else {
-    gslEditor.logging = true
-    vscode.window.setStatusBarMessage('Logging enabled.', 5000)
-  }
-}
-
-async function gslUserSetup() {
-  let continueSetup = true
-  await vscode.window.showInputBox({ prompt: 'Play.net Account:', ignoreFocusOut: true }).then(input => {
-    if (!input) {
-      continueSetup = false
-      return vscode.window.showErrorMessage('No input provided for Account.')
-    }
-    gslEditor.extContext.globalState.update('gslExtAccount', input)
-  })
-  if (continueSetup) {
-    await vscode.window.showInputBox({ prompt: 'Password:', password: true, ignoreFocusOut: true }).then(input => {
-      if (!input) {
-        continueSetup = false
-        return vscode.window.showErrorMessage('No input provided for Password.')
-      }
-      keytar.setPassword('GSLEditor', gslEditor.extContext.globalState.get('gslExtAccount'), input)
-    })
-  }
-  if (continueSetup) {
-    await vscode.window.showInputBox({ prompt: 'Character:', ignoreFocusOut: true }).then(input => {
-      if (!input) {
-        continueSetup = false
-        return vscode.window.showErrorMessage('No input provided for Character.')
-      }
-      gslEditor.extContext.globalState.update('gslExtCharacter', input)
-    })
-  }
-  if (continueSetup) {
-    await vscode.window.showQuickPick(['GemStone IV Development', 'GemStone IV', 'GemStone IV Platinum', 'GemStone IV Shattered', 'GemStone IV Prime Test', 'DragonRealms Development', 'DragonRealms', 'DragonRealms Platinum', 'DragonRealms The Fallen', 'DragonRealms Prime Test'], { placeHolder: 'Game Instance:', ignoreFocusOut: true }).then(input => {
-      if (!input) {
-        continueSetup = false
-        return vscode.window.showErrorMessage('No input provided for Game Instance.')
-      }
-      gslEditor.extContext.globalState.update('gslExtGameInstance', input)
-    })
-  }
-}
-
-function delayedGameCommand (command) {
-  if (gameClient.connected) {
-    getGameChannel().show(true)
-    sendMsg(command + '\n')
-  }
-}
-
-function gslUpload () {
-  let editor = vscode.window.activeTextEditor
-  if (!editor) {
-    return vscode.window.showErrorMessage('You must have a script open before you can upload it.')
-  }
-  let doc = editor.document
-  if (!doc) {
-    return vscode.window.showErrorMessage('You must have a script open before you can upload it.')
-  }
-  doc.save()
-  gslEditor.scriptTxt = doc.getText()
-  let scriptNum = path.basename(doc.fileName).replace(/\D+/g, '').replace(/^0+/, '')
-  if (!/^\d{1,5}$/.test(scriptNum)) {
-    vscode.window.showInputBox({ prompt: 'Unable to parse script # from file name. Script number to upload?' }).then(input => {
-      if (!input) {
-        return vscode.window.setStatusBarMessage('No input provided. Script upload aborted.', 2000)
-      } else {
-        gslEditor.scriptNum = input
-        gslUpload2(input)
-      }
-    })
-  } else {
-    gslEditor.scriptNum = scriptNum
-    gslUpload2(scriptNum)
-  }
-}
-
-function gslUpload2 (scriptNum) {
-  gslEditor.sendScript = 1
-  gslEditor.getScript = 0
-  gslEditor.dateCheck = 0
-  gslEditor.diagnostics.clear()
-  LogIntoGame().then(function () {
-    if (gameClient.connected) {
-      vscode.window.setStatusBarMessage('Uploading script ' + scriptNum + '...', 5000)
-      uploadScript(' \nWelcome to \n \nAll Rights Reserved ') // Simulate initial login text
-    }
-  })
-}
-
-function uploadScript (receivedMsg) {
-  if (/Welcome to.*\s\n.*\s\nAll Rights Reserved/.test(receivedMsg)) {
-    sendMsg('/ss ' + gslEditor.scriptNum + '\n')
-  } else if ((/Name:[\s\S]*\d{4}\r\n.*>$/.test(receivedMsg)) && (gslEditor.sendScript === 1)) {
-    let modifier = /Last modified by: ([\w-_.]+)/.exec(receivedMsg)[1]
-    let date = /\nOn \w+ (\w+) (\d+) (.+) (\d+)/.exec(receivedMsg)
-    let data = modifier + ' on ' + date[1] + ' ' + date[2] + ', ' + date[4] + ' at ' + date[3]
-    let lastMod = gslEditor.extContext.globalState.get('s' + gslEditor.scriptNum, '')
-    if (lastMod && (lastMod !== data)) {
-      let msg = 'Script ' + gslEditor.scriptNum + ' appears to have been edited since you last downloaded it.'
-      msg = msg + '\n\nLocal: ' + lastMod + '\nServer: ' + data + '\n\nWould you like to upload this script anyway?'
-      vscode.window.showWarningMessage(msg, { modal: true }, 'Yes').then(input => {
-        if (input === 'Yes') {
-          sendMsg('/ms ' + gslEditor.scriptNum + '\n')
-        } else {
-          gslEditor.sendScript = 0
-          vscode.window.setStatusBarMessage('Upload canceled.', 5000)
+    static async checkModifiedDate(script) {
+        const error = (e) => { error.caught = e; };
+        const client = await this.vsc.ensureGameConnection().catch(error);
+        if (error.caught) {
+            return void vscode_2.window.showErrorMessage(`Failed to connet to game: ${error.caught.message}`);
         }
-      })
-    } else {
-      sendMsg('/ms ' + gslEditor.scriptNum + '\n')
-    }
-  } else if (/Error: Script #(.*) is a verb. Please use \/mv (.*) instead\./.test(receivedMsg)) {
-    let match = /Error: Script #(.*) is a verb. Please use \/mv (.*) instead\./.exec(receivedMsg)
-    sendMsg('/mv ' + match[2] + '\n')
-  } else if (/Invalid script number./.test(receivedMsg)) {
-    return vscode.window.showErrorMessage(gslEditor.scriptNum + ' is an invalid script #.')
-  } else if ((/Edt:$/.test(receivedMsg)) && (gslEditor.sendScript === 1)) {
-    sendMsg('Z\n')
-  } else if ((/ZAP! {2}All lines deleted\./.test(receivedMsg)) | (/New File/.test(receivedMsg))) {
-    let scriptText = gslEditor.scriptTxt.replace(/\r/g, '\n').replace(/\n\n/g, '\n')
-    gameClient.write(scriptText + '\n')
-    if (!scriptText.endsWith('\n')) {
-      gameClient.write('\n')
-    }
-    outGameChannel(scriptText)
-    gslEditor.sendScript = 2
-  } else if ((/Edt:$/.test(receivedMsg)) && (gslEditor.sendScript === 2)) {
-    sendMsg('G\n')
-    gslEditor.sendScript = 3
-  } else if (/Edt:Inserting before line: 0/.test(receivedMsg)) {
-    vscode.window.showErrorMessage("Upload error. Please check to ensure you haven't gone past 118 characters on a single line.")
-    sendMsg('Q\n')
-    gslEditor.sendScript = 0
-    gslEditor.scriptTxt = ''
-    vscode.window.setStatusBarMessage('Upload failed.', 5000)
-    getGameChannel().show(true)
-  } else if (/Compile Failed w\/(.*) errors and (.*) warnings\./.test(receivedMsg)) {
-    sendMsg('Q\n')
-    gslEditor.sendScript = 0
-    gslEditor.scriptTxt = ''
-    let diagnosticList = []
-    let lines = receivedMsg.split('\r\n')
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i] && (/^\s*(\d+)\s:\s(.+)$/.test(lines[i]))) {
-        let match = /^\s*(\d+)\s:\s(.+)$/.exec(lines[i])
-        let line = match[1]
-        let errorMsg = match[2]
-        let textLine = vscode.window.activeTextEditor.document.lineAt(Number(line) - 1)
-        let diagnostic = new vscode.Diagnostic(textLine.range, errorMsg, vscode.DiagnosticSeverity.Error)
-        diagnosticList.push(diagnostic)
-      }
-    }
-    gslEditor.diagnostics.set(vscode.window.activeTextEditor.document.uri, diagnosticList)
-    vscode.commands.executeCommand('workbench.action.problems.focus')
-    let match = /(Compile Failed w\/(.*) errors and (.*) warnings\.)/.exec(receivedMsg)
-    vscode.window.showErrorMessage(match[1])
-    vscode.window.setStatusBarMessage('Upload failed.', 5000)
-  } else if (/Compile OK\./.test(receivedMsg)) {
-    sendMsg('Q\n')
-  } else if (/Compile ok\./.test(receivedMsg)) {
-    sendMsg('/ss ' + gslEditor.scriptNum + '\n')
-  } else if ((/Name:[\s\S]*\d{4}\r\n.*>$/.test(receivedMsg)) && (gslEditor.sendScript === 3)) {
-    let modifier = /Last modified by: ([\w-_.]+)/.exec(receivedMsg)[1]
-    let date = /\nOn \w+ (\w+) (\d+) (.+) (\d+)/.exec(receivedMsg)
-    let data = modifier + ' on ' + date[1] + ' ' + date[2] + ', ' + date[4] + ' at ' + date[3]
-    gslEditor.extContext.globalState.update('s' + gslEditor.scriptNum, data)
-    gslEditor.sendScript = 0
-    gslEditor.scriptTxt = ''
-    vscode.window.setStatusBarMessage('Upload successful.', 5000)
-  }
-}
-
-function gslDownload () {
-  vscode.window.showInputBox({ prompt: 'Script number or verb name to download? Multiple scripts via 12316;profile or 15-19.' }).then(input => {
-    if (!input) {
-      return vscode.window.setStatusBarMessage('No input provided. Script download aborted.', 2000)
-    }
-    gslEditor.scriptArray = []
-    let inputArray = input.split(';')
-    let BreakException = {}
-    try {
-      for (let i = 0; i < inputArray.length; i++) {
-        if (inputArray[i].indexOf('-') !== -1) {
-          let range = inputArray[i].split('-')
-          range[0] = parseInt(range[0])
-          range[1] = parseInt(range[1])
-          if (isNaN(range[0]) | isNaN(range[1]) | range[0] >= range[1]) {
-            BreakException.element = inputArray[i]
-            throw BreakException
-          }
-          for (let x = 0; range[0] + x <= range[1]; x++) {
-            gslEditor.scriptArray.push(range[0] + x)
-          }
-        } else {
-          gslEditor.scriptArray.push(inputArray[i])
+        vscode_2.window.setStatusBarMessage(`Checking modification date for script ${script} ...`);
+        let scriptProperties = await client.checkScript(script).catch(error);
+        if (error.caught) {
+            return void vscode_2.window.showErrorMessage(`Failed to check modification date: ${error.caught.message}`);
         }
-      }
-    } catch (e) {
-      if (e === BreakException) {
-        return vscode.window.showErrorMessage('Invalid script range: ' + BreakException.element)
-      }
+        const date = scriptProperties.lastModifiedDate;
+        vscode_2.window.showInformationMessage(`Script ${script} was last modified on ${date.toLocaleDateString()} as ${date.toLocaleTimeString()}`);
     }
-    gslEditor.scriptNum = gslEditor.scriptArray[0]
-    gslDownload2(gslEditor.scriptArray[0])
-  })
 }
-
-function gslDownload2 (script) {
-  gslEditor.getScript = 1
-  gslEditor.scriptTxt = ''
-  gslEditor.input = script
-  let type = ''
-  if (isNaN(gslEditor.input)) {
-    type = 'verb'
-  } else {
-    type = 'script'
-  }
-  LogIntoGame().then(function () {
-    if (gameClient.connected) {
-      vscode.window.setStatusBarMessage('Downloading ' + type + ' ' + gslEditor.input + '...', 5000)
-      downloadScript(' \nWelcome to \n \nAll Rights Reserved ') // Simulate initial login text
-    }
-  })
+exports.GSLExtension = GSLExtension;
+function scriptNumberFromFileName(fileName) {
+    return path.basename(fileName).replace(/\D+/g, '').replace(/^0+/, '');
 }
-
-function downloadScript (receivedMsg) {
-  if (gslEditor.getScript === 2) { // Downloading script now, may span multiple messages
-    gslEditor.scriptTxt += receivedMsg.replace(/Edt:$/, '') // Remove ending Edt:
-  }
-  if (/Welcome to.*\s\n.*\s\nAll Rights Reserved/.test(receivedMsg)) {
-    if (isNaN(gslEditor.input)) {
-      vscode.window.setStatusBarMessage('Downloading verb ' + gslEditor.input + '...', 5000)
-      sendMsg('/mv ' + gslEditor.input + '\n')
-    } else {
-      vscode.window.setStatusBarMessage('Downloading script ' + gslEditor.input + '...', 5000)
-      sendMsg('/ms ' + gslEditor.input + '\n')
+class VSCodeIntegration {
+    constructor(context) {
+        this.context = context;
+        this.downloadButton = vscode_2.window.createStatusBarItem(vscode_1.StatusBarAlignment.Left, 50);
+        this.uploadButton = vscode_2.window.createStatusBarItem(vscode_1.StatusBarAlignment.Left, 50);
+        this.gslButton = vscode_2.window.createStatusBarItem(vscode_1.StatusBarAlignment.Left, 50);
+        this.commandList = [
+            { label: "Download Script", name: 'gsl.downloadScript' },
+            { label: "Upload Script", name: 'gsl.uploadScript' },
+            { label: "Check script modification date", name: 'gsl.checkDate' },
+            { label: "List GSL Tokens", name: 'gsl.listTokens' },
+            { label: "Show GSL extension output channel", name: 'gsl.showChannel' },
+            { label: "Toggle output logging", name: 'gsl.toggleLogging' },
+            { label: "Open development terminal", name: 'gsl.openTerminal' },
+            { label: "Connect to development server", name: 'gsl.openConnection' },
+            { label: "User Setup", name: 'gsl.userSetup' }
+        ];
+        this.outputChannel = vscode_2.window.createOutputChannel("GSL Editor (debug)");
+        this.loggingEnabled = false;
+        this.registerCommands();
+        this.initializeComponents();
     }
-    gslEditor.getScript = 1
-    gslEditor.scriptTxt = ''
-  } else if (/Error: Script #(.*) is a verb. Please use \/mv (.*) instead\./.test(receivedMsg)) {
-    let match = /Error: Script #(.*) is a verb. Please use \/mv (.*) instead\./.exec(receivedMsg)
-    sendMsg('/mv ' + match[2] + '\n')
-  } else if (/Error: Script #\d\d\d\d\d has not been created yet/.test(receivedMsg)) {
-    return vscode.window.showErrorMessage('Script #' + gslEditor.input + ' has not been created yet.')
-  } else if (/Verb not found/.test(receivedMsg)) {
-    return vscode.window.showErrorMessage('Verb name ' + gslEditor.input + ' has not been created yet.')
-  } else if (/LineEditor/.test(receivedMsg)) {
-    let match = /(?:New\s)?File:\s\.\.\/scripts\/(S\d\d\d\d\d)/.exec(receivedMsg)
-    if (/New File/.test(receivedMsg)) {
-      sendMsg('\n')
-    } else {
-      sendMsg('P\n')
-    }
-    gslEditor.scriptNum = match[1]
-    gslEditor.getScript = 2
-  } else if (/Edt:$/.test(receivedMsg)) {
-    sendMsg('Q\n')
-    return __awaiter(this, void 0, void 0, function * () {
-      let fileName = path.join(getDownloadLocation(), gslEditor.scriptNum) + vscode.workspace.getConfiguration('gsl').get('fileExtension')
-      if (fs.existsSync(fileName)) { // Check for existing file
-        fs.unlinkSync(fileName) // Already exists, delete it
-      }
-      fs.writeFileSync(fileName, gslEditor.scriptTxt) // Create new file with script text
-      vscode.workspace.openTextDocument(fileName).then(document => {
-        vscode.window.showTextDocument(document, {preview: false})
-      })
-      vscode.window.setStatusBarMessage('Download successful.', 5000)
-    })
-  } else if (/(Script edit aborted|Modification aborted)/.test(receivedMsg)) {
-    if (gslEditor.goToDefinition) {
-      let doc = vscode.window.activeTextEditor.document
-      for (let i = 0; i < doc.lineCount; i++) {
-        let line = doc.lineAt(i)
-        if (line.text.toLowerCase().startsWith(': ' + gslEditor.goToDefinition)) {
-          vscode.commands.executeCommand('revealLine', {lineNumber: i, at: 'top'})
-          break
+    initializeComponents() {
+        this.downloadButton.text = "$(cloud-download) Download";
+        this.downloadButton.command = 'gsl.downloadScript';
+        this.downloadButton.show();
+        this.uploadButton.text = "$(cloud-upload) Upload";
+        this.uploadButton.command = 'gsl.uploadScript';
+        this.uploadButton.show();
+        this.gslButton.text = "$(ruby) GSL";
+        this.gslButton.command = 'gsl.showCommands';
+        this.gslButton.show();
+        if (vscode_2.workspace.getConfiguration('gsl').get('displayGameChannel')) {
+            this.outputChannel.show(true);
         }
-      }
-      gslEditor.goToDefinition = ''
     }
-    let scriptNum = gslEditor.scriptNum.replace(/\D+/g, '').replace(/^0+/, '')
-    sendMsg('/ss ' + scriptNum + '\n')
-  } else if (/Name:[\s\S]*\d{4}\r\n.*>$/.test(receivedMsg)) {
-    let scriptNum = gslEditor.scriptNum.replace(/\D+/g, '').replace(/^0+/, '')
-    let modifier = /Last modified by: ([\w-_.]+)/.exec(receivedMsg)[1]
-    let date = /\nOn \w+ (\w+) (\d+) (.+) (\d+)/.exec(receivedMsg)
-    let data = modifier + ' on ' + date[1] + ' ' + date[2] + ', ' + date[4] + ' at ' + date[3]
-    gslEditor.extContext.globalState.update('s' + scriptNum, data)
-    gslEditor.scriptArray.shift()
-    if (gslEditor.scriptArray.length > 0) {
-      gslDownload2(gslEditor.scriptArray[0])
-    } else {
-      gslEditor.getScript = 0
+    /* commands */
+    async commandDownloadScript() {
+        const prompt = 'Script number or verb name to download?';
+        const input = await vscode_2.window.showInputBox({ prompt });
+        if (!input) {
+            return;
+        }
+        const scriptOptions = input.replace(/\s/g, '').split(';');
+        const scriptList = [];
+        for (let option of scriptOptions) {
+            if (option.indexOf('-') > -1) {
+                let [first, second] = option.split('-');
+                let low = parseInt(first);
+                let high = parseInt(second);
+                if (isNaN(low) || isNaN(high) || low > high) {
+                    vscode_2.window.showErrorMessage("Invalid script range: " + option);
+                }
+                for (; low <= high;) {
+                    scriptList.push(low++);
+                }
+            }
+            else {
+                var script = Number(option);
+                if (isNaN(script)) {
+                    scriptList.push(option);
+                }
+                else {
+                    scriptList.push(script);
+                }
+            }
+        }
+        for (let script of scriptList) {
+            await GSLExtension.downloadScript(script);
+        }
     }
-  }
-}
-
-function getDownloadLocation () {
-  let extPath = null
-  let useWorkspaceFolder = vscode.workspace.getConfiguration('gsl').get('downloadToWorkspace')
-  if (useWorkspaceFolder && vscode.workspace.workspaceFolders) {
-    extPath = vscode.workspace.workspaceFolders[0].uri.fsPath
-  } else {
-    extPath = vscode.workspace.getConfiguration('gsl').get('downloadPath')
-  }
-  if (!extPath) {
-    let rootPath = path.resolve(__dirname, '../gsl')
-    if (!fs.existsSync(rootPath)) { // Directory doesn't exist
-      fs.mkdirSync(rootPath) // Create directory
+    async commandUploadScript() {
+        const rx_script_number = /^\d{1,5}$/;
+        if (!vscode_2.window.activeTextEditor || !vscode_2.window.activeTextEditor.document) {
+            return void vscode_2.window.showErrorMessage("You must have a script editor open before you can upload.");
+        }
+        const { document } = vscode_2.window.activeTextEditor;
+        if (document.isDirty) {
+            let result = await document.save();
+            if (result === false) {
+                return void vscode_2.window.showErrorMessage("Could not save active script editor before upload.");
+            }
+        }
+        const scriptNumber = scriptNumberFromFileName(document.fileName);
+        if (rx_script_number.test(scriptNumber) === false) {
+            const prompt = "Unable to parse script number from active editor file name.";
+            const placeHolder = "Script number to upload as?";
+            const input = await vscode_2.window.showInputBox({ prompt, placeHolder });
+            if (!input || rx_script_number.test(input) === false) {
+                return void vscode_2.window.showErrorMessage("Invalid script number provided.");
+            }
+            const script = Number(input);
+            GSLExtension.uploadScript(script, document);
+        }
+        else {
+            const script = Number(scriptNumber);
+            GSLExtension.uploadScript(script, document);
+        }
     }
-    extPath = path.resolve(__dirname, '../gsl/scripts')
-  }
-  if (!fs.existsSync(extPath)) { // Directory doesn't exist
-    fs.mkdirSync(extPath) // Create directory
-  }
-  return extPath
-}
-
-function gslDateCheck () {
-  let editor = vscode.window.activeTextEditor
-  if (!editor) {
-    return vscode.window.showErrorMessage('You must have a script open before you can check its date.')
-  }
-  let doc = editor.document
-  if (!doc) {
-    return vscode.window.showErrorMessage('You must have a script open before you can check its date.')
-  }
-  let scriptNum = path.basename(doc.fileName).replace(/\D+/g, '').replace(/^0+/, '')
-  if (!/^\d{1,5}$/.test(scriptNum)) {
-    return vscode.window.showErrorMessage('Unable to parse script # from file name.')
-  }
-  gslEditor.scriptNum = scriptNum
-  gslEditor.dateCheck = 1
-  LogIntoGame().then(function () {
-    if (gameClient.connected) {
-      vscode.window.setStatusBarMessage('Checking last modified date of script ' + scriptNum + '...', 5000)
-      dateCheck(' \nWelcome to \n \nAll Rights Reserved ') // Simulate initial login text
+    async commandShowCommands() {
+        const command = await vscode_2.window.showQuickPick(this.commandList, { placeHolder: 'Select a command to execute.' });
+        if (command) {
+            vscode_2.commands.executeCommand(command.name);
+        }
     }
-  })
-}
-
-function dateCheck (receivedMsg) {
-  if (/Welcome to.*\s\n.*\s\nAll Rights Reserved/.test(receivedMsg)) {
-    sendMsg('/ss ' + gslEditor.scriptNum + '\n')
-  } else if (/Last modified by: /.test(receivedMsg)) {
-    let modifier = /Last modified by: ([\w-_.]+)/.exec(receivedMsg)[1]
-    let date = /\nOn \w+ (\w+) (\d+) (.+) (\d+)/.exec(receivedMsg)
-    let data = 'Last modified by ' + modifier + ' on ' + date[1] + ' ' + date[2] + ', ' + date[4] + ' at ' + date[3] + '.'
-    vscode.window.setStatusBarMessage(data, 5000)
-    gslEditor.dateCheck = 0
-  }
-}
-
-function sendMsg (msg) {
-  if (gslEditor.logging && (sgeClient.connected === false)) { // Don't log SGE connection data (account, password hash, etc)
-    fs.appendFile(path.join(getDownloadLocation(), 'GSL-Editor.log'), 'Sent: ' + msg)
-  }
-  outGameChannel('Sent: ' + msg)
-  if (sgeClient.connected) {
-    sgeClient.write(msg)
-  } else if (gameClient.connected) {
-    gameClient.write(msg)
-  }
-}
-
-function PromptToRunUserSetup () {
-  let userSetup = 'Start User Setup'
-  vscode.window.showInformationMessage('To start using the GSL Editor, you must run the User Setup process to store your Play.net account credentials.', userSetup).then(choice => {
-    if (choice === userSetup) {
-      gslUserSetup()
+    commandCheckDate() {
+        if (!vscode_2.window.activeTextEditor || !vscode_2.window.activeTextEditor.document) {
+            return void vscode_2.window.showErrorMessage("You must have an open script before you can check its date.");
+        }
+        let scriptNumber = path.basename(vscode_2.window.activeTextEditor.document.fileName);
+        scriptNumber = scriptNumber.replace(/\D+/g, '').replace(/^0+/, '');
+        const script = Number(scriptNumber);
+        GSLExtension.checkModifiedDate(script);
     }
-  })
-}
-
-function onConnSGEData (data) {
-  let receivedMsg = data.toString()
-  receivedMsg = receivedMsg.replace(/\n$/, '') // Remove ending newline
-  let msgArray = receivedMsg.split('\t')
-  outGameChannel(receivedMsg)
-  gslEditor.lastMsg = receivedMsg
-  gslEditor.msgCount++
-
-  if (/^.{32}$/gu.test(receivedMsg) && (gslEditor.msgCount === 1)) {
-    gslEditor.hashKey = receivedMsg
-    keytar.getPassword('GSLEditor', gslEditor.extContext.globalState.get('gslExtAccount')).then((result) => {
-      let pw = result
-      if (!pw) {
-        sgeClient.end()
-        vscode.window.showErrorMessage('No Password set.  Please run User Setup.')
-        PromptToRunUserSetup()
-        return
-      }
-      gslEditor.pwHash = ''
-      for (let i = 0; i < pw.length; i++) {
-        gslEditor.pwHash += String.fromCharCode(((pw.charCodeAt(i) - 32) ^ gslEditor.hashKey.charCodeAt(i)) + 32)
-      }
-      let account = gslEditor.extContext.globalState.get('gslExtAccount')
-      if (!account) {
-        sgeClient.end()
-        vscode.window.showErrorMessage('No Account set.  Please run User Setup.')
-        PromptToRunUserSetup()
-        return
-      }
-      sendMsg('A\t' + account + '\t')
-      sendMsg(Buffer.from(str2ab(gslEditor.pwHash)))
-      sendMsg('\n')
-    })
-  } else if (/^A\t\tNORECORD$/.test(receivedMsg)) {
-    vscode.window.showErrorMessage('Invalid account name. Please recheck your credentials.')
-  } else if (/^A\t\tPASSWORD$/.test(receivedMsg)) {
-    vscode.window.showErrorMessage('Invalid password. Please recheck your credentials.')
-  } else if (/^A\t.*\tKEY\t.*/.test(receivedMsg)) {
-    sendMsg('M\n')
-  } else if (/^M\t.*/.test(receivedMsg)) {
-    let game = gslEditor.extContext.globalState.get('gslExtGameInstance')
-    if (!game) {
-      sgeClient.end()
-      vscode.window.showErrorMessage('No Game Instance set.  Please run User Setup.')
-      PromptToRunUserSetup()
-      return
+    commandListTokens() {
+        let uri = vscode_1.Uri.file(path.resolve(__dirname, './syntaxes/tokens.md'));
+        vscode_2.commands.executeCommand('markdown.showPreview', uri);
     }
-    gslEditor.gameCode = msgArray[msgArray.indexOf(game) - 1]
-    sendMsg('N\t' + gslEditor.gameCode + '\n')
-  } else if (/^N\t.*STORM$/.test(receivedMsg)) {
-    sendMsg('F\t' + gslEditor.gameCode + '\n')
-  } else if (/^F\t.*/.test(receivedMsg)) {
-    sendMsg('G\t' + gslEditor.gameCode + '\n')
-  } else if (/^G\t.*/.test(receivedMsg)) {
-    sendMsg('P\t' + gslEditor.gameCode + '\n')
-  } else if (/^P\t.*/.test(receivedMsg)) {
-    sendMsg('C\n')
-  } else if (/^C\t([0-9]+\t){4}.*/.test(receivedMsg)) {
-    let lowerCaseMsgArray = msgArray.map(function (value) {
-      return value.toLowerCase()
-    })
-    let character = gslEditor.extContext.globalState.get('gslExtCharacter')
-    if (!character) {
-      sgeClient.end()
-      vscode.window.showErrorMessage('No Character set.  Please run User Setup.')
-      PromptToRunUserSetup()
-      return
+    commandToggleLogging() {
+        var _a;
+        this.loggingEnabled = !this.loggingEnabled;
+        (_a = this.gameClient) === null || _a === void 0 ? void 0 : _a.toggleLogging();
+        vscode_2.window.setStatusBarMessage(this.loggingEnabled ? 'Logging enabled.' : 'Logging disabled.', 5000);
     }
-    let pos = (lowerCaseMsgArray.indexOf(character.toLowerCase()) - 1)
-    gslEditor.characterID = msgArray[pos]
-    sendMsg('L\t' + gslEditor.characterID + '\tSTORM\n')
-  } else if (/^L\tOK\t.*/.test(receivedMsg)) {
-    for (let i = 0; i < msgArray.length; i++) {
-      if (msgArray[i].includes('GAMEHOST=')) {
-        gslEditor.gameHost = msgArray[i].substring(msgArray[i].indexOf('=') + 1)
-      } else if (msgArray[i].includes('GAMEPORT=')) {
-        gslEditor.gamePort = msgArray[i].substring(msgArray[i].indexOf('=') + 1)
-      } else if (msgArray[i].includes('KEY=')) {
-        gslEditor.gameKey = msgArray[i].substring(msgArray[i].indexOf('=') + 1)
-      }
+    async commandUserSetup() {
+        let account = await vscode_2.window.showInputBox({ prompt: "PLAY.NET Account:", ignoreFocusOut: true });
+        if (!account) {
+            return void vscode_2.window.showErrorMessage("No account name entered; aborting setup.");
+        }
+        let password = await vscode_2.window.showInputBox({ prompt: "Password:", ignoreFocusOut: true, password: true });
+        if (!password) {
+            return void vscode_2.window.showErrorMessage("No password entered; aborting setup.");
+        }
+        /* capture rejected promises */
+        let error;
+        const captureError = (e) => (error = e, void (0));
+        /* login */
+        const gameChoice = await uaccessClient_1.UAccessClient.login(account, password, { name: /.*?development.*?/i }).catch(captureError);
+        if (!gameChoice) {
+            const message = error ? error.message : "Login failed?";
+            return void vscode_2.window.showErrorMessage(message);
+        }
+        /* pick a game */
+        const gamePickOptions = {
+            ignoreFocusOut: true, placeholder: "Select a game ..."
+        };
+        const game = await vscode_2.window.showQuickPick(gameChoice.toNameList(), gamePickOptions);
+        if (!game) {
+            gameChoice.cancel();
+            return void vscode_2.window.showErrorMessage("No game selected; aborting setup.");
+        }
+        const characterChoice = await gameChoice.select(gameChoice.pick(game)).catch(captureError);
+        if (!characterChoice) {
+            const message = error ? error.message : "Game select failed?";
+            gameChoice.cancel();
+            return void vscode_2.window.showErrorMessage(message);
+        }
+        /* pick a character */
+        const characterPickOptions = {
+            ignoreFocusOut: true, placeholder: "Select a character ..."
+        };
+        const character = await vscode_2.window.showQuickPick(characterChoice.toNameList(), characterPickOptions);
+        if (!character) {
+            characterChoice.cancel();
+            return void vscode_2.window.showErrorMessage("No character selected; aborting setup.");
+        }
+        const result = await characterChoice.select(characterChoice.pick(character)).catch(captureError);
+        if (!result) {
+            const message = error ? error.message : "Character select failed?";
+            return void vscode_2.window.showErrorMessage(message);
+        }
+        /* we now have the info we need to log into the same and save the details */
+        const { sal, loginDetails } = result;
+        /* store all the details for automated login */
+        const keytar = await Promise.resolve().then(() => require(`${vscode_2.env.appRoot}/node_modules.asar/keytar`));
+        this.context.globalState.update(GSLX_DEV_ACCOUNT, loginDetails.account);
+        this.context.globalState.update(GSLX_DEV_INSTANCE, loginDetails.game);
+        this.context.globalState.update(GSLX_DEV_CHARACTER, loginDetails.character);
+        keytar.setPassword(GSLX_KEYTAR_KEY, loginDetails.account, password);
     }
-    sgeClient.destroy()
-    gameClient.connect(gslEditor.gamePort, gslEditor.gameHost, function () {
-      gameClient.connected = true
-      outGameChannel('Game connection established.')
-      sendMsg(gslEditor.gameKey + '\n')
-    })
-  }
-}
-
-function onConnGameData (data) {
-  let receivedMsg = data.toString()
-  if (gslEditor.logging) {
-    fs.appendFile(path.join(getDownloadLocation(), 'GSL-Editor.log'), 'Received: ' + receivedMsg)
-  }
-  receivedMsg = receivedMsg.replace(/\n$/, '') // Remove ending newline
-  outGameChannel(receivedMsg)
-  gslEditor.lastMsg = receivedMsg
-  gslEditor.msgCount++
-
-  if (receivedMsg.includes('Edt:')) { // Editing a script
-    setTimeout(function () { checkState(receivedMsg, gslEditor.msgCount) }, 5000)
-  }
-
-  if (/^<mode id="GAME"\/>$/.test(receivedMsg)) {
-    setTimeout(function () { sendMsg('<c>\n') }, 300)
-    setTimeout(function () { sendMsg('<c>\n') }, 600)
-    gameClient.pause()
-    setTimeout(function () {gameClient.resume()}, 2000)
-  } else if (gslEditor.getScript) {
-    downloadScript(receivedMsg)
-  } else if (gslEditor.sendScript) {
-    uploadScript(receivedMsg)
-  } else if (gslEditor.dateCheck) {
-    dateCheck(receivedMsg)
-  }
-}
-
-function checkState (msg, count) {
-  if ((msg === gslEditor.lastMsg) && (count === gslEditor.msgCount)) { // Stuck on same last message after 5 seconds
-    sendMsg('\n')
-    setTimeout(function () { sendMsg('V\n') }, 200)
-    setTimeout(function () { sendMsg('Y\n') }, 400)
-    setTimeout(function () { sendMsg('Q\n') }, 600)
-  }
-}
-
-function onConnSGEClose () {
-  outGameChannel('SGE connection closed.')
-  sgeClient.connected = false
-  sgeClient.destroy()
-}
-
-function onConnGameClose () {
-  vscode.window.setStatusBarMessage('Game connection closed.', 5000)
-  outGameChannel('Game connection closed.')
-  gameClient.connected = false
-  gameClient.destroy()
-}
-
-function onConnError (err) {
-  if (sgeClient.connected) {
-    outGameChannel('SGE connection error: ' + err.message)
-    sgeClient.connected = false
-    sgeClient.destroy()
-  }
-  if (gameClient.connected) {
-    outGameChannel('Game connection error: ' + err.message)
-    gameClient.connected = false
-    gameClient.destroy()
-  }
-  if ((err.code === 'ECONNABORTED') || (err.code === 'ECONNRESET')) {
-    outGameChannel('Connection error: ' + err.message + ".  Attempting to reconnect...")
-    if (gslEditor.sendScript) {
-      gslUpload2(gslEditor.scriptNum)
-      return
-    } else if (gslEditor.getScript) {
-      gslDownload2(gslEditor.scriptNum)
-      return
-    } else if (gslEditor.dateCheck) {
-      gslDateCheck()
-      return
+    async commandOpenConnection() {
+        const error = (e) => { error.caught = e; };
+        if (this.gameClient) {
+            return void vscode_2.window.showErrorMessage("Development server connection is already established.");
+        }
+        const client = await this.ensureGameConnection().catch(error);
+        if (error.caught) {
+            return void vscode_2.window.showErrorMessage(`Failed to connect to development server: ${error.caught.message}`);
+        }
     }
-  }
-  showError(err)
+    async commandOpenTerminal() {
+        if (this.gameTerminal) {
+            return void vscode_2.window.showErrorMessage("Development terminal is already open.");
+        }
+        this.gameTerminal = new gameTerminal_1.GameTerminal(() => { this.gameTerminal = undefined; });
+        this.gameTerminal.show(true);
+        if (this.gameClient) {
+            this.gameTerminal.bindClient(this.gameClient);
+        }
+        else {
+            this.ensureGameConnection();
+        }
+    }
+    registerCommands() {
+        let subscription;
+        subscription = vscode_2.commands.registerCommand('gsl.downloadScript', this.commandDownloadScript, this);
+        this.context.subscriptions.push(subscription);
+        subscription = vscode_2.commands.registerCommand('gsl.uploadScript', this.commandUploadScript, this);
+        this.context.subscriptions.push(subscription);
+        subscription = vscode_2.commands.registerCommand('gsl.showCommands', this.commandShowCommands, this);
+        this.context.subscriptions.push(subscription);
+        subscription = vscode_2.commands.registerCommand('gsl.checkDate', this.commandCheckDate, this);
+        this.context.subscriptions.push(subscription);
+        subscription = vscode_2.commands.registerCommand('gsl.listTokens', this.commandListTokens, this);
+        this.context.subscriptions.push(subscription);
+        subscription = vscode_2.commands.registerCommand('gsl.toggleLogging', this.commandToggleLogging, this);
+        this.context.subscriptions.push(subscription);
+        subscription = vscode_2.commands.registerCommand('gsl.showChannel', this.showGameChannel, this);
+        this.context.subscriptions.push(subscription);
+        subscription = vscode_2.commands.registerCommand('gsl.userSetup', this.commandUserSetup, this);
+        this.context.subscriptions.push(subscription);
+        subscription = vscode_2.commands.registerCommand('gsl.openConnection', this.commandOpenConnection, this);
+        this.context.subscriptions.push(subscription);
+        subscription = vscode_2.commands.registerCommand('gsl.openTerminal', this.commandOpenTerminal, this);
+        this.context.subscriptions.push(subscription);
+    }
+    /* privates */
+    async getLoginDetails() {
+        const account = this.context.globalState.get(GSLX_DEV_ACCOUNT);
+        const instance = this.context.globalState.get(GSLX_DEV_INSTANCE);
+        const character = this.context.globalState.get(GSLX_DEV_CHARACTER);
+        const keytar = await Promise.resolve().then(() => require(`${vscode_2.env.appRoot}/node_modules.asar/keytar`));
+        const password = await keytar.getPassword(GSLX_KEYTAR_KEY, account);
+        if (!(account || instance || character || password)) {
+            return void this.promptUserSetup();
+        }
+        return { account, password, character, instance };
+    }
+    /* public api */
+    appendLineToGameChannel(text) {
+        this.outputChannel.appendLine(text);
+    }
+    showGameChannel() {
+        this.outputChannel.show(true);
+    }
+    outputGameChannel(text) {
+        this.outputChannel.appendLine(text);
+    }
+    async promptUserSetup() {
+        const message = "To start using the GSL Editor, you must run the User Setup process to store your Play.net account credentials.";
+        const option = 'Start User Setup';
+        const choice = await vscode_2.window.showInformationMessage(message, option);
+        if (choice === option) {
+            this.commandUserSetup();
+        }
+    }
+    async checkForNewInstall() {
+        let flag = this.context.globalState.get(GSLX_NEW_INSTALL_FLAG);
+        if (flag !== true) {
+            const message = "For the best experience, the GSL Vibrant theme is recommended for the GSL Editor.";
+            const option = 'Apply Theme';
+            const choice = await vscode_2.window.showInformationMessage(message, option);
+            if (choice === option) {
+                await vscode_2.workspace.getConfiguration().update('workbench.colorTheme', 'GSL Vibrant', true);
+            }
+        }
+    }
+    async checkForUpdatedVersion() {
+        let extension = vscode_2.extensions.getExtension('patricktrant.gsl');
+        if (extension) {
+            let { packageJSON: { version } } = extension;
+            let savedVersion = this.context.globalState.get(GSLX_SAVED_VERSION);
+            if (savedVersion && (savedVersion !== version)) {
+                const message = `The GSL Editor extension has been updated to version ${version}!`;
+                const option = 'Show Release Notes';
+                const choice = await vscode_2.window.showInformationMessage(message, option);
+                if (choice === option) {
+                    const changelogPath = path.resolve(__dirname, './CHANGELOG.md');
+                    vscode_2.commands.executeCommand('markdown.showPreview', vscode_1.Uri.file(changelogPath));
+                }
+            }
+            this.context.globalState.update(GSLX_SAVED_VERSION, version);
+        }
+    }
+    async ensureGameConnection() {
+        const error = (e) => { error.caught = e; };
+        const loginDisabled = vscode_2.workspace.getConfiguration('gsl').get(GSLX_DISABLE_LOGIN);
+        if (loginDisabled) {
+            return Promise.reject(new Error("Game login is disabled."));
+        }
+        const loginDetails = await this.getLoginDetails();
+        if (!loginDetails) {
+            return Promise.reject(new Error("Could not find login details?"));
+        }
+        if (this.gameClient === undefined) {
+            const { account, password, instance, character } = loginDetails;
+            const sal = await uaccessClient_1.UAccessClient.quickLogin(account, password, instance, character, 'storm').catch(error);
+            if (error.caught) {
+                return Promise.reject(error.caught);
+            }
+            const console = {
+                log: (...args) => {
+                    this.outputChannel.append(`[console(log): ${args.join(' ')}]\r\n`);
+                }
+            };
+            const log = path.join(GSLExtension.getDownloadLocation(), 'gsl-dev-server.log');
+            const logging = this.loggingEnabled;
+            const options = { sal, log, logging, debug: true, console, echo: true };
+            this.gameClient = new editorClient_1.EditorClient(options);
+            this.gameClient.on('quit', () => { this.gameClient = undefined; });
+            if (this.gameTerminal) {
+                this.gameTerminal.bindClient(this.gameClient);
+            }
+            await this.gameClient.connect().isInteractive();
+        }
+        return this.gameClient;
+    }
 }
-
-function showError (err) {
-  vscode.window.setStatusBarMessage('Error: ' + err.message, 30000)
-  getGameChannel().show(true)
+class ExtensionLanguageServer {
+    constructor(context) {
+        this.context = context;
+        this.lspClient = this.startLanguageServer();
+    }
+    startLanguageServer() {
+        const relativePath = path.join('gsl-language-server', 'out', 'server.js');
+        const module = this.context.asAbsolutePath(relativePath);
+        const options = { execArgv: ['--nolazy', '--inspect=6009'] };
+        const transport = vscode_languageclient_1.TransportKind.ipc;
+        const serverOptions = {
+            run: { module, transport },
+            debug: { module, transport, options }
+        };
+        const clientOptions = {
+            documentSelector: [{ scheme: 'file', language: 'gsl' }],
+            synchronize: {
+                fileEvents: vscode_2.workspace.createFileSystemWatcher('**/.clientrc')
+            }
+        };
+        const lspClient = new vscode_languageclient_1.LanguageClient('gslLanguageServer', 'GSL Language Server', serverOptions, clientOptions);
+        lspClient.start();
+        return lspClient;
+    }
 }
+function activate(context) {
+    const vsc = new VSCodeIntegration(context);
+    // const els = new ExtensionLanguageServer (context)
+    uaccessClient_1.UAccessClient.console = {
+        log: (...args) => { vsc.outputGameChannel(args.join(' ')); }
+    };
+    uaccessClient_1.UAccessClient.debug = true;
+    GSLExtension.init(vsc);
+    const selector = { scheme: '*', language: 'gsl' };
+    let subscription;
+    subscription = vscode_2.languages.registerDocumentSymbolProvider(selector, new gsl_1.GSLDocumentSymbolProvider());
+    context.subscriptions.push(subscription);
+    subscription = vscode_2.languages.registerHoverProvider(selector, new gsl_1.GSLHoverProvider());
+    context.subscriptions.push(subscription);
+    subscription = vscode_2.languages.registerDefinitionProvider(selector, new gsl_1.GSLDefinitionProvider());
+    context.subscriptions.push(subscription);
+    subscription = vscode_2.languages.registerDocumentHighlightProvider(selector, new gsl_1.GSLDocumentHighlightProvider());
+    context.subscriptions.push(subscription);
+    subscription = vscode_2.languages.registerDocumentFormattingEditProvider(selector, new gsl_1.GSLDocumentFormattingEditProvider());
+    context.subscriptions.push(subscription);
+    vsc.checkForNewInstall();
+    vsc.checkForUpdatedVersion();
+}
+exports.activate = activate;
+function deactivate() {
+}
+exports.deactivate = deactivate;
+//# sourceMappingURL=extension.js.map
