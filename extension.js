@@ -56,11 +56,14 @@ class GSLExtension {
             if (error.caught) {
                 return void vscode_2.window.showErrorMessage(error.caught.message);
             }
-            const content = await client.captureScript().catch(error);
+            let content = await client.captureScript().catch(error);
             if (error.caught) {
                 return void vscode_2.window.showErrorMessage(`Failed to download script: ${error.caught.message}`);
             }
             if (content) {
+                if (content.slice(-4) !== '\r\n\r\n') {
+                    content += '\r\n';
+                }
                 const scriptFile = scriptProperties.path.split('/').pop();
                 const scriptPath = path.join(downloadPath, scriptFile);
                 fs.writeFileSync(scriptPath, content);
@@ -93,6 +96,9 @@ class GSLExtension {
             const lines = [];
             for (let n = 0, nn = document.lineCount; n < nn; n++) {
                 lines.push(document.lineAt(n).text);
+            }
+            if (lines[lines.length - 1] !== '') {
+                lines.push('');
             }
             let scriptProperties = await client.modifyScript(script).catch(error);
             if (error.caught) {
@@ -448,6 +454,7 @@ class VSCodeIntegration {
             const logging = this.loggingEnabled;
             const options = { sal, log, logging, debug: true, console, echo: true };
             this.gameClient = new editorClient_1.EditorClient(options);
+            this.gameClient.on('error', () => { this.gameClient = undefined; });
             this.gameClient.on('quit', () => { this.gameClient = undefined; });
             if (this.gameTerminal) {
                 this.gameTerminal.bindClient(this.gameClient);

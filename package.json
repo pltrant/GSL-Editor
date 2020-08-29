@@ -25,7 +25,7 @@
     "*"
   ],
   "engines": {
-    "vscode": "^1.24.0"
+    "vscode": "^1.43.0"
   },
   "dependencies": {
     "vscode-languageclient": "^6.1.3"
@@ -33,7 +33,7 @@
   "devDependencies": {
     "@types/mocha": "^7.0.2",
     "@types/node": "^12.12.53",
-    "@types/vscode": "1.43.0",
+    "@types/vscode": "^1.43.0",
     "@typescript-eslint/parser": "^2.3.0",
     "eslint": "^6.4.0",
     "mocha": "^8.0.1",
@@ -41,7 +41,7 @@
     "vscode-test": "^1.3.0"
   },
   "scripts": {
-    "vscode:prepublish": "cd gsl-language-server && npm run compile",
+    "vscode:prepublish": "npm run compile && cd gsl-language-server && npm run compile",
     "postinstall": "cd gsl-language-server && npm install && cd ..",
     "compile": "tsc -b"
   },
@@ -176,27 +176,22 @@
     ],
     "keybindings": [
       {
-        "command": "extension.gslDownload",
+        "command": "gsl.downloadScript",
         "key": "ctrl+d",
         "mac": "cmd+d"
       },
       {
-        "command": "extension.gslUpload",
+        "command": "gsl.uploadScript",
         "key": "ctrl+u",
         "mac": "cmd+u"
       },
       {
-        "command": "extension.gslSendGameCommand",
-        "key": "ctrl+alt+g",
-        "mac": "cmd+alt+g"
-      },
-      {
-        "command": "extension.gslDateCheck",
+        "command": "gsl.checkDate",
         "key": "ctrl+alt+c",
         "mac": "cmd+alt+c"
       },
       {
-        "command": "extension.gslListTokens",
+        "command": "gsl.listTokens",
         "key": "ctrl+alt+l",
         "mac": "cmd+alt+l"
       }
