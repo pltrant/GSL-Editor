@@ -37,7 +37,7 @@ const rx_noverb = /Verb not found\./
 const rx_ready = /READY FOR ASCII UPLOAD/
 
 const rx_compiling = /^Compiling GSL script\: (?<script>\d+) \[(\d+)\]\[(?<path>.*?)\]$/
-const rx_compile_ok = /^Compile OK\.  (?<warnings>\d+) Warnings\.  Size\: (?<bytes>\d+) bytes \(of (?<maxBytes>[0-9,]+) available\)$/
+const rx_compile_ok = /^Compile OK\.  (?<warnings>\d+) Warnings\.  Size\: (?<bytes>[0-9,]+) bytes \(of (?<maxBytes>[0-9,]+) available\)$/
 const rx_compile_fail = /^Compile Failed w\/(?<errors>\d+) errors and (?<warnings>\d+) warnings\.$/
 
 const rx_compile_error = /^\s*(?<line>\d+)\s:\s(?<message>.*?)$/
@@ -232,7 +232,7 @@ export class EditorClient extends BaseGameClient {
 				if (match && match.groups) {
 					compileResults.status = ScriptCompileStatus.Compiled
 					compileResults.warnings = Number(match.groups.warnings)
-					compileResults.bytes = Number(match.groups.bytes)
+					compileResults.bytes = Number(match.groups.bytes.replace(/,/g, ''))
 					return
 				}
 				match = line.match(rx_compile_fail)
