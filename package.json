@@ -156,7 +156,6 @@
           118
         ],
         "editor.scrollBeyondLastLine": false,
-        "editor.selectionHighlight": false,
         "editor.tabSize": 2,
         "editor.wordBasedSuggestions": false,
         "editor.wordWrap": "wordWrapColumn",

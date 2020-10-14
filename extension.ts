@@ -26,6 +26,8 @@ import { GameClientOptions } from './gsl/gameClients'
 import { GameTerminal } from './gsl/gameTerminal'
 import { ScriptCompileStatus, ScriptError, EditorClient } from './gsl/editorClient'
 
+const GSL_LANGUAGE_ID = 'gsl'
+
 const GSLX_DEV_ACCOUNT = 'developmentAccount'
 const GSLX_DEV_INSTANCE = 'developmentInstance'
 const GSLX_DEV_CHARACTER = 'developmentCharacter'
@@ -36,6 +38,8 @@ const GSLX_SAVED_VERSION = 'savedVersion'
 const GSLX_DISABLE_LOGIN = 'disableLoginAttempts'
 
 const GSLX_KEYTAR_KEY = 'GSL-Editor'
+
+const rx_script_number = /^\d{1,5}$/
 
 export class GSLExtension {
 	private static vsc: VSCodeIntegration
@@ -49,11 +53,11 @@ export class GSLExtension {
 
 	static getDownloadLocation (): string {
 		let extPath: any = null
-		let useWorkspaceFolder = workspace.getConfiguration('gsl').get('downloadToWorkspace')
+		let useWorkspaceFolder = workspace.getConfiguration(GSL_LANGUAGE_ID).get('downloadToWorkspace')
 		if (useWorkspaceFolder && workspace.workspaceFolders) {
 			extPath = workspace.workspaceFolders[0].uri.fsPath
 		} else {
-			extPath = workspace.getConfiguration('gsl').get('downloadPath')
+			extPath = workspace.getConfiguration(GSL_LANGUAGE_ID).get('downloadPath')
 		}
 		if (!extPath) {
 			let rootPath = path.resolve(__dirname, '../gsl')
@@ -71,7 +75,7 @@ export class GSLExtension {
 	static async downloadScript (script: number | string, gotoDef?: string) {
 		const error: any = (e: Error) => { error.caught = e }
 		const downloadPath = this.getDownloadLocation()
-		const fileExtension = workspace.getConfiguration('gsl').get('fileExtension')
+		const fileExtension = workspace.getConfiguration(GSL_LANGUAGE_ID).get('fileExtension')
 		const client = await this.vsc.ensureGameConnection().catch(error)
 		if (error.caught) { return void window.showErrorMessage(`Failed to connect to game: ${error.caught.message}`) }
 		if (client) {
@@ -208,7 +212,7 @@ class VSCodeIntegration {
 		this.gslButton.command = 'gsl.showCommands'
 		this.gslButton.show()
 
-		if (workspace.getConfiguration('gsl').get('displayGameChannel')) {
+		if (workspace.getConfiguration(GSL_LANGUAGE_ID).get('displayGameChannel')) {
 			this.outputChannel.show(true);
 		}
 	}
@@ -245,19 +249,18 @@ class VSCodeIntegration {
 	}
 
 	private async commandUploadScript () {
-		const rx_script_number = /^\d{1,5}$/
-		if (!window.activeTextEditor || !window.activeTextEditor.document) {
-			return void window.showErrorMessage(
-				"You must have a script editor open before you can upload."
+		const document = window.activeTextEditor?.document
+		if (!document || !(document.languageId === GSL_LANGUAGE_ID)) {
+			return void window.showWarningMessage(
+				"Script upload requires an active GSL script editor"
 			)
 		}
-		const { document } = window.activeTextEditor
 		if (document.isDirty) {
 			let result = await document.save()
 			if (result === false) {
 				return void window.showErrorMessage(
-					"Could not save active script editor before upload."
-					)
+					"Failed to save active script editor before upload."
+				)
 			}
 		}
 		const scriptNumber = scriptNumberFromFileName(document.fileName)
@@ -480,7 +483,7 @@ class VSCodeIntegration {
 
 	async ensureGameConnection (): Promise<EditorClient> {
 		const error: any = (e: Error) => { error.caught = e }
-		const loginDisabled = workspace.getConfiguration('gsl').get(GSLX_DISABLE_LOGIN)
+		const loginDisabled = workspace.getConfiguration(GSL_LANGUAGE_ID).get(GSLX_DISABLE_LOGIN)
 		if (loginDisabled) { return Promise.reject(new Error ("Game login is disabled.")) }
 		const loginDetails = await this.getLoginDetails()
 		if (!loginDetails) { return Promise.reject(new Error ("Could not find login details?")) }
@@ -527,7 +530,7 @@ class ExtensionLanguageServer {
 		}
 
 		const clientOptions: LanguageClientOptions = {
-				documentSelector: [{ scheme: 'file', language: 'gsl' }],
+				documentSelector: [{ scheme: 'file', language: GSL_LANGUAGE_ID }],
 				synchronize: {
 						fileEvents: workspace.createFileSystemWatcher('**/.clientrc')
 				}
@@ -559,7 +562,7 @@ export function activate (context: ExtensionContext) {
 
 	GSLExtension.init(vsc)
 
-	const selector: DocumentSelector = { scheme: '*', language: 'gsl' }
+	const selector: DocumentSelector = { scheme: '*', language: GSL_LANGUAGE_ID }
 
 	let subscription: Disposable
 
