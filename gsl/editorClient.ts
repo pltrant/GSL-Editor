@@ -83,7 +83,7 @@ export class EditorClient extends BaseGameClient {
 		})
 	}
 
-	checkScript (/*this: BaseGameClient, */script: number): Promise<ScriptProperties> {
+	checkScript (script: number): Promise<ScriptProperties> {
 		const scriptProperties: any = {}
 		return new Promise ((resolve, reject) => {
 			const output = new OutputProcessor ((line: string) => {
@@ -121,7 +121,7 @@ export class EditorClient extends BaseGameClient {
 		})
 	}
 	
-	modifyScript (/*this: BaseGameClient, */script: number | string): Promise<ScriptProperties> {
+	modifyScript (script: number | string): Promise<ScriptProperties> {
 		const scriptProperties: any = {}
 		return new Promise ((resolve, reject) => {
 			const modifyFailed = (reason: string) => {
@@ -172,7 +172,7 @@ export class EditorClient extends BaseGameClient {
 		})
 	}
 	
-	captureScript (/*this: BaseGameClient*/): Promise<string> {
+	captureScript (): Promise<string> {
 		return new Promise ((resolve, reject) => {
 			const captureFailed = (reason: string) => {
 				clearTimeout(timeout)
@@ -196,7 +196,7 @@ export class EditorClient extends BaseGameClient {
 		})
 	}
 	
-	sendScript (/*this: BaseGameClient, */lines: Array<string>): Promise<ScriptCompileResults> {
+	sendScript (lines: Array<string>): Promise<ScriptCompileResults> {
 		return new Promise ((resolve, reject) => {
 			const compileResults: ScriptCompileResults = {
 				script: 0, path: '', bytes: 0, errors: 0, warnings: 0, errorList: [], status: ScriptCompileStatus.Unknown
