@@ -166,7 +166,7 @@
 				},
 				{
 					"name": "statement.gsl.effects",
-					"begin": "\\b(?i)((?:test2?|rem(n|2)?)(?:effect))\\b",
+					"begin": "\\b(?i)((?:scan|check|(?:test|end)2?|rem(?:n|2)?)(?:effect))\\b",
 					"beginCaptures": {
 						"1": { "name": "keyword.gsl.effects" }
 					},
@@ -254,7 +254,7 @@
 				},
 				{
 					"name": "statement.gsl.combat",
-					"begin": "\\b(?i)(hurt|injure)\\b",
+					"begin": "\\b(?i)(hurt|injure|isinjured|heal|cando)\\b",
 					"beginCaptures": {
 						"1": { "name": "keyword.gsl.combat" }
 					},
@@ -262,7 +262,7 @@
 					"patterns": [
 						{
 							"name": "keyword.gsl.combat.param",
-							"match": "\\b(?i:hits)\\b"
+							"match": "\\b(?i:hits|area|by|action|for)\\b"
 						},
 						{ "include": "#variables" },
 						{ "include": "#comments" }
@@ -365,15 +365,15 @@
 				},
 				{
 					"name": "keyword.gsl.info",
-					"match": "\\b(?i:info|getnameof|table|profile|script)\\b"
+					"match": "\\b(?i:info|getnameof|table|profile|script|varfield)\\b"
 				},
 				{
 					"name": "keyword.gsl.table",
 					"match": "\\b(?i:createtable|resizetable|updatetable|deletetable|cleartable|type|size|x|y|z)\\b"
 				},
 				{
-					"name": "keyword.gsl.player",
-					"match": "\\b(?i:glue)\\b"
+					"name": "keyword.gsl.script",
+					"match": "\\b(?i:glue|getps)\\b"
 				},
 				{
 					"name": "keyword.gsl.existences",
@@ -405,11 +405,15 @@
 				},
 				{
 					"name": "keyword.gsl.misc",
-					"match": "\\b(?i:lookroom|dolook|diradd|dirsend)\\b"
+					"match": "\\b(?i:lookroom|dolook|diradd|dirsend|goto|call)\\b"
 				},
 				{
 					"name": "keyword.gsl.assignment",
-					"match": "\\b(?i:random|index)\\b"
+					"match": "\\b(?i:random|index|rndplyr)\\b"
+				},
+				{
+					"name": "keyword.gsl.menus",
+					"match": "\\b(?i:addmenuitem|remmenuitem|clearmenu)\\b"
 				}
 			]
 		},
