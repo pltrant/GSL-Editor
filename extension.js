@@ -488,7 +488,7 @@ class ExtensionLanguageServer {
 }
 function activate(context) {
     const vsc = new VSCodeIntegration(context);
-    const els = new ExtensionLanguageServer(context);
+    // const els = new ExtensionLanguageServer (context)
     uaccessClient_1.UAccessClient.console = {
         log: (...args) => { vsc.outputGameChannel(args.join(' ')); }
     };
