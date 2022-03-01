@@ -488,9 +488,6 @@ class VSCodeIntegration {
 		const loginDetails = await this.getLoginDetails()
 		if (!loginDetails) { return Promise.reject(new Error ("Could not find login details?")) }
 		if (this.gameClient === undefined) {
-			const { account, password, instance, character } = loginDetails
-			const sal = await UAccessClient.quickLogin(account, password, instance, character, 'storm').catch(error)
-			if (error.caught) { return Promise.reject(error.caught) }
 			const console: { log: (...args: any) => void } = {
 				log: (...args: any) => {
 					this.outputChannel.append(`[console(log): ${args.join(' ')}]\r\n`)
@@ -498,12 +495,12 @@ class VSCodeIntegration {
 			}
 			const log = path.join(GSLExtension.getDownloadLocation(), 'gsl-dev-server.log')
 			const logging = this.loggingEnabled
-			const options: GameClientOptions = { sal, log, logging, debug: true, console, echo: true }
+			const options: GameClientOptions = { log, logging, debug: true, console, echo: true }
 			this.gameClient = new EditorClient (options)
 			this.gameClient.on('error', () => { this.gameClient = undefined })
 			this.gameClient.on('quit', () => { this.gameClient = undefined })
 			if (this.gameTerminal) { this.gameTerminal.bindClient(this.gameClient) }
-			await this.gameClient.connect().isInteractive()
+			await this.gameClient.login(loginDetails)
 		}
 		return this.gameClient
 	}

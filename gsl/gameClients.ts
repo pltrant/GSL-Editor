@@ -4,20 +4,19 @@ import { EventEmitter } from "events";
 import { maxHeaderSize } from "http";
 import * as fs from 'fs';
 import { WriteStream } from "fs";
+import { LoginDetails } from "./uaccessClient";
 
 export interface GameClientOptions {
 	debug?: boolean, echo?: boolean,
 	console?: { log: (...args: any) => void },
-	quit?: () => void,
-	sal: SAL, log?: string, logging?: boolean
+	// quit?: () => void,
+	log?: string, logging?: boolean,
 }
 
 const defaultConsole = { log: () => {} }
 
 export class BaseGameClient extends EventEmitter {
-	protected server: ServerConnection
-
-	private serverOptions: ServerConnectionOptions
+	protected server?: ServerConnection
 
 	private newLine: string
 
@@ -34,9 +33,6 @@ export class BaseGameClient extends EventEmitter {
 		super()
 
 		const { debug, echo, console, log, logging } = options
-		const { gamehost: host, gameport: port, key } = options.sal
-
-		this.newLine = '\n'
 
 		this.debug = (debug === undefined ? false : debug)
 		this.echo = (echo === undefined ? false : echo)
@@ -45,27 +41,31 @@ export class BaseGameClient extends EventEmitter {
 
 		this.console = console
 
-		this.serverOptions = { host, port, key, debug, console }
-		this.server = new ServerConnection(this.serverOptions)
+		this.newLine = '\n'
 
 		if (logging === true) {
 			this.logStream = fs.createWriteStream(this.log, { flags: 'a' })
 		}
-
-		this.initializeServer()
 	}
 
-	private initializeServer() {
+	private initializeServer (options: any) {
+		this.server = new ServerConnection(options)
 		this.server.on('text', text => this.serverText(text))
 		this.server.on('error', error => this.serverError(error))
 		this.server.on('close', () => this.serverClosed())
 		this.server.on('mode', mode => this.serverMode(mode))
 		this.server.on('connect', () => this.serverConnect())
+		this.server.connect()
 	}
 
-	protected serverConnect() {
-		this.server.send('/FE:JAVA /VERSION:1.0 /P:WIN_UNKNOWN\n')
-		this.emit('hello')
+	protected cleanupServer () {
+		if (!this.server) return
+		this.server.removeAllListeners('text')
+		this.server.removeAllListeners('error')
+		this.server.removeAllListeners('close')
+		this.server.removeAllListeners('mode')
+		this.server.removeAllListeners('connect')
+		this.server = undefined
 	}
 
 	protected serverMode(mode: ServerConnectionMode) {
@@ -74,11 +74,13 @@ export class BaseGameClient extends EventEmitter {
 	protected serverClosed() {
 		if (this.console) { this.console.log("server socket has closed") }
 		this.emit('quit')
+		this.cleanupServer()
 	}
 
 	protected serverError(error: Error) {
 		if (this.console) { this.console.log("server socket errored", error) }
 		this.emit('error', error)
+		this.cleanupServer()
 	}
 
 	protected serverText(text: string) {
@@ -86,16 +88,26 @@ export class BaseGameClient extends EventEmitter {
 		this.emit('text', text)
 	}
 
-	connect() {
-		this.server.connect()
-		return this
+	protected serverConnect() {
+		if (!this.server) throw new Error('not connected')
+		this.server.send('/FE:JAVA /VERSION:1.0 /P:WIN_UNKNOWN\n')
+		this.emit('hello')
+	}
+
+	connect(sal: SAL) {
+		if (this.server) { throw new Error('already connected') }
+		 const { gamehost: host, gameport: port, key } = sal
+		 const options = { host, port, key, console: this.console, debug: this.debug }
+		this.initializeServer(options)
 	}
 
 	quit() {
+		if (!this.server) throw new Error('not connected')
 		this.server.close('quit')
 	}
 
 	send(command: string, echo: boolean = true) {
+		if (!this.server) throw new Error('not connected')
 		if (echo) { this.emit('echo', command) }
 		this.logStream?.write(command + '\r\n')
 		this.server.send(command + this.newLine)
@@ -116,7 +128,7 @@ class WizardGameClient extends BaseGameClient {
 		super(options)
 	}
 	protected serverConnect() {
-		this.server.send('/FE:WIZARD /VERSION:1.0.1.22 /P:WIN_UNKNOWN\n')
+		// this.server.send('/FE:WIZARD /VERSION:1.0.1.22 /P:WIN_UNKNOWN\n')
 	}
 }
 
@@ -125,6 +137,6 @@ class StormGameClient extends BaseGameClient {
 		super(options)
 	}
 	protected serverConnect() {
-		this.server.send('/FE:STORMFRONT /VERSION:1.0.1.26 /P:WIN_UNKNOWN /XML\n')
+		// this.server.send('/FE:STORMFRONT /VERSION:1.0.1.26 /P:WIN_UNKNOWN /XML\n')
 	}
 }

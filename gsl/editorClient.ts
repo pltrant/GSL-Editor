@@ -1,4 +1,6 @@
+import { isMainThread } from "worker_threads"
 import { BaseGameClient, GameClientOptions } from "./gameClients"
+import { LoginDetails, UAccessClient } from "./uaccessClient"
 
 export interface ScriptProperties {
 	lastModifiedDate: Date,
@@ -49,15 +51,20 @@ const rx_details = /(?:^Name\: (?<name>.*?)$)|(?:^Desc\: (?<desc>.*?)$)|(?:^Owne
 
 const monthList = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
+const delay = 15000
+
 export class EditorClient extends BaseGameClient {
 	private interactive: boolean
+	private loginDetails: any
+	private retryCommand: string
     
 	constructor (options: GameClientOptions) {
 		super(options)
 		this.interactive = false
+		this.retryCommand = ''
 	}
 
-	isInteractive(): Promise<void> {
+	private isInteractive(): Promise<void> {
 		if (this.interactive === true) { return Promise.resolve() }
 		return new Promise<void> ((resolve, reject) => {
 			const output = new OutputProcessor ((line: string) => {
@@ -69,10 +76,10 @@ export class EditorClient extends BaseGameClient {
 			const timeout = setTimeout(() => {
 				this.off('text', waitForPrompt)
 				reject()
-			}, 5000)
+			}, delay)
 			const waitForPrompt = (text: string) => {
 				output.accumulate(text)
-				if (output.peek() === '>') {
+				if (output.peek(1) === '>') {
 					this.interactive = true
 					this.off('text', waitForPrompt)
 					clearTimeout(timeout)
@@ -81,6 +88,24 @@ export class EditorClient extends BaseGameClient {
 			}
 			this.on('text', waitForPrompt)
 		})
+	}
+
+	private trySend(command: string, echo?: boolean): void {
+		this.retryCommand = command
+		this.send(command, echo)
+	}
+
+	protected serverError(error: any): void {
+		// attempt to reconnet on reset connections
+		if (error.code === 'ECONNRESET') {
+			this.cleanupServer()
+			this.reconnect().then(() => {
+				if (this.retryCommand.length > 0) {
+					this.send(this.retryCommand)
+					this.retryCommand = ''
+				}
+			})
+		} else { super.serverError(error) }
 	}
 
 	checkScript (script: number): Promise<ScriptProperties> {
@@ -115,9 +140,9 @@ export class EditorClient extends BaseGameClient {
 			const timeout = setTimeout(() => {
 				this.off('text', processText)
 				reject(new Error ("Script check timed out."))
-			}, 5000)
+			}, delay)
 			this.on('text', processText)
-			this.send(`/ss ${script}`)
+			this.trySend(`/ss ${script}`)
 		})
 	}
 	
@@ -158,7 +183,7 @@ export class EditorClient extends BaseGameClient {
 					return
 				}
 			})
-			const timeout = setTimeout(() => modifyFailed("Modification timed out."), 5000)
+			const timeout = setTimeout(() => modifyFailed("Modification timed out."), delay)
 			const processText = (text: string) => {
 				output.accumulate(text)
 				if (output.peek() === 'Edt:') {
@@ -168,7 +193,7 @@ export class EditorClient extends BaseGameClient {
 				}
 			}
 			this.on('text', processText)
-			this.send(`/${(typeof script === 'number' ? 'ms' : 'mv')} ${script}`)
+			this.trySend(`/${(typeof script === 'number' ? 'ms' : 'mv')} ${script}`)
 		})
 	}
 	
@@ -181,7 +206,7 @@ export class EditorClient extends BaseGameClient {
 			}
 			const scriptLines: Array<string> = []
 			const output = new OutputProcessor ((line: string) => scriptLines.push(line))
-			const timeout = setTimeout(() => captureFailed("Capture timed out."), 5000)
+			const timeout = setTimeout(() => captureFailed("Capture timed out."), delay)
 			const processText = (text: string) => {
 				output.accumulate(text)
 				if (output.peek() === 'Edt:') {
@@ -192,7 +217,7 @@ export class EditorClient extends BaseGameClient {
 				}
 			}
 			this.on('text', processText)
-			this.send('P')
+			this.trySend('P')
 		})
 	}
 	
@@ -257,8 +282,23 @@ export class EditorClient extends BaseGameClient {
 				}
 			}
 			this.on('text', processText)
-			this.send('Z')
+			this.trySend('Z')
 		})
+	}
+
+	async reconnect () {
+		const error: any = (e: Error) => { error.caught = e }
+		const { account, password, instance, character } = this.loginDetails
+		const sal = await UAccessClient.quickLogin(account, password, instance, character, 'storm').catch(error)
+		if (error.caught) { return Promise.reject(error.caught) }
+		this.interactive = false
+		this.connect(sal)
+		return await this.isInteractive()
+	}
+
+	async login (loginDetails: any) {
+		this.loginDetails = loginDetails
+		return await this.reconnect()
 	}
 }
 
@@ -282,6 +322,6 @@ class OutputProcessor {
 			this.buffer = this.buffer.substring(last + 2)
 		}		
 	}
-	peek(): string { return this.buffer }
-	flush(): string { return this.buffer = '' }
+	peek (n: number = 0): string { return (n <= 0) ? this.buffer : this.buffer.substring(this.buffer.length - n, this.buffer.length) }
+	flush (): string { return this.buffer = '' }
 }
