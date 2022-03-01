@@ -10,6 +10,7 @@ const gsl_1 = require("./gsl");
 const uaccessClient_1 = require("./gsl/uaccessClient");
 const gameTerminal_1 = require("./gsl/gameTerminal");
 const editorClient_1 = require("./gsl/editorClient");
+const GSL_LANGUAGE_ID = 'gsl';
 const GSLX_DEV_ACCOUNT = 'developmentAccount';
 const GSLX_DEV_INSTANCE = 'developmentInstance';
 const GSLX_DEV_CHARACTER = 'developmentCharacter';
@@ -17,6 +18,7 @@ const GSLX_NEW_INSTALL_FLAG = 'gslExtNewInstallFlag';
 const GSLX_SAVED_VERSION = 'savedVersion';
 const GSLX_DISABLE_LOGIN = 'disableLoginAttempts';
 const GSLX_KEYTAR_KEY = 'GSL-Editor';
+const rx_script_number = /^\d{1,5}$/;
 class GSLExtension {
     static init(vsc) {
         this.diagnostics = vscode_2.languages.createDiagnosticCollection();
@@ -24,12 +26,12 @@ class GSLExtension {
     }
     static getDownloadLocation() {
         let extPath = null;
-        let useWorkspaceFolder = vscode_2.workspace.getConfiguration('gsl').get('downloadToWorkspace');
+        let useWorkspaceFolder = vscode_2.workspace.getConfiguration(GSL_LANGUAGE_ID).get('downloadToWorkspace');
         if (useWorkspaceFolder && vscode_2.workspace.workspaceFolders) {
             extPath = vscode_2.workspace.workspaceFolders[0].uri.fsPath;
         }
         else {
-            extPath = vscode_2.workspace.getConfiguration('gsl').get('downloadPath');
+            extPath = vscode_2.workspace.getConfiguration(GSL_LANGUAGE_ID).get('downloadPath');
         }
         if (!extPath) {
             let rootPath = path.resolve(__dirname, '../gsl');
@@ -46,7 +48,7 @@ class GSLExtension {
     static async downloadScript(script, gotoDef) {
         const error = (e) => { error.caught = e; };
         const downloadPath = this.getDownloadLocation();
-        const fileExtension = vscode_2.workspace.getConfiguration('gsl').get('fileExtension');
+        const fileExtension = vscode_2.workspace.getConfiguration(GSL_LANGUAGE_ID).get('fileExtension');
         const client = await this.vsc.ensureGameConnection().catch(error);
         if (error.caught) {
             return void vscode_2.window.showErrorMessage(`Failed to connect to game: ${error.caught.message}`);
@@ -177,7 +179,7 @@ class VSCodeIntegration {
         this.gslButton.text = "$(ruby) GSL";
         this.gslButton.command = 'gsl.showCommands';
         this.gslButton.show();
-        if (vscode_2.workspace.getConfiguration('gsl').get('displayGameChannel')) {
+        if (vscode_2.workspace.getConfiguration(GSL_LANGUAGE_ID).get('displayGameChannel')) {
             this.outputChannel.show(true);
         }
     }
@@ -217,15 +219,15 @@ class VSCodeIntegration {
         }
     }
     async commandUploadScript() {
-        const rx_script_number = /^\d{1,5}$/;
-        if (!vscode_2.window.activeTextEditor || !vscode_2.window.activeTextEditor.document) {
-            return void vscode_2.window.showErrorMessage("You must have a script editor open before you can upload.");
+        var _a;
+        const document = (_a = vscode_2.window.activeTextEditor) === null || _a === void 0 ? void 0 : _a.document;
+        if (!document || !(document.languageId === GSL_LANGUAGE_ID)) {
+            return void vscode_2.window.showWarningMessage("Script upload requires an active GSL script editor");
         }
-        const { document } = vscode_2.window.activeTextEditor;
         if (document.isDirty) {
             let result = await document.save();
             if (result === false) {
-                return void vscode_2.window.showErrorMessage("Could not save active script editor before upload.");
+                return void vscode_2.window.showErrorMessage("Failed to save active script editor before upload.");
             }
         }
         const scriptNumber = scriptNumberFromFileName(document.fileName);
@@ -431,7 +433,7 @@ class VSCodeIntegration {
     }
     async ensureGameConnection() {
         const error = (e) => { error.caught = e; };
-        const loginDisabled = vscode_2.workspace.getConfiguration('gsl').get(GSLX_DISABLE_LOGIN);
+        const loginDisabled = vscode_2.workspace.getConfiguration(GSL_LANGUAGE_ID).get(GSLX_DISABLE_LOGIN);
         if (loginDisabled) {
             return Promise.reject(new Error("Game login is disabled."));
         }
@@ -479,7 +481,7 @@ class ExtensionLanguageServer {
             debug: { module, transport, options }
         };
         const clientOptions = {
-            documentSelector: [{ scheme: 'file', language: 'gsl' }],
+            documentSelector: [{ scheme: 'file', language: GSL_LANGUAGE_ID }],
             synchronize: {
                 fileEvents: vscode_2.workspace.createFileSystemWatcher('**/.clientrc')
             }
@@ -497,7 +499,7 @@ function activate(context) {
     };
     uaccessClient_1.UAccessClient.debug = true;
     GSLExtension.init(vsc);
-    const selector = { scheme: '*', language: 'gsl' };
+    const selector = { scheme: '*', language: GSL_LANGUAGE_ID };
     let subscription;
     subscription = vscode_2.languages.registerDocumentSymbolProvider(selector, new gsl_1.GSLDocumentSymbolProvider());
     context.subscriptions.push(subscription);
