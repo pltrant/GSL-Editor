@@ -442,11 +442,6 @@ class VSCodeIntegration {
             return Promise.reject(new Error("Could not find login details?"));
         }
         if (this.gameClient === undefined) {
-            const { account, password, instance, character } = loginDetails;
-            const sal = await uaccessClient_1.UAccessClient.quickLogin(account, password, instance, character, 'storm').catch(error);
-            if (error.caught) {
-                return Promise.reject(error.caught);
-            }
             const console = {
                 log: (...args) => {
                     this.outputChannel.append(`[console(log): ${args.join(' ')}]\r\n`);
@@ -454,14 +449,14 @@ class VSCodeIntegration {
             };
             const log = path.join(GSLExtension.getDownloadLocation(), 'gsl-dev-server.log');
             const logging = this.loggingEnabled;
-            const options = { sal, log, logging, debug: true, console, echo: true };
+            const options = { log, logging, debug: true, console, echo: true };
             this.gameClient = new editorClient_1.EditorClient(options);
             this.gameClient.on('error', () => { this.gameClient = undefined; });
             this.gameClient.on('quit', () => { this.gameClient = undefined; });
             if (this.gameTerminal) {
                 this.gameTerminal.bindClient(this.gameClient);
             }
-            await this.gameClient.connect().isInteractive();
+            await this.gameClient.login(loginDetails);
         }
         return this.gameClient;
     }
@@ -493,7 +488,7 @@ class ExtensionLanguageServer {
 }
 function activate(context) {
     const vsc = new VSCodeIntegration(context);
-    // const els = new ExtensionLanguageServer (context)
+    const els = new ExtensionLanguageServer(context);
     uaccessClient_1.UAccessClient.console = {
         log: (...args) => { vsc.outputGameChannel(args.join(' ')); }
     };
