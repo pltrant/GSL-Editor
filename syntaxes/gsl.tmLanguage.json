@@ -457,7 +457,7 @@
 				},
 				{
 					"name": "token.gsl.misc",
-					"match": "\\$(\\$|\\\\|\\^|\\*|\\+|'|Q|R|ZE)"
+					"match": "\\$(\\$|\\\\|\\^|\\*|\\+|,|'|Q|R|ZE)"
 				},
 				{
 					"name": "token.gsl.sysvar",
@@ -533,8 +533,9 @@
 			]
 		},
 		"comments": {
-			"name": "comment.line.gsl",
-			"match": "![^=].*$",
+			"name": "comment.gsl",
+			"begin": "![^=]",
+			"end": "$",
 			"patterns": [
 				{
 					"name": "comment.gsl.scan.index",
