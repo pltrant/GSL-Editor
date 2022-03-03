@@ -7,7 +7,7 @@ const vscode_1 = require("vscode");
 const vscode_2 = require("vscode");
 const vscode_languageclient_1 = require("vscode-languageclient");
 const gsl_1 = require("./gsl");
-const uaccessClient_1 = require("./gsl/uaccessClient");
+const eaccessClient_1 = require("./gsl/eaccessClient");
 const gameTerminal_1 = require("./gsl/gameTerminal");
 const editorClient_1 = require("./gsl/editorClient");
 const GSL_LANGUAGE_ID = 'gsl';
@@ -134,13 +134,13 @@ class GSLExtension {
         if (error.caught) {
             return void vscode_2.window.showErrorMessage(`Failed to connet to game: ${error.caught.message}`);
         }
-        vscode_2.window.setStatusBarMessage(`Checking modification date for script ${script} ...`);
+        vscode_2.window.setStatusBarMessage(`Checking modification date for script ${script} ...`, 5000);
         let scriptProperties = await client.checkScript(script).catch(error);
         if (error.caught) {
             return void vscode_2.window.showErrorMessage(`Failed to check modification date: ${error.caught.message}`);
         }
         const date = scriptProperties.lastModifiedDate;
-        vscode_2.window.showInformationMessage(`Script ${script} was last modified on ${date.toLocaleDateString()} as ${date.toLocaleTimeString()}`);
+        vscode_2.window.setStatusBarMessage(`Script ${script} was last modified on ${date.toLocaleDateString()} as ${date.toLocaleTimeString()}`, 5000);
     }
 }
 exports.GSLExtension = GSLExtension;
@@ -284,7 +284,7 @@ class VSCodeIntegration {
         let error;
         const captureError = (e) => (error = e, void (0));
         /* login */
-        const gameChoice = await uaccessClient_1.EAccessClient.login(account, password, { name: /.*?development.*?/i }).catch(captureError);
+        const gameChoice = await eaccessClient_1.EAccessClient.login(account, password, { name: /.*?development.*?/i }).catch(captureError);
         if (!gameChoice) {
             const message = error ? error.message : "Login failed?";
             return void vscode_2.window.showErrorMessage(message);
@@ -489,10 +489,10 @@ class ExtensionLanguageServer {
 function activate(context) {
     const vsc = new VSCodeIntegration(context);
     // const els = new ExtensionLanguageServer (context)
-    uaccessClient_1.EAccessClient.console = {
+    eaccessClient_1.EAccessClient.console = {
         log: (...args) => { vsc.outputGameChannel(args.join(' ')); }
     };
-    uaccessClient_1.EAccessClient.debug = true;
+    eaccessClient_1.EAccessClient.debug = true;
     GSLExtension.init(vsc);
     const selector = { scheme: '*', language: GSL_LANGUAGE_ID };
     let subscription;

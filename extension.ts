@@ -21,7 +21,7 @@ import {
 	GSLDocumentFormattingEditProvider
 } from './gsl'
 
-import { EAccessClient } from './gsl/uaccessClient'
+import { EAccessClient } from './gsl/eaccessClient'
 import { GameClientOptions } from './gsl/gameClients'
 import { GameTerminal } from './gsl/gameTerminal'
 import { ScriptCompileStatus, ScriptError, EditorClient } from './gsl/editorClient'
@@ -142,11 +142,11 @@ export class GSLExtension {
 		const error: any = (e: Error) => { error.caught = e }
 		const client = await this.vsc.ensureGameConnection().catch(error)
 		if (error.caught) { return void window.showErrorMessage(`Failed to connet to game: ${error.caught.message}`) }
-		window.setStatusBarMessage(`Checking modification date for script ${script} ...`)
+		window.setStatusBarMessage(`Checking modification date for script ${script} ...`, 5000)
 		let scriptProperties = await client.checkScript(script).catch(error)
 		if (error.caught) { return void window.showErrorMessage(`Failed to check modification date: ${error.caught.message}`) }
 		const date = scriptProperties.lastModifiedDate
-		window.showInformationMessage(`Script ${script} was last modified on ${date.toLocaleDateString()} as ${date.toLocaleTimeString()}`)
+		window.setStatusBarMessage(`Script ${script} was last modified on ${date.toLocaleDateString()} as ${date.toLocaleTimeString()}`, 5000)
 	}
 }
 

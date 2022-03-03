@@ -1,6 +1,6 @@
 
 import { BaseGameClient, GameClientOptions } from "./gameClients"
-import { EAccessClient } from "./uaccessClient"
+import { EAccessClient } from "./eaccessClient"
 
 export interface ScriptProperties {
 	lastModifiedDate: Date,

@@ -4,7 +4,7 @@ import { EventEmitter } from "events";
 import { maxHeaderSize } from "http";
 import * as fs from 'fs';
 import { WriteStream } from "fs";
-import { LoginDetails } from "./uaccessClient";
+import { LoginDetails } from "./eaccessClient";
 
 export interface GameClientOptions {
 	debug?: boolean, echo?: boolean,
