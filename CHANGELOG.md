@@ -2,7 +2,7 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
-## [1.8.0] - 2022-03-03
+## [1.9.0] - 2022-03-03
 
 ### Added
 
@@ -305,7 +305,7 @@ No change.  Publish error bumped up to 1.5.0.
 
 ### Added
 
-- The extension now includes 2 default color themes for GSL, aptly named GSL Light and GSL Dark.  **The GSL Dark theme is strongly recommended.  To change your color theme, go to File > Preferences > Color Theme (or Ctrl+K Ctrl+T).**  It should be noted that you color customize any element of code.  If you don't like the red that is used for `kill`, you can change it to any other color you want.
+- The extension now includes 2 default color themes for GSL, aptly named GSL Light and GSL Dark.  __The GSL Dark theme is strongly recommended.  To change your color theme, go to File > Preferences > Color Theme (or Ctrl+K Ctrl+T).__  It should be noted that you color customize any element of code.  If you don't like the red that is used for `kill`, you can change it to any other color you want.
 
 ### Changed
 
