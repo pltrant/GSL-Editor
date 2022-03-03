@@ -19,7 +19,7 @@ Setup instructions can be found [here](https://github.com/pltrant/GSL-Editor/blo
 
 Submit bugs to the [issue tracker](https://github.com/pltrant/GSL-Editor/issues).
 
-Join the [#gsl-editor](https://discord.gg/kjX79pB) channel on the official GemStone IV Discord server to discuss any issues, feedback, or enhancements.  There's also a [Google Group](https://groups.google.com/forum/#!forum/gsl-editor/join) for email discussions.
+Join the [#gsl-editor](https://discord.gg/kjX79pB) channel on the official GemStone IV Discord server to discuss any issues, feedback, or enhancements.
 
 ## Release Notes
 

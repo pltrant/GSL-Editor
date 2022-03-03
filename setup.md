@@ -10,15 +10,15 @@ Use the below instructions to setup and use the GSL Editor.
 
 2. Once installed, launch the application.  Then from the top menu, select View > Extensions (Ctrl+Shift+X).  In the new pane that opens up, there is a textbox at the top to search for extensions in the VSCode Marketplace. Search for "gsl", which should then list the "GSL Editor".  Click the "Install" button.
 
-    ![](https://radiantglyph.com/gsiv/gsleditor/extension.jpg)
+    ![](https://www.glyph.dev/gsiv/gsleditor/extension.jpg)
 
 3. Once the extension is installed, you will be prompted to run the User Setup process.  It will securely store your Play.net account credentials so you can log into the game to download and upload scripts.
 
-    ![](https://radiantglyph.com/gsiv/gsleditor/settings.jpg)
+    ![](https://www.glyph.dev/gsiv/gsleditor/settings.jpg)
 
 4. You should now be ready to use the GSL Editor.  You can just start by downloading or uploading any script by using the previous referenced buttons.
 
-    ![](https://radiantglyph.com/gsiv/gsleditor/buttons.jpg)
+    ![](https://www.glyph.dev/gsiv/gsleditor/buttons.jpg)
 
 5. Join the [#gsl-editor](https://discord.gg/kjX79pB) channel on the official GemStone IV Discord server to discuss any issues, feedback, or enhancements.  There's also a [Google Group](https://groups.google.com/forum/#!forum/gsl-editor/join) for email discussions.
 
@@ -33,7 +33,7 @@ Use the below instructions to setup and use the GSL Editor.
     * Goto any specific line in a script with Ctrl+G.
 * Learn to use snippets.  Start typing any GSL command, such as "add" and as you type in the word, you will see menu pop-up for options such as: addeffect, addexp, addgroup, and addmenuitem.  Use the arrows then TAB to select any entry or just click on it, and it will type out the rest of the syntax for you and prompt you to enter any needed values.  Then just TAB between input values, then ENTER or ESC once done.
 
-    ![](https://radiantglyph.com/gsiv/gsleditor/snippets.gif)
+    ![](https://www.glyph.dev/gsiv/gsleditor/snippets.gif)
 
 * Review the entire list of 100+ settings (File > Preferences > Settings (Ctrl+Comma)) that are built into VSCode.  You can customize settings such as auto-save, font size, drag and drop text selections, and more!
 * For advanced users, setup a local git repository of the Dev script archive from https://github.com/pltrant/GSL-Editor.git, allowing you to use the built in Search functionality of VSCode.  You can then easily keep your local repository in sync (git pull) and quickly search all script files using keywords or regex with a useful graphical user interface to review the results.

@@ -1,0 +1,19 @@
+{
+    "version": "0.2",
+    "files": ["*.gsl"],
+    "dictionaries": ["GemStone"],
+    "dictionaryDefinitions": [
+        {
+            "name": "GemStone",
+            "path": "./GemStoneDictionary.txt"
+        }
+    ],
+    "includeRegExpList": [
+        "\"(.*?)\""
+    ],
+    "ignoreRegExpList": [
+        "callmatch.*\"(.*?)\"",
+        "set \\$MATCH to \"(.*?)\"",
+        "\\:\\s+\"(.*?)\""
+    ]
+}

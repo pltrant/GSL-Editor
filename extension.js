@@ -431,6 +431,32 @@ class VSCodeIntegration {
             this.context.globalState.update(GSLX_SAVED_VERSION, version);
         }
     }
+    async spellCheckUpdate() {
+        let copyFile = false;
+        let sourceFile = path.resolve(__dirname, './spellcheck/cspell.json');
+        let destinationFile = path.join(GSLExtension.getDownloadLocation(), 'cspell.json');
+        if (!fs.existsSync(destinationFile)) {
+            copyFile = true;
+        }
+        else if (fs.statSync(sourceFile).mtime > fs.statSync(destinationFile).mtime) {
+            copyFile = true;
+        }
+        if (copyFile) {
+            fs.copyFile(sourceFile, destinationFile, () => { });
+        }
+        copyFile = false;
+        sourceFile = path.resolve(__dirname, './spellcheck/GemStoneDictionary.txt');
+        destinationFile = path.join(GSLExtension.getDownloadLocation(), 'GemStoneDictionary.txt');
+        if (!fs.existsSync(destinationFile)) {
+            copyFile = true;
+        }
+        else if (fs.statSync(sourceFile).mtime > fs.statSync(destinationFile).mtime) {
+            copyFile = true;
+        }
+        if (copyFile) {
+            fs.copyFile(sourceFile, destinationFile, () => { });
+        }
+    }
     async ensureGameConnection() {
         const error = (e) => { error.caught = e; };
         const loginDisabled = vscode_2.workspace.getConfiguration(GSL_LANGUAGE_ID).get(GSLX_DISABLE_LOGIN);
@@ -492,7 +518,7 @@ function activate(context) {
     eaccessClient_1.EAccessClient.console = {
         log: (...args) => { vsc.outputGameChannel(args.join(' ')); }
     };
-    eaccessClient_1.EAccessClient.debug = true;
+    eaccessClient_1.EAccessClient.debug = false;
     GSLExtension.init(vsc);
     const selector = { scheme: '*', language: GSL_LANGUAGE_ID };
     let subscription;
@@ -508,6 +534,7 @@ function activate(context) {
     context.subscriptions.push(subscription);
     vsc.checkForNewInstall();
     vsc.checkForUpdatedVersion();
+    vsc.spellCheckUpdate();
 }
 exports.activate = activate;
 function deactivate() {

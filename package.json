@@ -22,7 +22,7 @@
     "url": "https://github.com/pltrant/GSL-Editor/issues"
   },
   "activationEvents": [
-    "*"
+    "onStartupFinished"
   ],
   "engines": {
     "vscode": "^1.43.0"

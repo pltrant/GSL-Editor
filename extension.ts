@@ -27,18 +27,13 @@ import { GameTerminal } from './gsl/gameTerminal'
 import { ScriptCompileStatus, ScriptError, EditorClient } from './gsl/editorClient'
 
 const GSL_LANGUAGE_ID = 'gsl'
-
 const GSLX_DEV_ACCOUNT = 'developmentAccount'
 const GSLX_DEV_INSTANCE = 'developmentInstance'
 const GSLX_DEV_CHARACTER = 'developmentCharacter'
-
 const GSLX_NEW_INSTALL_FLAG = 'gslExtNewInstallFlag'
 const GSLX_SAVED_VERSION = 'savedVersion'
-
 const GSLX_DISABLE_LOGIN = 'disableLoginAttempts'
-
 const GSLX_KEYTAR_KEY = 'GSL-Editor'
-
 const rx_script_number = /^\d{1,5}$/
 
 export class GSLExtension {
@@ -481,6 +476,31 @@ class VSCodeIntegration {
 		}
 	}
 
+	async spellCheckUpdate () {
+		let copyFile = false
+		let sourceFile = path.resolve(__dirname, './spellcheck/cspell.json')
+		let destinationFile = path.join(GSLExtension.getDownloadLocation(), 'cspell.json')
+		if (!fs.existsSync(destinationFile)) {
+			copyFile = true
+		} else if (fs.statSync(sourceFile).mtime > fs.statSync(destinationFile).mtime) {
+			copyFile = true
+		}
+		if (copyFile) {
+			fs.copyFile(sourceFile, destinationFile, () => {})
+		}
+		copyFile = false
+		sourceFile = path.resolve(__dirname, './spellcheck/GemStoneDictionary.txt')
+		destinationFile = path.join(GSLExtension.getDownloadLocation(), 'GemStoneDictionary.txt')
+		if (!fs.existsSync(destinationFile)) {
+			copyFile = true
+		} else if (fs.statSync(sourceFile).mtime > fs.statSync(destinationFile).mtime) {
+			copyFile = true
+		}
+		if (copyFile) {
+			fs.copyFile(sourceFile, destinationFile, () => {})
+		}
+	}
+
 	async ensureGameConnection (): Promise<EditorClient> {
 		const error: any = (e: Error) => { error.caught = e }
 		const loginDisabled = workspace.getConfiguration(GSL_LANGUAGE_ID).get(GSLX_DISABLE_LOGIN)
@@ -546,7 +566,6 @@ class ExtensionLanguageServer {
 	}
 }
 
-
 export function activate (context: ExtensionContext) {
 	const vsc = new VSCodeIntegration (context)
 	// const els = new ExtensionLanguageServer (context)
@@ -555,7 +574,7 @@ export function activate (context: ExtensionContext) {
 		log: (...args: any) => { vsc.outputGameChannel(args.join(' ')) }
 	}
 
-	EAccessClient.debug = true
+	EAccessClient.debug = false
 
 	GSLExtension.init(vsc)
 
@@ -590,10 +609,8 @@ export function activate (context: ExtensionContext) {
 
 	vsc.checkForNewInstall()
 	vsc.checkForUpdatedVersion()
+	vsc.spellCheckUpdate()
 }
 
 export function deactivate () {
-
 }
-
-
