@@ -34,10 +34,9 @@ export class SAL {
 
     [index: string]: any
 
-	/* expects reply to be Array<String> */
-	static parseUAccessResponse (reply: Array<string>) {
-		let sal = new SAL ()
-		for (let n = 2, nn = reply.length - 1; n < nn; n++) {
+	static parseEAccessResponse (reply: Array<string>) {
+		let sal = new this ()
+		for (let n = 2, nn = reply.length; n < nn; n++) {
 			let [key, value] = reply[n].split('=')
 			key = key.toLowerCase()
 			if (key === 'upport' || key === 'gameport') {

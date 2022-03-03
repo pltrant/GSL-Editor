@@ -284,7 +284,7 @@ class VSCodeIntegration {
         let error;
         const captureError = (e) => (error = e, void (0));
         /* login */
-        const gameChoice = await uaccessClient_1.UAccessClient.login(account, password, { name: /.*?development.*?/i }).catch(captureError);
+        const gameChoice = await uaccessClient_1.EAccessClient.login(account, password, { name: /.*?development.*?/i }).catch(captureError);
         if (!gameChoice) {
             const message = error ? error.message : "Login failed?";
             return void vscode_2.window.showErrorMessage(message);
@@ -488,11 +488,11 @@ class ExtensionLanguageServer {
 }
 function activate(context) {
     const vsc = new VSCodeIntegration(context);
-    const els = new ExtensionLanguageServer(context);
-    uaccessClient_1.UAccessClient.console = {
+    // const els = new ExtensionLanguageServer (context)
+    uaccessClient_1.EAccessClient.console = {
         log: (...args) => { vsc.outputGameChannel(args.join(' ')); }
     };
-    uaccessClient_1.UAccessClient.debug = true;
+    uaccessClient_1.EAccessClient.debug = true;
     GSLExtension.init(vsc);
     const selector = { scheme: '*', language: GSL_LANGUAGE_ID };
     let subscription;

@@ -1,6 +1,6 @@
-import { isMainThread } from "worker_threads"
+
 import { BaseGameClient, GameClientOptions } from "./gameClients"
-import { LoginDetails, UAccessClient } from "./uaccessClient"
+import { EAccessClient } from "./uaccessClient"
 
 export interface ScriptProperties {
 	lastModifiedDate: Date,
@@ -289,7 +289,7 @@ export class EditorClient extends BaseGameClient {
 	async reconnect () {
 		const error: any = (e: Error) => { error.caught = e }
 		const { account, password, instance, character } = this.loginDetails
-		const sal = await UAccessClient.quickLogin(account, password, instance, character, 'storm').catch(error)
+		const sal = await EAccessClient.quickLogin(account, password, instance, character, 'storm').catch(error)
 		if (error.caught) { return Promise.reject(error.caught) }
 		this.interactive = false
 		this.connect(sal)

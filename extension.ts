@@ -21,7 +21,7 @@ import {
 	GSLDocumentFormattingEditProvider
 } from './gsl'
 
-import { UAccessClient } from './gsl/uaccessClient'
+import { EAccessClient } from './gsl/uaccessClient'
 import { GameClientOptions } from './gsl/gameClients'
 import { GameTerminal } from './gsl/gameTerminal'
 import { ScriptCompileStatus, ScriptError, EditorClient } from './gsl/editorClient'
@@ -322,7 +322,7 @@ class VSCodeIntegration {
 		const captureError = (e: Error) => (error = e, void(0))
 
 		/* login */
-		const gameChoice = await UAccessClient.login(account, password, { name: /.*?development.*?/i }).catch(captureError)
+		const gameChoice = await EAccessClient.login(account, password, { name: /.*?development.*?/i }).catch(captureError)
 		if (!gameChoice) {
 			const message = error ? error.message : "Login failed?"
 			return void window.showErrorMessage(message)
@@ -551,11 +551,11 @@ export function activate (context: ExtensionContext) {
 	const vsc = new VSCodeIntegration (context)
 	// const els = new ExtensionLanguageServer (context)
 
-	UAccessClient.console = {
+	EAccessClient.console = {
 		log: (...args: any) => { vsc.outputGameChannel(args.join(' ')) }
 	}
 
-	UAccessClient.debug = true
+	EAccessClient.debug = true
 
 	GSLExtension.init(vsc)
 
