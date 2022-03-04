@@ -18,6 +18,10 @@ All notable changes to the GSL Editor extension will be documented in this file.
 - Various syntax highlighting fixes. - Oliver/Naos
 - The status bar will now properly timeout when checking the modification timestamp of a script.
 
+## [1.8.0] - 2022-03-03
+
+-- No change.  Accidental publish.
+
 ## [1.7.10] - 2020-07-24
 
 ### Added

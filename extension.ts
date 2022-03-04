@@ -136,7 +136,7 @@ export class GSLExtension {
 	static async checkModifiedDate (script: number) {
 		const error: any = (e: Error) => { error.caught = e }
 		const client = await this.vsc.ensureGameConnection().catch(error)
-		if (error.caught) { return void window.showErrorMessage(`Failed to connet to game: ${error.caught.message}`) }
+		if (error.caught) { return void window.showErrorMessage(`Failed to connect to game: ${error.caught.message}`) }
 		window.setStatusBarMessage(`Checking modification date for script ${script} ...`, 5000)
 		let scriptProperties = await client.checkScript(script).catch(error)
 		if (error.caught) { return void window.showErrorMessage(`Failed to check modification date: ${error.caught.message}`) }
@@ -471,12 +471,13 @@ class VSCodeIntegration {
 					const changelogPath = path.resolve(__dirname, './CHANGELOG.md')
 					commands.executeCommand('markdown.showPreview', Uri.file(changelogPath))
 				}
+				this.copySpellCheckFiles()
+				this.context.globalState.update(GSLX_SAVED_VERSION, version)
 			}
-			this.context.globalState.update(GSLX_SAVED_VERSION, version)
 		}
 	}
 
-	async spellCheckUpdate () {
+	async copySpellCheckFiles () {
 		let copyFile = false
 		let sourceFile = path.resolve(__dirname, './spellcheck/cspell.json')
 		let destinationFile = path.join(GSLExtension.getDownloadLocation(), 'cspell.json')
@@ -609,7 +610,6 @@ export function activate (context: ExtensionContext) {
 
 	vsc.checkForNewInstall()
 	vsc.checkForUpdatedVersion()
-	vsc.spellCheckUpdate()
 }
 
 export function deactivate () {

@@ -1,11 +1,20 @@
 {
     "version": "0.2",
-    "files": ["*.gsl"],
-    "dictionaries": ["GemStone"],
+    "files": [
+        "*.gsl"
+    ],
+    "enableFiletypes": [
+        "gsl"
+    ],
+    "minWordLength": 3,
+    "dictionaries": [
+        "GemStone"
+    ],
     "dictionaryDefinitions": [
         {
             "name": "GemStone",
-            "path": "./GemStoneDictionary.txt"
+            "path": "./GemStoneDictionary.txt",
+            "addWords": true
         }
     ],
     "includeRegExpList": [
