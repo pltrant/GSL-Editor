@@ -235,7 +235,7 @@
       },
       {
         "label": "GSL In The Sky With Naos",
-        "uiTheme": "vs",
+        "uiTheme": "vs-dark",
         "path": "./themes/gsl_naos.json"
       }
     ]
