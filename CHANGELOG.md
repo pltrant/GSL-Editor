@@ -2,6 +2,12 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.9.1] - 2022-03-11
+
+### Added
+
+- Add spellcheck to your code/comments by installing the [Code Spell Checker](https://marketplace.visualstudio.com/items?itemName=streetsidesoftware.code-spell-checker).  Follow the link, then click on the green Install button.  Next, open your Visual Studio Code Settings by hitting F1, then type in or copy/paste "Preferences: Open Settings (JSON)", and hit enter.  In the file, add this line `"cSpell.ignorePaths": []`, then save and close the file.
+
 ## [1.9.0] - 2022-03-03
 
 ### Added

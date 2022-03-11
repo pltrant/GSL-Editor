@@ -109,7 +109,7 @@
 		"body": [
 			"checkeffect ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|} code ${2:#}"
 		],
-		"description": "checkeffect {node} code {value expression}\n\nCheck for the existence of a specific effect on a node."
+		"description": "checkeffect {node} code {value expression}\n\nCheck for the existence of a specific effect on a node. If a matching effect is found, the following V variables are initialized:\n\n  V0 - Code of the effect\n  V1 - VALUE1 field of the effect\n  V2 - VALUE2 field of the effect\n  V3 - FLAGS field of the effect\n  V4 - Script ID# of the effect\n  V5 - Number of seconds left until this effect will trigger"
 	},
 	"clear": {
 		"prefix": "clear",
@@ -267,21 +267,21 @@
 		"body": [
 			"end2effect code ${1:#} value2 ${2:#} from ${3|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|}"
 		],
-		"description": "end2effect code {value expression} value2 {value expression} from {node}\n\nTerminate an effect from a node."
+		"description": "end2effect code {value expression} value2 {value expression} from {node}\n\nTerminate an effect from a node. V variables are not initialized."
 	},
 	"endeffect": {
 		"prefix": "endeffect",
 		"body": [
 			"endeffect code ${1:#} from ${2|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|}"
 		],
-		"description": "endeffect code {value expression} from {node}\n\nTerminate an effect from a node."
+		"description": "endeffect code {value expression} from {node}\n\nTerminate an effect from a node. V variables are not initialized."
 	},
 	"endneffect": {
 		"prefix": "endneffect",
 		"body": [
 			"endneffect ${1|A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,V0,V1,V2,V3,V4,V5,V6,V7,V8,V9,B0,B1,B2,B3,B4,B5,B6,B7,B8,B9|}"
 		],
-		"description": "endneffect {variable}\n\nTerminate next effect on a node."
+		"description": "endneffect {variable}\n\nTerminate next effect on a node. V variables are not initialized."
 	},
 	"expand": {
 		"prefix": "expand",
@@ -808,14 +808,14 @@
 		"body": [
 			"rem2effect code ${1:#} value2 ${2:#} from ${3|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|}"
 		],
-		"description": "rem2effect code {value expression} value2 {value expression} from {node}\n\nRemove an effect from a node with no script execution."
+		"description": "rem2effect code {value expression} value2 {value expression} from {node}\n\nRemove an effect from a node with no script execution. V variables are not initialized."
 	},
 	"remeffect": {
 		"prefix": "remeffect",
 		"body": [
 			"remeffect code ${1:#} from ${2|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|}"
 		],
-		"description": "remeffect code {value expression} from {node}\n\nRemove an effect from a node with no script execution."
+		"description": "remeffect code {value expression} from {node}\n\nRemove an effect from a node with no script execution. V variables are not initialized."
 	},
 	"remmenuitem": {
 		"prefix": "remmenuitem",
@@ -829,7 +829,7 @@
 		"body": [
 			"remneffect ${1|A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,V0,V1,V2,V3,V4,V5,V6,V7,V8,V9,B0,B1,B2,B3,B4,B5,B6,B7,B8,B9|}"
 		],
-		"description": "remneffect {variable}\n\nRemove next effect."
+		"description": "remneffect {variable}\n\nRemove next effect. V variables are not initialized."
 	},
 	"removevarfield": {
 		"prefix": "removevarfield",
@@ -913,7 +913,7 @@
 		"body": [
 			"scaneffect ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|} code ${2:#} value2 ${3:#}"
 		],
-		"description": "scaneffect {node} code {value expression} value2 {value expression}\n\nCheck for the existence of a specific effect on a node."
+		"description": "scaneffect {node} code {value expression} value2 {value expression}\n\nCheck for the existence of a specific effect on a node. If a matching effect is found, the following V variables are initialized:\n\n  V0 - Code of the effect\n  V1 - VALUE1 field of the effect\n  V2 - VALUE2 field of the effect\n  V3 - FLAGS field of the effect\n  V4 - Script ID# of the effect\n  V5 - Number of seconds left until this effect will trigger"
 	},
 	"script header": {
 		"prefix": "new",
@@ -994,14 +994,14 @@
 		"body": [
 			"test2effect ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|} code ${2:#} value2 ${3:#}"
 		],
-		"description": "test2effect {node} code {value expression} value2 {value expression}\n\nTest for an effect."
+		"description": "test2effect {node} code {value expression} value2 {value expression}\n\nTest for an effect. V variables are not initialized."
 	},
 	"testeffect": {
 		"prefix": "testeffect",
 		"body": [
 			"testeffect ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|} code ${2:#}"
 		],
-		"description": "testeffect {node} code {value expression}\n\nTest for an effect."
+		"description": "testeffect {node} code {value expression}\n\nTest for an effect. V variables are not initialized."
 	},
 	"tparse": {
 		"prefix": "tparse",
@@ -1078,14 +1078,14 @@
 		"body": [
 			"whereat ${1|NP0,NP1,NP2,NP3,NP4,NP5,NP6,NP7,NP8,NP9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9,NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NR0,NR1,NR2,NR3,NR4,NR5,NR6,NR7,NR8,NR9|} for ${2|A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,V0,V1,V2,V3,V4,V5,V6,V7,V8,V9,B0,B1,B2,B3,B4,B5,B6,B7,B8,B9|}"
 		],
-		"description": "whereat {node} for {node variable}\n\nDetermine exact location of node."
+		"description": "whereat {node} for {node variable}\n\nDetermine exact location of node. Potential results:\n\n  0 - ground\n  1 - inventory\n  2 - in\n  3 - on\n  4 - behind\n  5 - under"
 	},
 	"whereitem": {
 		"prefix": "whereitem",
 		"body": [
 			"whereitem ${1|NO0,NO1,NO2,NO3,NO4,NO5,NO6,NO7,NO8,NO9,NE0,NE1,NE2,NE3,NE4,NE5,NE6,NE7,NE8,NE9,NC0,NC1,NC2,NC3,NC4,NC5,NC6,NC7,NC8,NC9|} for ${2|S0,S1,S2,S3,S4,S5,S6,S7,S8,S9,T0,T1,T2,T3,T4,T5,T6,T7,T8,T9|}"
 		],
-		"description": "whereitem {node} for {node variable}\n\nFind the type of a node's location."
+		"description": "whereitem {node} for {string variable}\n\nFind the type of a node's location. Potential results:\n\n  \"\"  - node is not located anywhere\n  \"r\" - node is located to a room\n  \"p\" - node is located to a player\n  \"o\" - node is located to a object"
 	},
 	"writechar": {
 		"prefix": "writechar",

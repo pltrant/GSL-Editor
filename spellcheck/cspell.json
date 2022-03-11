@@ -1,8 +1,5 @@
 {
     "version": "0.2",
-    "files": [
-        "*.gsl"
-    ],
     "enableFiletypes": [
         "gsl"
     ],
@@ -14,15 +11,35 @@
         {
             "name": "GemStone",
             "path": "./GemStoneDictionary.txt",
-            "addWords": true
+            "type": "C"
         }
     ],
-    "includeRegExpList": [
-        "\"(.*?)\""
-    ],
-    "ignoreRegExpList": [
-        "callmatch.*\"(.*?)\"",
-        "set \\$MATCH to \"(.*?)\"",
-        "\\:\\s+\"(.*?)\""
+    "languageSettings":[
+        {
+            "languageId": [
+                "gsl"
+            ],
+            "includeRegExpList": [
+                "\"(.*?)\""                                // Any string between quotes
+            ],
+            "ignoreRegExpList": [
+                "callmatch.*?\"(.*?)\"",                   // callmatch must_match "$TEST_UPDATE" in $THISSCRIPT
+                "set \\$MATCH to \"(.*?)\"",               // set $MATCH to "$TEST_UPDATE"
+                "\\:\\s+\"(.*?)\"",                        // : "$TEST_UPDATE"
+                "\\$[$|Q|R]",                              // msgp "$R$P0 said, $QHello.$Q"
+                "\\$:\\$(\\w*)",                           // msgp "Game is $:$GAMECODE."
+                "(add|removevar)group \"(.*?)\"",          // addgroup "datastore" to NO1
+                "is(not)?oftype \"(.*?)\""                 // NO1 isoftype "datastore"
+            ],
+            "flagWords": [
+                "he",
+                "she",
+                "his",
+                "him",
+                "her",
+                "himself",
+                "herself"
+            ]
+        }
     ]
 }
