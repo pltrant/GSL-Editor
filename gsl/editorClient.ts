@@ -35,8 +35,9 @@ const rx_aborted = /(?:Script edit|Modification) aborted\./
 const rx_getverb = /Error: Script #(?<script>\d+) is a verb\. Please use (?<command>.*?) instead\./
 const rx_noscript = /Error\: Script \#\d+ has not been created yet\./
 const rx_noverb = /Verb not found\./
+const rx_newscript = /New File\: \.\.\/scripts\/S(\d+)\.gsl\./
 
-const rx_ready = /READY FOR ASCII UPLOAD/
+const rx_ready = /(?:READY FOR ASCII UPLOAD)|(?:Continuing\:)/
 
 const rx_compiling = /^Compiling GSL script\: (?<script>\d+) \[(\d+)\]\[(?<path>.*?)\]$/
 const rx_compile_ok = /^Compile OK\.  (?<warnings>\d+) Warnings\.  Size\: (?<bytes>[0-9,]+) bytes \(of (?<maxBytes>[0-9,]+) available\)$/
@@ -46,7 +47,7 @@ const rx_compile_error = /^\s*(?<line>\d+)\s:\s(?<message>.*?)$/
 
 const rx_compiled = /Compile ok\./
 
-const rx_modified = /^On (?<dow>\w+) (?<month>\w+) (?<day>\d+) (?<hh>\d+)\:(?<mm>\d+)\:(?<ss>\d+) (?<year>\d+)$/
+const rx_modified = /^On\s(?<dow>\w+)\s(?<month>\w+) \s?(?<day>\d+) (?<hh>\d+)\:(?<mm>\d+)\:(?<ss>\d+) (?<year>\d+)$/
 const rx_details = /(?:^Name\: (?<name>.*?)$)|(?:^Desc\: (?<desc>.*?)$)|(?:^Owned by: (?<owner>.*?)$)|(?:^Last modified by: (?<modifier>.*?)$)|(?:^(?<new>New)? ?File\: (?<path>.*?)(?:, (?<lines>\d+) lines?)?\.$)/
 
 const monthList = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -146,7 +147,7 @@ export class EditorClient extends BaseGameClient {
 		})
 	}
 	
-	modifyScript (script: number | string): Promise<ScriptProperties> {
+	modifyScript (script: number | string, noQuit?:boolean): Promise<ScriptProperties> {
 		const scriptProperties: any = {}
 		return new Promise ((resolve, reject) => {
 			const modifyFailed = (reason: string) => {
@@ -186,7 +187,13 @@ export class EditorClient extends BaseGameClient {
 			const timeout = setTimeout(() => modifyFailed("Modification timed out."), delay)
 			const processText = (text: string) => {
 				output.accumulate(text)
-				if (output.peek() === 'Edt:') {
+				switch (true) {
+				case (output.peek(5) === '001] '):
+					if (noQuit !== true) {
+						this.send('')
+						this.send('Q')
+					}
+				case (output.peek(4) === 'Edt:'):
 					clearTimeout(timeout)
 					this.off('text', processText)
 					resolve(scriptProperties)
@@ -209,7 +216,7 @@ export class EditorClient extends BaseGameClient {
 			const timeout = setTimeout(() => captureFailed("Capture timed out."), delay)
 			const processText = (text: string) => {
 				output.accumulate(text)
-				if (output.peek() === 'Edt:') {
+				if (output.peek(4) === 'Edt:') {
 					clearTimeout(timeout)
 					this.off('text', processText)
 					this.send('Q')
@@ -221,7 +228,7 @@ export class EditorClient extends BaseGameClient {
 		})
 	}
 	
-	sendScript (lines: Array<string>): Promise<ScriptCompileResults> {
+	sendScript (lines: Array<string>, newScript: boolean): Promise<ScriptCompileResults> {
 		return new Promise ((resolve, reject) => {
 			const compileResults: ScriptCompileResults = {
 				script: 0, path: '', bytes: 0, errors: 0, warnings: 0, errorList: [], status: ScriptCompileStatus.Unknown
@@ -270,7 +277,7 @@ export class EditorClient extends BaseGameClient {
 			})
 			const processText = (text: string) => {
 				output.accumulate(text)
-				if (output.peek() === 'Edt:') {
+				if (output.peek(4) === 'Edt:') {
 					if (compileResults.status === ScriptCompileStatus.Uploaded) {
 						this.send('G')
 					} else if (compileResults.status === ScriptCompileStatus.Compiled) {
@@ -282,7 +289,7 @@ export class EditorClient extends BaseGameClient {
 				}
 			}
 			this.on('text', processText)
-			this.trySend('Z')
+			this.trySend(newScript ? this.newLine + 'C' : 'Z')
 		})
 	}
 
