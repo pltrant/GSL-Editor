@@ -1,9 +1,9 @@
-**/scripts/*
-**/S[0-9][0-9][0-9][0-9][0-9]
-**/*.gsl
+*.gsl
+scripts/
+**/*.map
 **/*.ts
 **/tsconfig.json
 **/.gitignore
 **/.vscodeignore
-original_extension.js
 gsl-language-server/src/*
+.vscode/

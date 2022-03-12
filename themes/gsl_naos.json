@@ -1,5 +1,5 @@
 {
-    "name": "Naos In The Sky",
+    "name": "GSL In The Sky With Naos",
 	"type": "dark",
 	"$schema": "vscode://schemas/color-theme",
 	"include": "./dark_plus.json",

@@ -27,18 +27,13 @@ import { GameTerminal } from './gsl/gameTerminal'
 import { ScriptCompileStatus, ScriptError, EditorClient } from './gsl/editorClient'
 
 const GSL_LANGUAGE_ID = 'gsl'
-
 const GSLX_DEV_ACCOUNT = 'developmentAccount'
 const GSLX_DEV_INSTANCE = 'developmentInstance'
 const GSLX_DEV_CHARACTER = 'developmentCharacter'
-
 const GSLX_NEW_INSTALL_FLAG = 'gslExtNewInstallFlag'
 const GSLX_SAVED_VERSION = 'savedVersion'
-
 const GSLX_DISABLE_LOGIN = 'disableLoginAttempts'
-
 const GSLX_KEYTAR_KEY = 'GSL-Editor'
-
 const rx_script_number = /^\d{1,5}$/
 
 export class GSLExtension {
@@ -144,7 +139,7 @@ export class GSLExtension {
 	static async checkModifiedDate (script: number) {
 		const error: any = (e: Error) => { error.caught = e }
 		const client = await this.vsc.ensureGameConnection().catch(error)
-		if (error.caught) { return void window.showErrorMessage(`Failed to connet to game: ${error.caught.message}`) }
+		if (error.caught) { return void window.showErrorMessage(`Failed to connect to game: ${error.caught.message}`) }
 		window.setStatusBarMessage(`Checking modification date for script ${script} ...`, 5000)
 		let scriptProperties = await client.checkScript(script).catch(error)
 		if (error.caught) { return void window.showErrorMessage(`Failed to check modification date: ${error.caught.message}`) }
@@ -479,8 +474,34 @@ class VSCodeIntegration {
 					const changelogPath = path.resolve(__dirname, './CHANGELOG.md')
 					commands.executeCommand('markdown.showPreview', Uri.file(changelogPath))
 				}
+				this.copySpellCheckFiles()
+				this.context.globalState.update(GSLX_SAVED_VERSION, version)
 			}
-			this.context.globalState.update(GSLX_SAVED_VERSION, version)
+		}
+	}
+
+	async copySpellCheckFiles () {
+		let copyFile = false
+		let sourceFile = path.resolve(__dirname, './spellcheck/cspell.json')
+		let destinationFile = path.join(GSLExtension.getDownloadLocation(), 'cspell.json')
+		if (!fs.existsSync(destinationFile)) {
+			copyFile = true
+		} else if (fs.statSync(sourceFile).mtime > fs.statSync(destinationFile).mtime) {
+			copyFile = true
+		}
+		if (copyFile) {
+			fs.copyFile(sourceFile, destinationFile, () => {})
+		}
+		copyFile = false
+		sourceFile = path.resolve(__dirname, './spellcheck/GemStoneDictionary.txt')
+		destinationFile = path.join(GSLExtension.getDownloadLocation(), 'GemStoneDictionary.txt')
+		if (!fs.existsSync(destinationFile)) {
+			copyFile = true
+		} else if (fs.statSync(sourceFile).mtime > fs.statSync(destinationFile).mtime) {
+			copyFile = true
+		}
+		if (copyFile) {
+			fs.copyFile(sourceFile, destinationFile, () => {})
 		}
 	}
 
@@ -549,7 +570,6 @@ class ExtensionLanguageServer {
 	}
 }
 
-
 export function activate (context: ExtensionContext) {
 	const vsc = new VSCodeIntegration (context)
 	// const els = new ExtensionLanguageServer (context)
@@ -558,7 +578,7 @@ export function activate (context: ExtensionContext) {
 		log: (...args: any) => { vsc.outputGameChannel(args.join(' ')) }
 	}
 
-	EAccessClient.debug = true
+	EAccessClient.debug = false
 
 	GSLExtension.init(vsc)
 
@@ -596,7 +616,4 @@ export function activate (context: ExtensionContext) {
 }
 
 export function deactivate () {
-
 }
-
-

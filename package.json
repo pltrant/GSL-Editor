@@ -2,7 +2,7 @@
   "name": "gsl",
   "displayName": "GSL",
   "description": "GSL Editor",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "publisher": "patricktrant",
   "author": {
     "name": "Patrick Trant",
@@ -22,7 +22,7 @@
     "url": "https://github.com/pltrant/GSL-Editor/issues"
   },
   "activationEvents": [
-    "*"
+    "onStartupFinished"
   ],
   "engines": {
     "vscode": "^1.43.0"
@@ -232,6 +232,11 @@
         "label": "GSL Light",
         "uiTheme": "vs",
         "path": "./themes/gsl_light.json"
+      },
+      {
+        "label": "GSL In The Sky With Naos",
+        "uiTheme": "vs-dark",
+        "path": "./themes/gsl_naos.json"
       }
     ]
   }
