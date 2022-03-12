@@ -18,7 +18,7 @@ const defaultConsole = { log: () => {} }
 export class BaseGameClient extends EventEmitter {
 	protected server?: ServerConnection
 
-	private newLine: string
+	protected newLine: string
 
 	private debug: boolean
 	private echo: boolean

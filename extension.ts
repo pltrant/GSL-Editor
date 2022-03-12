@@ -76,23 +76,26 @@ export class GSLExtension {
 		if (client) {
 			const scriptProperties = await client.modifyScript(script).catch(error)
 			if (error.caught) { return void window.showErrorMessage(error.caught.message) }
-			let content = await client.captureScript().catch(error)
-			if (error.caught) { return void window.showErrorMessage(`Failed to download script: ${error.caught.message}`) }
-			if (content) {
-				if (content.slice(-4) !== '\r\n\r\n') { content += '\r\n' }
-				const scriptFile = scriptProperties.path.split('/').pop()!
-				const scriptPath = path.join(downloadPath, scriptFile)
-				fs.writeFileSync(scriptPath, content)
-				const document = await workspace.openTextDocument(scriptPath)
-				const editor = await window.showTextDocument(document, { preview: false })
-				if (gotoDef) {
-					const gotoRegExp = new RegExp(`:\s+${gotoDef}`)
-					for (let n = 0, nn = document.lineCount; n < nn; n++) {
-						const line = document.lineAt(n)
-						if (line.text.match(gotoRegExp)) {
-							commands.executeCommand('revealLine', { lineNumber: n, at: 'center' })
-							break
-						}
+			const scriptFile = scriptProperties.path.split('/').pop()!
+			const scriptPath = path.join(downloadPath, scriptFile)
+			if (scriptProperties.new) { fs.writeFileSync(scriptPath, "") } else {
+				let content = await client.captureScript().catch(error)
+				if (error.caught) { return void window.showErrorMessage(`Failed to download script: ${error.caught.message}`) }
+				if (content) {
+					if (content.slice(-2) !== '\r\n') { content += '\r\n' }
+					fs.writeFileSync(scriptPath, content)
+				}
+			}
+			// open the script file and maybe navigagte to definition
+			const document = await workspace.openTextDocument(scriptPath)
+			const editor = await window.showTextDocument(document, { preview: false })
+			if (gotoDef) {
+				const gotoRegExp = new RegExp(`:\s+${gotoDef}`)
+				for (let n = 0, nn = document.lineCount; n < nn; n++) {
+					const line = document.lineAt(n)
+					if (line.text.match(gotoRegExp)) {
+						commands.executeCommand('revealLine', { lineNumber: n, at: 'center' })
+						break
 					}
 				}
 			}
@@ -112,9 +115,9 @@ export class GSLExtension {
 				lines.push(document.lineAt(n).text)
 			}
 			if (lines[lines.length - 1] !== '') { lines.push('') }
-			let scriptProperties = await client.modifyScript(script).catch(error)
+			let scriptProperties = await client.modifyScript(script, true).catch(error)
 			if (error.caught) { return void window.showErrorMessage(error.caught.message) }
-			let compileResults = await client.sendScript(lines).catch(error)
+			let compileResults = await client.sendScript(lines, !(scriptProperties.new === undefined)).catch(error)
 			if (error.caught) { return window.showErrorMessage(error.caught.message) }
 			if (compileResults.status === ScriptCompileStatus.Failed) {
 				const problems = compileResults.errorList.map((error: ScriptError) => {
