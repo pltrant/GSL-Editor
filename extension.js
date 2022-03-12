@@ -58,27 +58,33 @@ class GSLExtension {
             if (error.caught) {
                 return void vscode_2.window.showErrorMessage(error.caught.message);
             }
-            let content = await client.captureScript().catch(error);
-            if (error.caught) {
-                return void vscode_2.window.showErrorMessage(`Failed to download script: ${error.caught.message}`);
+            const scriptFile = scriptProperties.path.split('/').pop();
+            const scriptPath = path.join(downloadPath, scriptFile);
+            if (scriptProperties.new) {
+                fs.writeFileSync(scriptPath, "");
             }
-            if (content) {
-                if (content.slice(-4) !== '\r\n\r\n') {
-                    content += '\r\n';
+            else {
+                let content = await client.captureScript().catch(error);
+                if (error.caught) {
+                    return void vscode_2.window.showErrorMessage(`Failed to download script: ${error.caught.message}`);
                 }
-                const scriptFile = scriptProperties.path.split('/').pop();
-                const scriptPath = path.join(downloadPath, scriptFile);
-                fs.writeFileSync(scriptPath, content);
-                const document = await vscode_2.workspace.openTextDocument(scriptPath);
-                const editor = await vscode_2.window.showTextDocument(document, { preview: false });
-                if (gotoDef) {
-                    const gotoRegExp = new RegExp(`:\s+${gotoDef}`);
-                    for (let n = 0, nn = document.lineCount; n < nn; n++) {
-                        const line = document.lineAt(n);
-                        if (line.text.match(gotoRegExp)) {
-                            vscode_2.commands.executeCommand('revealLine', { lineNumber: n, at: 'center' });
-                            break;
-                        }
+                if (content) {
+                    if (content.slice(-2) !== '\r\n') {
+                        content += '\r\n';
+                    }
+                    fs.writeFileSync(scriptPath, content);
+                }
+            }
+            // open the script file and maybe navigagte to definition
+            const document = await vscode_2.workspace.openTextDocument(scriptPath);
+            const editor = await vscode_2.window.showTextDocument(document, { preview: false });
+            if (gotoDef) {
+                const gotoRegExp = new RegExp(`:\s+${gotoDef}`);
+                for (let n = 0, nn = document.lineCount; n < nn; n++) {
+                    const line = document.lineAt(n);
+                    if (line.text.match(gotoRegExp)) {
+                        vscode_2.commands.executeCommand('revealLine', { lineNumber: n, at: 'center' });
+                        break;
                     }
                 }
             }
@@ -102,11 +108,11 @@ class GSLExtension {
             if (lines[lines.length - 1] !== '') {
                 lines.push('');
             }
-            let scriptProperties = await client.modifyScript(script).catch(error);
+            let scriptProperties = await client.modifyScript(script, true).catch(error);
             if (error.caught) {
                 return void vscode_2.window.showErrorMessage(error.caught.message);
             }
-            let compileResults = await client.sendScript(lines).catch(error);
+            let compileResults = await client.sendScript(lines, !(scriptProperties.new === undefined)).catch(error);
             if (error.caught) {
                 return vscode_2.window.showErrorMessage(error.caught.message);
             }
