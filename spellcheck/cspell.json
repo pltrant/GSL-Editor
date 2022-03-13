@@ -11,7 +11,7 @@
         {
             "name": "GemStone",
             "path": "./GemStoneDictionary.txt",
-            "type": "C"
+            "type": "W"
         }
     ],
     "languageSettings":[
@@ -19,6 +19,7 @@
             "languageId": [
                 "gsl"
             ],
+            "caseSensitive": true,
             "includeRegExpList": [
                 "\"(.*?)\""                                // Any string between quotes
             ],
@@ -30,15 +31,6 @@
                 "\\$:\\$(\\w*)",                           // msgp "Game is $:$GAMECODE."
                 "(add|removevar)group \"(.*?)\"",          // addgroup "datastore" to NO1
                 "is(not)?oftype \"(.*?)\""                 // NO1 isoftype "datastore"
-            ],
-            "flagWords": [
-                "he",
-                "she",
-                "his",
-                "him",
-                "her",
-                "himself",
-                "herself"
             ]
         }
     ]

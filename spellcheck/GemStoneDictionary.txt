@@ -1,13 +1,20 @@
+!he
+!her
+!herself
+!him
+!himself
+!his
+!she
 acantha
 acerbic
 adamantine
 adytum
 adze
 aegis
-aeia
+Aeia
 aelotoi
 aemikvai
-aenatumgana
+Aenatumgana
 aeneous
 aetherstone
 affable
@@ -33,20 +40,20 @@ almsbox
 aloeas
 alum
 amaranthine
-amasalen
+Amasalen
 ambrominas
 amphorae
-andelas
-anfelt
+Andelas
+Anfelt
 angargeist
 angon
 Angstholm
 apotl
 apotla
 aqilorn
-arachne
+Arachne
 arahni
-Araime
+Araime Sun Clan
 arbalest
 arbalester
 arcanist
@@ -120,7 +127,7 @@ binnol
 bisacuta
 bistre
 biwa
-black ora
+Black Swan Castle
 black-ora
 bladed-disc
 bladed-ring
@@ -130,7 +137,7 @@ bladestaff
 blithe
 bloodletter
 blood-marble
-bloodriven
+Bloodriven Village
 bloodspeaker
 bludgeon
 bludgeoner
@@ -142,7 +149,6 @@ bolmara
 bolthurler
 boltmaster
 boltwielder
-Borthuum
 bouche
 bouk
 bourde
@@ -162,7 +168,7 @@ Brughan
 brusque
 buffcoat
 bulawa
-burghal gnome
+burghal
 burgonet
 burnoose
 byrnie
@@ -193,8 +199,8 @@ cestus
 chainsil
 chakram
 chamois
-charl
-charl's-tail
+Charl
+Charl's-tail
 charmeuse
 chartreuse
 Chastonia
@@ -202,7 +208,7 @@ chasuble
 chatelaine
 chausses
 chereb
-cholen
+Cholen
 chopine
 chopines
 cinereous
@@ -220,6 +226,7 @@ cooldown
 cope
 coracia
 coraesine
+Coraesine Forest
 corbeau
 cordovan
 corestone
@@ -244,13 +251,12 @@ cyclas
 cysaegir
 daggerbeak
 D'ahranals
-dai
 damson
-dark elf
 darkwoode
 dataprop
 deathsworn
 decorous
+Delirium Manor
 delphinium
 demonmaster
 demonmistress
@@ -258,6 +264,7 @@ deringo
 despondent
 dhara
 Dhe'nar
+Dhu Gillywack
 direbear
 direwolf
 dirk
@@ -272,23 +279,26 @@ draken
 draugr
 dreadnaught
 droughtman
+Droughtman's Challenge
 dubonnet
 duckfoot
 dun
-duskruin
+Duskruin Arena
 dwarf
 eahnor
 earthdelver
+Eastern Seaboard
+Ebon Gate
 eburnean
 ecru
-Egrentek
+Egrentek Clan
 elanthia
 electrum
 elementalist
 elesine
 elf
 elm
-Eloth
+Eloth Dai
 elothrai
 elven
 empath
@@ -296,9 +306,9 @@ enarmes
 enchiridion
 enhancive
 enshai
-eonak
+Eonak
 eonake
-eorgina
+Eorgina
 epee
 ephlox
 erithian
@@ -317,7 +327,7 @@ falcata
 falx
 farlook
 farszig
-fash'lo'nae
+Fash'lo'nae
 faulds
 fawn
 fel
@@ -345,8 +355,8 @@ floog
 flyrsilk
 flyssa
 foehn
+Foehn's Promise
 foil
-forest gnome
 forestwalker
 forte
 fortuneer
@@ -374,7 +384,7 @@ gardbrace
 gauntlets
 geldaralad
 ghashza
-ghezresh
+Ghezresh
 ghezyte
 giantman
 glacei
@@ -386,6 +396,7 @@ glib
 glowbark
 gnarp
 gnoll
+gnome
 Gob'tak
 goleras
 goliah
@@ -394,26 +405,29 @@ goodwoman
 gorefrost
 gorget
 gornar
-gosaena
-Gotronek
+Gosaena
+Gotronek Clan
 goupillon
 gousset
 grahnk
+Great Western Sea
 Greengair
 greenwing
 gremlock
-Grenroa
-Grevnek
+Grenroa Clan
+Grevnek Clan
 gridelin
 grifflet
 grimoire
 grimswarm
 Grishknel
+Grishknel Wolf Clan
 grosgrain
 Grot'karesh
+Grot'karesh Hammer Clan
 grutik
 gsl
-Gulroten
+Gulroten Clan
 gyrovague
 haft
 hakapik
@@ -436,12 +450,11 @@ Hendor
 hennin
 herbmaster
 herbmistress
-high steel
 Highmount
 hillman
 hilt
 hinterboar
-hinterwilds
+Hinterwilds
 hippe
 hiresword
 hisskra
@@ -460,15 +473,15 @@ hujuura
 human
 huntmaster
 huntmistress
-huntress
+Huntress
 icebringer
-icemule
+Icemule Trace
 ikarrak
 Illistim
 illoke
 illthorn
 ilvari
-imaera
+Imaera
 imbeddable
 imflass
 imperious
@@ -482,23 +495,25 @@ irascible
 iron
 ironwood
 isiqiri
+Isle of Ornath
 Issimir
+Issimir Ogre Clan
 ithzir
-ivas
-ivasian
+Ivas
+Ivasian
 jackblade
 jaculum
 Jantalar
 jantalarian
-jastev
-jaston
+Jastev
+Jaston
 jazerant
 jeddart-axe
 jitte
 jonquil
 justicar
 kaftan
-kai
+Kai
 kakore
 kama
 kanjiqi
@@ -506,17 +521,18 @@ kanjir
 kaskara
 katana
 katzbalger
-Kazunel
+Kazunel Clan
 kelyn
 kerambit
 kerven
 Khanshael
-kharag 'doth dzulthu
+Kharag 'doth Dzulthu
+Kharam Dzu
 khazurka
 kheten
 khopesh
 kickboxer
-Kikthuum
+Kikthuum Clan
 kilij
 kiramon
 kirtle
@@ -527,7 +543,7 @@ klys
 klysmar
 knifeman
 knopkierie
-koar
+Koar
 ko'nag
 koncerz
 kopis
@@ -535,9 +551,9 @@ kora
 korseke
 kozuka
 krag
-kraken's fall
-Krenlumtrek
-Krethuum
+Kraken's Fall
+Krenlumtrek Clan
+Krethuum Clan
 kris
 krizta
 krodera
@@ -549,7 +565,7 @@ krytze
 kubikiri
 kumade
 kunai
-kuon
+Kuon
 kurutai
 kurzsax
 kut
@@ -558,7 +574,7 @@ kut'zikokra
 Kytawa
 kyuak
 laborious
-laethe
+Laethe
 laje
 lamellar
 lames
@@ -570,8 +586,8 @@ Lassaran
 lavaliere
 lectionary
 leine
-leya
-liabo
+Leya
+Liabo
 lich
 limned
 lisan
@@ -586,25 +602,26 @@ lor
 loremaster
 loremistress
 loresinger
-lorminstra
-lornon
+Lorminstra
+Lornon
 loupe
 lovat
 low steel
-lumnis
+Lumnis
 lupine
 lutk
 lutk'azi
 lutk'quoab
-luukos
+Luukos
 lyraigne
 lysard
 machera
 madder
 madrinol
-Maeramil
+Maeramil Wind Runner Clan
 magari-yari
 magru
+Makiri
 malachite
 maledictor
 Malghava
@@ -614,7 +631,7 @@ manticore
 maoral
 marabou
 marbrinus
-marlu
+Marlu
 massuelle
 matchmarker
 mattina
@@ -635,20 +652,21 @@ Mhoragian
 mignonette
 misericord
 missal
-mistydeep
+Mist Harbor
+Mistydeep
 mithglin
-Mithrenek
+Mithrenek Clan
 mithril
 modwir
 moire
-Mordrakam
+Mordrakam Clan
 morduska
 morion
 mossbark
 moulis
 moyles
 mrae'ni
-mularos
+Mularos
 mulberry
 munnions
 myklian
@@ -661,18 +679,21 @@ nagyka
 naisirc
 Nalfein
 nanjir
-Nathala
+Nathala Dai
 nazhor
-neartofar
+Neartofar
 n'ecare
 nedum vereri
+Needle of Pentas
 Neimhean
 ne'rutka
+New Ta'Faendryl
 niello
 nifa
+Night At the Academy
 nightstalker
-niima
-niima's-embrace
+Niima
+Niima's-embrace
 niirsha
 nitid
 niveous
@@ -688,15 +709,15 @@ ochre
 octavo
 ogee
 Oire
-oleani
-Oltregek
-onar
+Old Ta'Faendryl
+Oleani
+Oltregek Clan
+Onar
 oncin
 ono
 opisthenar
 ora
 orase
-ornath
 orrery
 otti
 ottrar
@@ -711,7 +732,7 @@ palestra
 pantofles
 Paradis
 parazonium
-Parkshnuum
+Parkshnuum Clan
 partisan
 pata
 pattens
@@ -723,6 +744,7 @@ pedantic
 peevish
 pelisse
 pelta
+Pennant Chase
 pergulae
 periapt
 periperiu
@@ -732,7 +754,7 @@ perspicacious
 phantasma
 phelerae
 phlebotomist
-phoen
+Phoen
 phylactery
 phyon
 phytologist
@@ -741,7 +763,7 @@ pid
 pike
 pill
 pilum
-pinefar
+Pinefar
 pinsons
 piqued
 pixane
@@ -778,9 +800,9 @@ quoit
 qyn'arj
 rabblerouser
 Rafi'kaes
-Ragnak
+Ragnak Clan
 raihken
-Ralgrenek
+Ralgrenek Clan
 ramie
 ramie-linen
 ramie-silk
@@ -788,7 +810,7 @@ ranseur
 razern
 razorpaw
 reaver
-reim
+Reim
 reiver
 relnak
 rerebrace
@@ -797,20 +819,22 @@ reticule
 retrousse
 revelin
 rezga
-Reznek
+Reznek Clan
 rhimar
 ricasso
 ridgeback
 ridgeweaver
+Rift
+River's Rest
 rivertears
 Riverwood
 roa'ter
 roestone
 rolaren
 rolton
-ronan
+Ronan
 rondel
-Roramnoak
+Roramnoak Clan
 Rosengift
 rostrum
 roundtime
@@ -849,12 +873,13 @@ sarum
 scarpines
 schiavona
 schlager
-Schneckgren
+Schneckgren Clan
 schynbalds
 scramasax
 scrimshaw
 scutum
 scythe
+Sea of Fire
 Seareach
 seax
 seer-stone
@@ -876,11 +901,11 @@ shambler
 shamisen
 shamorf
 shamshir
-Sharznekgren
+Sharznekgren Clan
 shaundara
 shelfae
-sheru
-sheruvian
+Sheru
+Sheruvian
 shield-breaker
 shield-sunderer
 shield-sword
@@ -900,7 +925,7 @@ skayl
 sket
 slasher
 sledgehammer
-Smaelton
+Smaelton Clan
 smaragdine
 smoldereye
 snath
@@ -909,7 +934,7 @@ snoskyn
 snowcat
 snowrunner
 solacebringer
-solhaven
+Solhaven
 solleret
 songmaster
 songmistress
@@ -943,7 +968,8 @@ stonecaller
 stormcaller
 strident
 sudis
-Surath
+Summit Academy
+Surath Dai
 surita
 surreptitious
 sword-breaker
@@ -954,20 +980,21 @@ Swu'lin
 sylvankind
 sympath
 synobj
-T’Kirem
+T’Kirem Bear Clan
 Ta'Ardenai
 taavish
 tabar
 tachi
 Ta'Faendryl
-ta'illistim
+Ta'Illistim
 takouba
-talador
+Talador
 talneo
 Ta'Loenthra
+Talon Isle
 tambara
 Ta'Nalfein
-ta'niira
+Ta'Niira
 tanik
 tanto
 taper
@@ -975,35 +1002,37 @@ tar'toph
 tassets
 taun'tor
 taupe
-ta'vaalor
+Ta'Vaalor
 tegu
 tegursh
 tehir
 telepath
-teras
+Tenebrous Cauldron
+Teras
 teskha
 tetsubo
 thrak
 thrak-bite
 thyril
-Tichan
-tilamaire
+Tichan Dai
+Tilamaire
+Tilaok
 timberwolf
 tippit
 tizona
 tkaro
 tock
 tocke
-Toktrog
+Toktrog Clan
 tomahawk
-tonis
+Tonis
 tonlet
 tonsure
 toporok
 toqua
 torban
 Torre
-tosak'dusalla
+Tosak'dusalla
 toyak
 trailsman
 trali
@@ -1012,12 +1041,13 @@ treekin
 t'rhet
 trinette
 triptych
+Troubled Waters
 trukt
 truncheon
 tsark
 tuck
 tuille
-turamzzyrian
+Turamzzyrian
 tvekre
 t'vrak
 two-hander
@@ -1037,7 +1067,8 @@ vaalorn
 vaer'sah
 vaespilon
 Vaikalimara
-Valaka
+Vaikalimara Clan
+Valaka Dai
 valravn
 vambraces
 vamplate
@@ -1065,17 +1096,17 @@ vinaceous
 vinous
 virid
 viridian
-voaris
+Voaris
 vociferous
-voln
-Volnath
+Voln
+Volnath Dai
 Vornavis
 vor'taz
 vortece
 voulge
 vourkha
 vruul
-v'tull
+V'tull
 vultite
 vvrael
 Vylem
@@ -1093,7 +1124,7 @@ waspish
 waterweb
 wavedancer
 weaponmaster
-wehnimer
+Wehnimer's Landing
 weighted-cord
 Wendwillow
 wenge
@@ -1128,13 +1159,13 @@ woundmistress
 woundtender
 wrathbringer
 wrotwood
-Wsalamir
+Wsalamir Arctic Clan
 wyrd
 wyrm
 wyrwood
 xazkruvrixis
 xiphos
-Yachan
+Yachan Dai
 yari
 yataghan
 yatane
@@ -1146,9 +1177,9 @@ yierka
 yierka-spur
 yoribo
 yumi
-yuriqen
+Yuriqen
 zaffre
-zelia
+Zelia
 zelnorn
 zevt
 zevt'zko
@@ -1156,6 +1187,6 @@ zevt'zkokra
 zinnor
 zirah
 zorchar
-zul logoth
+Zul Logoth
 zweihander
 zydris
