@@ -2,11 +2,19 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
-## [1.9.1] - 2022-03-11
+## [1.9.1] - 2022-03-13
 
 ### Added
 
 - Add spellcheck to your code/comments by installing the [Code Spell Checker](https://marketplace.visualstudio.com/items?itemName=streetsidesoftware.code-spell-checker).  Follow the link, then click on the green Install button.  Next, open your Visual Studio Code Settings by hitting F1, then type in or copy/paste "Preferences: Open Settings (JSON)", and hit enter.  In the file, add this line `"cSpell.ignorePaths": []`, then save and close the file.
+
+### Changed
+
+- Updated the formatter to replace smart quotes with normal quotes. [Oliver/Naos]
+
+### Fixed
+
+- Better support for downloading new/empty scripts. [Oliver/Naos]
 
 ## [1.9.0] - 2022-03-03
 
@@ -16,12 +24,12 @@ All notable changes to the GSL Editor extension will be documented in this file.
 
 ### Changed
 
-- Rewrote extension to TypeScript. - Oliver/Naos
-- EAccess login now uses an encrypted (TLS) connection. - Oliver/Naos
+- Rewrote extension to TypeScript. [Oliver/Naos]
+- EAccess login now uses an encrypted (TLS) connection. [Oliver/Naos]
 
 ### Fixed
 
-- Various syntax highlighting fixes. - Oliver/Naos
+- Various syntax highlighting fixes. [Oliver/Naos]
 - The status bar will now properly timeout when checking the modification timestamp of a script.
 
 ## [1.8.0] - 2022-03-03
@@ -237,7 +245,7 @@ No change.  Publish error bumped up to 1.5.0.
 ### Added
 
 - New installations of the extension will now prompt users to apply the GSL Vibrant theme.
-- New "Download To Workspace" setting, which when enabled, will download scripts to your currently opened folder. - Oliver/Naos
+- New "Download To Workspace" setting, which when enabled, will download scripts to your currently opened folder. [Oliver/Naos]
 
 ### Changed
 
@@ -247,7 +255,7 @@ No change.  Publish error bumped up to 1.5.0.
 ### Fixed
 
 - Adjusted game login Status Bar text to only display when connecting.
-- Langauge definition update for callmatch pattern. - Oliver/Naos
+- Langauge definition update for callmatch pattern. [Oliver/Naos]
 
 ## [1.0.5] - 2017-09-21
 
