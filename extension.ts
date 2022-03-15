@@ -456,9 +456,8 @@ class VSCodeIntegration {
 			const choice = await window.showInformationMessage(message, option)
 			if (choice === option) {
 				await workspace.getConfiguration().update('workbench.colorTheme', 'GSL Vibrant', true)
-
 			}
-		}
+		} else { this.context.globalState.update(GSLX_NEW_INSTALL_FLAG, true) }
 	}
 
 	async checkForUpdatedVersion () {
