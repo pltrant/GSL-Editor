@@ -2,6 +2,12 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.9.2] - 2022-03-14
+
+### Fixed
+
+- Corrected issue with formatter. [Oliver/Naos]
+
 ## [1.9.1] - 2022-03-13
 
 ### Added

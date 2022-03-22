@@ -54,7 +54,9 @@ export class GSLHoverProvider implements HoverProvider {
 				'F': 'himself/herself of creature or player.',
 				'G': 'he/she of creature or player.',
 				'H': 'his/her of creature or player.',
-				'I': 'him/her of creature or player.'
+				'I': 'him/her of creature or player.',
+				'T': "Creatures: 'crtr_name' field if set, otherwise 'the' followed by noun. Characters: first name.",
+				'U': "Creatures: 'the' followed by adjective and noun. Characters: first name."
 			},
 			'E': {
 				'A': 'article',

@@ -421,7 +421,7 @@
 			"patterns": [
 				{
 					"name": "token.gsl.entity",
-					"match": "\\$X\\d[FGHIT]?"
+					"match": "\\$X\\d[FGHITU]?"
 				},
 				{
 					"name": "token.gsl.player",

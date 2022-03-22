@@ -30,7 +30,8 @@
                 "\\$[$|Q|R]",                              // msgp "$R$P0 said, $QHello.$Q"
                 "\\$:\\$(\\w*)",                           // msgp "Game is $:$GAMECODE."
                 "(add|removevar)group \"(.*?)\"",          // addgroup "datastore" to NO1
-                "is(not)?oftype \"(.*?)\""                 // NO1 isoftype "datastore"
+                "is(not)?oftype \"(.*?)\"",                // NO1 isoftype "datastore"
+                "hasfield \"(.*?)\""                       // NO1 hasfield "abltycd"
             ]
         }
     ]
