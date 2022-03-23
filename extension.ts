@@ -374,8 +374,13 @@ class VSCodeIntegration {
 
 	private async commandOpenConnection () {
 		const error: any = (e: Error) => { error.caught = e }
-		if (this.gameClient) { return void window.showErrorMessage("Development server connection is already established.") }
-		const client = await this.ensureGameConnection().catch(error)
+		await new Promise<void>((resolve, reject) => {
+			if (!this.gameClient) { return void resolve() }
+			this.gameClient.once('quit', () => void resolve())
+			this.gameClient.once('error', () => void reject())
+			this.gameClient.quit()
+		})
+		await this.ensureGameConnection().catch(error)
 		if (error.caught) { return void window.showErrorMessage(`Failed to connect to development server: ${error.caught.message}`) }
 	}
 

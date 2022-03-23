@@ -11,14 +11,17 @@ export class GSLDocumentFormattingEditProvider implements DocumentFormattingEdit
         document.lineCount - 1,
         lastLine.range.end.character
       )
-      // Replace smart quotes and other common mistake with dumb variety
-      textEdits.push(TextEdit.replace(textRange, document.getText().replace(/[\u2018\u2019]/g, "'")))
-      textEdits.push(TextEdit.replace(textRange, document.getText().replace(/[\u201C\u201D]/g, '"')))
-      // Remove non-printable characters
-      // eslint-disable-next-line no-control-regex
-      textEdits.push(TextEdit.replace(textRange, document.getText().replace(/[^\x00-\x7e]/g, '')))
-      // Remove blank lines
-      textEdits.push(TextEdit.replace(textRange, document.getText().replace(/(\r\n){2,}/g, '\r\n')))
+      let documentText = document.getText()
+        // Replace smart quotes and other common mistake with dumb variety
+        .replace(/[\u2018\u2019]/g, "'")
+        .replace(/[\u201C\u201D]/g, '"')
+        // Remove non-printable characters
+        .replace(/[^\x00-\x7e]/g, '')
+        // Remove blank lines
+        .replace(/(\r\n){2,}/g, '\r\n')
+
+      textEdits.push(TextEdit.replace(textRange, documentText))
+
       return textEdits
     }
   }
