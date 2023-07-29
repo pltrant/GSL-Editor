@@ -2,6 +2,16 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.9.3] - 2023-07-29
+
+### Fixed
+
+- Resolved issue with GSL Vibrant theme prompt when starting the extension. [Patrick/Estild]
+
+### Changed
+
+- Updated dependencies. [Patrick/Estild]
+
 ## [1.9.2] - 2022-03-14
 
 ### Fixed

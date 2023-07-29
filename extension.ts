@@ -11,7 +11,7 @@ import { env, workspace, window, commands, languages, extensions } from 'vscode'
 
 import {
 	LanguageClient, LanguageClientOptions, ServerOptions, TransportKind, DiagnosticSeverity
-} from 'vscode-languageclient'
+} from 'vscode-languageclient/node'
 
 import {
 	GSLDocumentSymbolProvider,
@@ -462,7 +462,8 @@ class VSCodeIntegration {
 			if (choice === option) {
 				await workspace.getConfiguration().update('workbench.colorTheme', 'GSL Vibrant', true)
 			}
-		} else { this.context.globalState.update(GSLX_NEW_INSTALL_FLAG, true) }
+			this.context.globalState.update(GSLX_NEW_INSTALL_FLAG, true)
+		}
 	}
 
 	async checkForUpdatedVersion () {

@@ -105,7 +105,7 @@ export class GameTerminal {
 				this.writeEmitter.fire('[Terminal is ready for development server connections.]\r\n')
 			},
 			close: () => {
-				this.closeEmitter.fire()
+				this.closeEmitter.fire(0)
 			},
 			handleInput: (data: string) => {
 				const buffer = Buffer.from(data, 'binary')
