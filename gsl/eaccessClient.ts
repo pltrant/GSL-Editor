@@ -135,7 +135,7 @@ export class EAccessClient extends EventEmitter {
                 if (certificate.pubkey.toString('hex').toUpperCase() !== PUBKEY.toUpperCase()) {
                     this.console.log(`Certificate pubkey ${certificate.pubkey.toString('hex')} does not match expeted value.`)
                     this.socket.end()
-                    this.emit(EVENT_ERROR, new Error ("Could not establish secure connection for authenticatio; bad certificate."))
+                    this.emit(EVENT_ERROR, new Error ("Could not establish secure connection for authentication; bad certificate."))
                     return
                 }
                 this.console.log("EAccess::socket::secureConnect", this.socket.authorized)

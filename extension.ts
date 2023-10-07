@@ -30,10 +30,10 @@ const GSL_LANGUAGE_ID = 'gsl'
 const GSLX_DEV_ACCOUNT = 'developmentAccount'
 const GSLX_DEV_INSTANCE = 'developmentInstance'
 const GSLX_DEV_CHARACTER = 'developmentCharacter'
+const GSLX_DEV_PASSWORD = 'developmentPassword'
 const GSLX_NEW_INSTALL_FLAG = 'gslExtNewInstallFlag'
 const GSLX_SAVED_VERSION = 'savedVersion'
 const GSLX_DISABLE_LOGIN = 'disableLoginAttempts'
-const GSLX_KEYTAR_KEY = 'GSL-Editor'
 const rx_script_number = /^\d{1,5}$/
 
 export class GSLExtension {
@@ -365,11 +365,10 @@ class VSCodeIntegration {
 		const { sal, loginDetails } = result
 
 		/* store all the details for automated login */
-		const keytar = await import(`${env.appRoot}/node_modules.asar/keytar`)
 		this.context.globalState.update(GSLX_DEV_ACCOUNT, loginDetails.account)
 		this.context.globalState.update(GSLX_DEV_INSTANCE, loginDetails.game)
 		this.context.globalState.update(GSLX_DEV_CHARACTER, loginDetails.character)
-		keytar.setPassword(GSLX_KEYTAR_KEY, loginDetails.account, password)
+		await this.context.secrets.store(GSLX_DEV_PASSWORD, password)
 	}
 
 	private async commandOpenConnection () {
@@ -422,9 +421,8 @@ class VSCodeIntegration {
 		const account = this.context.globalState.get(GSLX_DEV_ACCOUNT)
 		const instance = this.context.globalState.get(GSLX_DEV_INSTANCE)
 		const character = this.context.globalState.get(GSLX_DEV_CHARACTER)
-		const keytar = await import (`${env.appRoot}/node_modules.asar/keytar`)
-		const password = await keytar.getPassword(GSLX_KEYTAR_KEY, account)
-		if (!(account || instance || character || password)) {
+		const password = await this.context.secrets.get(GSLX_DEV_PASSWORD)
+		if (!account || !instance || !character || !password) {
 			return void this.promptUserSetup()
 		}
 		return { account, password, character, instance }

@@ -2,21 +2,27 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.9.4] - 2023-10-07
+
+### Changed
+
+- Updated to use VSCode's SecretStorage API to store password [previous keytar method was deprecated].
+
 ## [1.9.3] - 2023-07-29
 
 ### Fixed
 
-- Resolved issue with GSL Vibrant theme prompt when starting the extension. [Patrick/Estild]
+- Resolved issue with GSL Vibrant theme prompt when starting the extension.
 
 ### Changed
 
-- Updated dependencies. [Patrick/Estild]
+- Updated dependencies.
 
 ## [1.9.2] - 2022-03-14
 
 ### Fixed
 
-- Corrected issue with formatter. [Oliver/Naos]
+- Corrected issue with formatter.
 
 ## [1.9.1] - 2022-03-13
 
@@ -26,11 +32,11 @@ All notable changes to the GSL Editor extension will be documented in this file.
 
 ### Changed
 
-- Updated the formatter to replace smart quotes with normal quotes. [Oliver/Naos]
+- Updated the formatter to replace smart quotes with normal quotes.
 
 ### Fixed
 
-- Better support for downloading new/empty scripts. [Oliver/Naos]
+- Better support for downloading new/empty scripts.
 
 ## [1.9.0] - 2022-03-03
 
@@ -40,12 +46,12 @@ All notable changes to the GSL Editor extension will be documented in this file.
 
 ### Changed
 
-- Rewrote extension to TypeScript. [Oliver/Naos]
-- EAccess login now uses an encrypted (TLS) connection. [Oliver/Naos]
+- Rewrote extension to TypeScript.
+- EAccess login now uses an encrypted (TLS) connection.
 
 ### Fixed
 
-- Various syntax highlighting fixes. [Oliver/Naos]
+- Various syntax highlighting fixes.
 - The status bar will now properly timeout when checking the modification timestamp of a script.
 
 ## [1.8.0] - 2022-03-03
@@ -261,7 +267,7 @@ No change.  Publish error bumped up to 1.5.0.
 ### Added
 
 - New installations of the extension will now prompt users to apply the GSL Vibrant theme.
-- New "Download To Workspace" setting, which when enabled, will download scripts to your currently opened folder. [Oliver/Naos]
+- New "Download To Workspace" setting, which when enabled, will download scripts to your currently opened folder.
 
 ### Changed
 
@@ -271,13 +277,13 @@ No change.  Publish error bumped up to 1.5.0.
 ### Fixed
 
 - Adjusted game login Status Bar text to only display when connecting.
-- Langauge definition update for callmatch pattern. [Oliver/Naos]
+- Langauge definition update for callmatch pattern.
 
 ## [1.0.5] - 2017-09-21
 
 ### Added
 
-- Hover over any token (e.g. $P0H = "his/her") to get a description of what it represents! - Don/Konacon
+- Hover over any token (e.g. $P0H = "his/her") to get a description of what it represents!
 - Get a listing of all tokens with the new List Tokens command.  Available by hitting F1 (to display the Command Palette), type in "gsl", then select List Tokens or use Ctrl+Alt+L.
 - Status Bar text when logging into the game.
 
@@ -294,7 +300,7 @@ No change.  Publish error bumped up to 1.5.0.
 ### Added
 
 - Upload script check: a timestamp is now stored when you download any script.  That timestamp is then referenced against the server before any upload.  If they are different, you will be prompted before continuing.  This should help ensure you don't upload a version of the script that is now out of date.
-- Empty matchmarker is now listed as "" at the top of the Matchmarkers view and symbol list. - Don/Konacon
+- Empty matchmarker is now listed as "" at the top of the Matchmarkers view and symbol list.
 
 ### Changed
 
@@ -305,11 +311,11 @@ No change.  Publish error bumped up to 1.5.0.
 ### Added
 
 - There is now a Date Check command, thanks to Don/Konacon, that will display the last modified date of a script from the game (e.g. /ss script#) to assist with QC.  You can manually invoke the command from the Command Palette (F1, then type in GSL), from the keybinding Ctrl+Alt+C, or you can add a Check Date button to the Status Bar by enabling it under Settings.
-- Matchmarkers are now considered symbols (for go to symbol functionality (Ctrl+Shift+O)) from Don/Konacon.
+- Matchmarkers are now considered symbols (for go to symbol functionality (Ctrl+Shift+O)).
 
 ### Changed
 
-- More language definition updates from Oliver/Naos:
+- More language definition updates:
   - fixed comments on GATHER and REMOVEVARFIELD lines
   - added MATCH and REPLYADDRESS system string vars
   - added highlighting for RMCALL statements
@@ -343,7 +349,7 @@ No change.  Publish error bumped up to 1.5.0.
 
 ### Changed
 
-- Thanks to Oliver/Naos' work, the language definition file for GSL was significantly updated and now fully supports almost every element of GSL.  This mostly comes into play for the color customization noted above.
+- The language definition file for GSL was significantly updated and now fully supports almost every element of GSL.  This mostly comes into play for the color customization noted above.
 - Snippets have been updated to provide choices where appropriate.  For example, if you're using `checkeffect`, the first placeholder is always a node, so it will display a dropdown listing all valid nodes (NP#, NC#, NO#, NE#, NR#, where # is 0-9).  You don't have to scroll through the entire list, you can start to type which option you want and it will narrow down the list for you.
 
 ## [0.0.33] - 2017-08-11
@@ -391,7 +397,7 @@ No change.  Publish error bumped up to 1.5.0.
 
 ### Changed
 
-- Re-implemented the script upload function so it should be significantly more reliable now. Thanks for the help, Oliver!
+- Re-implemented the script upload function so it should be significantly more reliable now.
 
 ## [0.0.17] - 2017-07-11
 
