@@ -34,6 +34,7 @@ const GSLX_DEV_PASSWORD = 'developmentPassword'
 const GSLX_NEW_INSTALL_FLAG = 'gslExtNewInstallFlag'
 const GSLX_SAVED_VERSION = 'savedVersion'
 const GSLX_DISABLE_LOGIN = 'disableLoginAttempts'
+const GSLX_ENABLE_SNIPPET_ASSISTED_HOVER = 'enableSnippetAssistedHover'
 const rx_script_number = /^\d{1,5}$/
 
 export class GSLExtension {
@@ -595,7 +596,11 @@ export function activate (context: ExtensionContext) {
     context.subscriptions.push(subscription)
 
     subscription = languages.registerHoverProvider(
-        selector, new GSLHoverProvider()
+        selector,
+        new GSLHoverProvider({
+            "useSnippets": !!workspace.getConfiguration(GSL_LANGUAGE_ID)
+                .get(GSLX_ENABLE_SNIPPET_ASSISTED_HOVER)
+        })
     )
     context.subscriptions.push(subscription)
 

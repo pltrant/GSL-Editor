@@ -1,6 +1,27 @@
 import { HoverProvider, Hover } from "vscode"
+import { GslSnippet, snippets } from '../snippets/GslSnippets'
+
+const skippedSnippets = new Set(['if', 'ifnot', 'else', 'loop', 'when'])
+
+const snippetDescriptionMap = Object.values(snippets).reduce(
+    (memo, snippet) => {
+        const firstWord = snippet.prefix.split(/\s+/)[0].toLowerCase()
+        if (!firstWord || skippedSnippets.has(firstWord)) return memo
+        const tokens = snippet.description.split(/\n+/)
+        memo[firstWord] ||= []
+        tokens[0] = '`' + tokens[0] + '`'
+        memo[firstWord].push(tokens.join('\n\n'))
+        return memo
+    },
+    {} as Record<string, string[]>
+)
+
+interface Options {
+    useSnippets: boolean
+}
 
 export class GSLHoverProvider implements HoverProvider {
+    private options: Options;
     private nodeInfo: any;
     private varInfo: any;
     private tokenInfo: any;
@@ -12,7 +33,8 @@ export class GSLHoverProvider implements HoverProvider {
     private systemRegex: RegExp;
     private tableRegex: RegExp;
 
-    constructor() {
+    constructor(options: Options) {
+        this.options = options
         this.nodeInfo = {
             'O': {
                 'A': 'article',
@@ -92,7 +114,7 @@ export class GSLHoverProvider implements HoverProvider {
             "'": "Adds 's to next string token, properly XML wrapped",
             'ZE': 'Outputs timestamp for token that follows'
         }
-        this.baseHoverRegex = /\$(:\$[A-Z]+|:\d+\[\d+,\d+,\d+\]|[\w\d:_-]+|[ABDVLSKT]\d|[$\\^QR*+'])/
+        this.baseHoverRegex = /^\s*[a-zA-Z]+( |$)|\$(:\$[A-Z]+|:\d+\[\d+,\d+,\d+\]|[\w\d:_-]+|[ABDVLSKT]\d|[$\\^QR*+'])/
         this.stringTokenRegex = /\$([POCEXr])(\d)([A-Z]?)$/
         this.fieldRegex = /\$([POCEXr]\d):([\w\d_]+)$/
         this.varRegex = /\$([ABDVLSKT])(\d)/
@@ -105,8 +127,12 @@ export class GSLHoverProvider implements HoverProvider {
         let wordRange = document.getWordRangeAtPosition(position, this.baseHoverRegex)
         if (!wordRange) return
 
-        let word = document.getText(wordRange)
-        if (this.stringTokenRegex.test(word)) {
+        const word = document.getText(wordRange)?.trim()
+        const snippets = snippetDescriptionMap[word.toLowerCase()]
+
+        if (this.options.useSnippets && snippets?.length) {
+            return this.snippetHover(snippets)
+        } else if (this.stringTokenRegex.test(word)) {
             return this.stringTokenHover(word)
         } else if (this.fieldRegex.test(word)) {
             return this.fieldHover(word)
@@ -119,6 +145,10 @@ export class GSLHoverProvider implements HoverProvider {
         } else if (this.tableRegex.test(word)) {
             return this.tableHover(word)
         }
+    }
+
+    snippetHover(snippets: string[]): Hover | undefined {
+        return new Hover(snippets.join('\n\n---\n\n'))
     }
 
     stringTokenHover(token: any): any {

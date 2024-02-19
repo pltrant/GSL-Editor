@@ -112,6 +112,13 @@
           "default": false,
           "description": "Enable to permanently disable login attempts from various actions in the editor."
         },
+        "gsl.enableSnippetAssistedHover": {
+            "type": [
+              "boolean"
+            ],
+            "default": false,
+            "description": "Enable to utilize snippets to enhance hover information."
+          },
         "gsl.alwaysEnabled": {
           "type": [
             "boolean"
