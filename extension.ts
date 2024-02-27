@@ -74,32 +74,34 @@ export class GSLExtension {
         const client = await this.vsc.ensureGameConnection().catch(error)
         if (error.caught) { return void window.showErrorMessage(`Failed to connect to game: ${error.caught.message}`) }
         if (client) {
-            const scriptProperties = await client.modifyScript(script).catch(error)
-            if (error.caught) { return void window.showErrorMessage(error.caught.message) }
-            const scriptFile = scriptProperties.path.split('/').pop()!
-            const scriptPath = path.join(downloadPath, scriptFile)
-            if (scriptProperties.new) { fs.writeFileSync(scriptPath, "") } else {
-                let content = await client.captureScript().catch(error)
-                if (error.caught) { return void window.showErrorMessage(`Failed to download script: ${error.caught.message}`) }
-                if (content) {
-                    if (content.slice(-2) !== '\r\n') { content += '\r\n' }
-                    fs.writeFileSync(scriptPath, content)
-                }
-            }
-            // open the script file and maybe navigagte to definition
-            const document = await workspace.openTextDocument(scriptPath)
-            const editor = await window.showTextDocument(document, { preview: false })
-            if (gotoDef) {
-                const gotoRegExp = new RegExp(`:\s+${gotoDef}`)
-                for (let n = 0, nn = document.lineCount; n < nn; n++) {
-                    const line = document.lineAt(n)
-                    if (line.text.match(gotoRegExp)) {
-                        commands.executeCommand('revealLine', { lineNumber: n, at: 'center' })
-                        break
+            client.lock.acquire(async () => {
+                const scriptProperties = await client.modifyScript(script).catch(error)
+                if (error.caught) { return void window.showErrorMessage(error.caught.message) }
+                const scriptFile = scriptProperties.path.split('/').pop()!
+                const scriptPath = path.join(downloadPath, scriptFile)
+                if (scriptProperties.new) { fs.writeFileSync(scriptPath, "") } else {
+                    let content = await client.captureScript().catch(error)
+                    if (error.caught) { return void window.showErrorMessage(`Failed to download script: ${error.caught.message}`) }
+                    if (content) {
+                        if (content.slice(-2) !== '\r\n') { content += '\r\n' }
+                        fs.writeFileSync(scriptPath, content)
                     }
                 }
-            }
-            window.setStatusBarMessage("Script download complete!", 5000)
+                // open the script file and maybe navigagte to definition
+                const document = await workspace.openTextDocument(scriptPath)
+                const editor = await window.showTextDocument(document, { preview: false })
+                if (gotoDef) {
+                    const gotoRegExp = new RegExp(`:\s+${gotoDef}`)
+                    for (let n = 0, nn = document.lineCount; n < nn; n++) {
+                        const line = document.lineAt(n)
+                        if (line.text.match(gotoRegExp)) {
+                            commands.executeCommand('revealLine', { lineNumber: n, at: 'center' })
+                            break
+                        }
+                    }
+                }
+                window.setStatusBarMessage("Script download complete!", 5000)
+            })
         } else {
             window.showErrorMessage("Could not connect to game?")
         }
@@ -110,27 +112,35 @@ export class GSLExtension {
         const client = await this.vsc.ensureGameConnection().catch(error)
         if (error.caught) { return void window.showErrorMessage(`Failed to connect to game: ${error.caught.message}`) }
         if (client) {
-            const lines = []
+            const lines = new Array<string>()
             for (let n = 0, nn = document.lineCount; n < nn; n++) {
                 lines.push(document.lineAt(n).text)
             }
             if (lines[lines.length - 1] !== '') { lines.push('') }
-            let scriptProperties = await client.modifyScript(script, true).catch(error)
-            if (error.caught) { return void window.showErrorMessage(error.caught.message) }
-            let compileResults = await client.sendScript(lines, !(scriptProperties.new === undefined)).catch(error)
-            if (error.caught) { return window.showErrorMessage(error.caught.message) }
-            if (compileResults.status === ScriptCompileStatus.Failed) {
-                const problems = compileResults.errorList.map((error: ScriptError) => {
-                    const line = document.lineAt(error.line - 1)!
-                    return new Diagnostic (line.range, error.message, DiagnosticSeverity.Error)
-                })
-                this.diagnostics.set(document.uri, problems)
-                window.showErrorMessage(`Script ${compileResults.script}: Compile failed; ${compileResults.errors} error(s), ${compileResults.warnings} warning(s).`)
-                commands.executeCommand('workbench.actions.view.problems')
-            } else {
-                this.diagnostics.clear()
-                window.setStatusBarMessage(`Script ${compileResults.script}: Compile OK; ${compileResults.bytes} bytes`, 5000)
-            }
+            client.lock.acquire(async () => {
+                let scriptProperties = await client.modifyScript(script, true).catch(error)
+                if (error.caught) {
+                    window.showErrorMessage(error.caught.message)
+                    return
+                }
+                let compileResults = await client.sendScript(lines, !(scriptProperties.new === undefined)).catch(error)
+                if (error.caught) {
+                    window.showErrorMessage(error.caught.message)
+                    return
+                }
+                if (compileResults.status === ScriptCompileStatus.Failed) {
+                    const problems = compileResults.errorList.map((error: ScriptError) => {
+                        const line = document.lineAt(error.line - 1)!
+                        return new Diagnostic (line.range, error.message, DiagnosticSeverity.Error)
+                    })
+                    this.diagnostics.set(document.uri, problems)
+                    window.showErrorMessage(`Script ${compileResults.script}: Compile failed; ${compileResults.errors} error(s), ${compileResults.warnings} warning(s).`)
+                    commands.executeCommand('workbench.actions.view.problems')
+                } else {
+                    this.diagnostics.clear()
+                    window.setStatusBarMessage(`Script ${compileResults.script}: Compile OK; ${compileResults.bytes} bytes`, 5000)
+                }
+            })
         } else {
             window.showErrorMessage("Could not connect to game?")
         }
@@ -141,10 +151,12 @@ export class GSLExtension {
         const client = await this.vsc.ensureGameConnection().catch(error)
         if (error.caught) { return void window.showErrorMessage(`Failed to connect to game: ${error.caught.message}`) }
         window.setStatusBarMessage(`Checking modification date for script ${script} ...`, 5000)
-        let scriptProperties = await client.checkScript(script).catch(error)
-        if (error.caught) { return void window.showErrorMessage(`Failed to check modification date: ${error.caught.message}`) }
-        const date = scriptProperties.lastModifiedDate
-        window.setStatusBarMessage(`Script ${script} was last modified on ${date.toLocaleDateString()} as ${date.toLocaleTimeString()}`, 5000)
+        client.lock.acquire(async () => {
+            let scriptProperties = await client.checkScript(script).catch(error)
+            if (error.caught) { return void window.showErrorMessage(`Failed to check modification date: ${error.caught.message}`) }
+            const date = scriptProperties.lastModifiedDate
+            window.setStatusBarMessage(`Script ${script} was last modified on ${date.toLocaleDateString()} as ${date.toLocaleTimeString()}`, 5000)
+        })
     }
 }
 

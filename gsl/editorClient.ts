@@ -54,7 +54,29 @@ const monthList = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','
 
 const delay = 15000
 
+export class EditorLock {
+    private blockingTask: Promise<void>
+
+    constructor () {
+        this.blockingTask = Promise.resolve()
+    }
+
+    public acquire(task: () => Promise<void>): void {
+        this.blockingTask = this.blockingTask.then(async () => {
+            // Wrap the task execution in a try/catch so that the
+            // blockingTask promise never fails.
+            try {
+                await task()
+            }
+            catch (e) {
+                console.error(e)
+            }
+        })
+    }
+}
+
 export class EditorClient extends BaseGameClient {
+    public lock: EditorLock
     private interactive: boolean
     private loginDetails: any
     private retryCommand: string
@@ -63,6 +85,7 @@ export class EditorClient extends BaseGameClient {
         super(options)
         this.interactive = false
         this.retryCommand = ''
+        this.lock = new EditorLock()
     }
 
     private isInteractive(): Promise<void> {
