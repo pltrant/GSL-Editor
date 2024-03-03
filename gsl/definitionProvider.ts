@@ -6,6 +6,11 @@ import * as fs from "fs"
 import { GSLExtension } from "../extension";
 
 export class GSLDefinitionProvider implements DefinitionProvider {
+  private enableAutomaticDownloads: boolean
+
+  constructor(enableAutomaticDownloads: boolean) {
+    this.enableAutomaticDownloads = enableAutomaticDownloads
+  }
 
   async provideDefinition (document: any, position: any, token: any) {
     let txt = document.lineAt(position.line).text.trim().toLowerCase()
@@ -36,6 +41,11 @@ export class GSLDefinitionProvider implements DefinitionProvider {
         let scriptFile = path.join(GSLExtension.getDownloadLocation(), 'S' + scriptNum)
                        + workspace.getConfiguration('gsl').get('fileExtension')
         if (!fs.existsSync(scriptFile)) {
+          if (!this.enableAutomaticDownloads) {
+            throw new Error(
+              'Failed to find script and automatic downloads are disabled'
+            )
+          }
           await GSLExtension.downloadScript(Number(scriptNum))
         }
         if (!fs.existsSync(scriptFile)) {

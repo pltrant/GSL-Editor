@@ -34,6 +34,7 @@ const GSLX_DEV_PASSWORD = 'developmentPassword'
 const GSLX_NEW_INSTALL_FLAG = 'gslExtNewInstallFlag'
 const GSLX_SAVED_VERSION = 'savedVersion'
 const GSLX_DISABLE_LOGIN = 'disableLoginAttempts'
+const GSLX_AUTOMATIC_DOWNLOADS = 'automaticallyDownloadScripts'
 const rx_script_number = /^\d{1,5}$/
 
 export class GSLExtension {
@@ -675,7 +676,10 @@ export function activate (context: ExtensionContext) {
     context.subscriptions.push(subscription)
 
     subscription = languages.registerDefinitionProvider(
-        selector, new GSLDefinitionProvider()
+        selector,
+        new GSLDefinitionProvider(
+            !!workspace.getConfiguration(GSL_LANGUAGE_ID).get(GSLX_AUTOMATIC_DOWNLOADS)
+        )
     )
     context.subscriptions.push(subscription)
 
