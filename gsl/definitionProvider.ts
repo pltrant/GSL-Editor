@@ -7,7 +7,7 @@ import { GSLExtension } from "../extension";
 
 export class GSLDefinitionProvider implements DefinitionProvider {
 
-  provideDefinition (document: any, position: any, token: any) {
+  async provideDefinition (document: any, position: any, token: any) {
     let txt = document.lineAt(position.line).text.trim().toLowerCase()
     if (txt.includes('call')) {
       let txtArray = txt.split(' ')
@@ -35,23 +35,24 @@ export class GSLDefinitionProvider implements DefinitionProvider {
         }
         let scriptFile = path.join(GSLExtension.getDownloadLocation(), 'S' + scriptNum)
                        + workspace.getConfiguration('gsl').get('fileExtension')
-        if (fs.existsSync(scriptFile)) {
-          let idx = 0
-          if (txtArray[4]) {
-            let fileTxt = fs.readFileSync(scriptFile).toString().split('\r\n')
-            for (let i = 0; i < fileTxt.length; i++) {
-              if (fileTxt[i].toLowerCase().startsWith(': ' + txtArray[2])) {
-                idx = i
-                break
-              }
+        if (!fs.existsSync(scriptFile)) {
+          await GSLExtension.downloadScript(Number(scriptNum))
+        }
+        if (!fs.existsSync(scriptFile)) {
+          console.error('Failed to find file')
+          return
+        }
+        let idx = 0
+        if (txtArray[4]) {
+          let fileTxt = fs.readFileSync(scriptFile).toString().split('\r\n')
+          for (let i = 0; i < fileTxt.length; i++) {
+            if (fileTxt[i].toLowerCase().startsWith(': ' + txtArray[2])) {
+              idx = i
+              break
             }
           }
-          return new Location(Uri.file(scriptFile), new Position(idx, 0))
-        } else {
-          // gslEditor.goToDefinition = txtArray[2]
-          // gslDownload2(scriptNum)
-          GSLExtension.downloadScript(Number(scriptNum), txtArray[2])
         }
+        return new Location(Uri.file(scriptFile), new Position(idx, 0))
       }
     }
   }
