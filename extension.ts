@@ -24,7 +24,7 @@ import {
 import { EAccessClient } from './gsl/eaccessClient'
 import { GameClientOptions } from './gsl/gameClients'
 import { GameTerminal } from './gsl/gameTerminal'
-import { ScriptCompileStatus, ScriptError, EditorClient } from './gsl/editorClient'
+import { ScriptCompileStatus, ScriptError, EditorClient, ScriptProperties, SerializedScriptProperties } from './gsl/editorClient'
 
 const GSL_LANGUAGE_ID = 'gsl'
 const GSLX_DEV_ACCOUNT = 'developmentAccount'
@@ -34,6 +34,7 @@ const GSLX_DEV_PASSWORD = 'developmentPassword'
 const GSLX_NEW_INSTALL_FLAG = 'gslExtNewInstallFlag'
 const GSLX_SAVED_VERSION = 'savedVersion'
 const GSLX_DISABLE_LOGIN = 'disableLoginAttempts'
+const GSLX_AUTOMATIC_DOWNLOADS = 'automaticallyDownloadScripts'
 const rx_script_number = /^\d{1,5}$/
 
 export class GSLExtension {
@@ -67,7 +68,7 @@ export class GSLExtension {
         return extPath
     }
 
-    static async downloadScript (script: number | string, gotoDef?: string) {
+    static async downloadScript (script: number | string) {
         const error: any = (e: Error) => { error.caught = e }
         const downloadPath = this.getDownloadLocation()
         const fileExtension = workspace.getConfiguration(GSL_LANGUAGE_ID).get('fileExtension')
@@ -86,20 +87,10 @@ export class GSLExtension {
                     fs.writeFileSync(scriptPath, content)
                 }
             }
-            // open the script file and maybe navigagte to definition
-            const document = await workspace.openTextDocument(scriptPath)
-            const editor = await window.showTextDocument(document, { preview: false })
-            if (gotoDef) {
-                const gotoRegExp = new RegExp(`:\s+${gotoDef}`)
-                for (let n = 0, nn = document.lineCount; n < nn; n++) {
-                    const line = document.lineAt(n)
-                    if (line.text.match(gotoRegExp)) {
-                        commands.executeCommand('revealLine', { lineNumber: n, at: 'center' })
-                        break
-                    }
-                }
-            }
+            this.vsc.recordScriptProperties(script, scriptProperties)
             window.setStatusBarMessage("Script download complete!", 5000)
+            const document = await workspace.openTextDocument(scriptPath)
+            await window.showTextDocument(document, { preview: false })
         } else {
             window.showErrorMessage("Could not connect to game?")
         }
@@ -117,8 +108,22 @@ export class GSLExtension {
             if (lines[lines.length - 1] !== '') { lines.push('') }
             let scriptProperties = await client.modifyScript(script, true).catch(error)
             if (error.caught) { return void window.showErrorMessage(error.caught.message) }
-            let compileResults = await client.sendScript(lines, !(scriptProperties.new === undefined)).catch(error)
-            if (error.caught) { return window.showErrorMessage(error.caught.message) }
+            const isNewScript = scriptProperties.new !== undefined
+            const requiresConfirmation = isNewScript ? false :
+                GSLExtension.requiresUploadConfirmation(script, scriptProperties)
+            if (requiresConfirmation) {
+                const confirmation = await window.showWarningMessage(
+                    requiresConfirmation.prompt,
+                    { modal: true },
+                    'Yes'
+                )
+                if (confirmation !== 'Yes') {
+                    await client.exitModifyScript()
+                    return
+                }
+            }
+            let compileResults = await client.sendScript(lines, isNewScript).catch(error)
+            if (error.caught) { return void window.showErrorMessage(error.caught.message) }
             if (compileResults.status === ScriptCompileStatus.Failed) {
                 const problems = compileResults.errorList.map((error: ScriptError) => {
                     const line = document.lineAt(error.line - 1)!
@@ -130,6 +135,10 @@ export class GSLExtension {
             } else {
                 this.diagnostics.clear()
                 window.setStatusBarMessage(`Script ${compileResults.script}: Compile OK; ${compileResults.bytes} bytes`, 5000)
+                // Record updated script properties
+                const props = await GSLExtension.getScriptProperties(script)
+                if (!props || !props.lastModifiedDate) throw new Error('Failed to update local script properties')
+                this.vsc.recordScriptProperties(script, props)
             }
         } else {
             window.showErrorMessage("Could not connect to game?")
@@ -137,14 +146,60 @@ export class GSLExtension {
     }
 
     static async checkModifiedDate (script: number) {
+        const props = await GSLExtension.getScriptProperties(script)
+        if (!props || !props.lastModifiedDate) return
+        const date = props.lastModifiedDate
+        window.setStatusBarMessage(
+            `Script ${script} was last modified on ${date.toLocaleDateString()} as ${date.toLocaleTimeString()}`,
+            5000
+        )
+    }
+
+    static async getScriptProperties (script: number): Promise<ScriptProperties | undefined> {
         const error: any = (e: Error) => { error.caught = e }
         const client = await this.vsc.ensureGameConnection().catch(error)
         if (error.caught) { return void window.showErrorMessage(`Failed to connect to game: ${error.caught.message}`) }
         window.setStatusBarMessage(`Checking modification date for script ${script} ...`, 5000)
         let scriptProperties = await client.checkScript(script).catch(error)
         if (error.caught) { return void window.showErrorMessage(`Failed to check modification date: ${error.caught.message}`) }
-        const date = scriptProperties.lastModifiedDate
-        window.setStatusBarMessage(`Script ${script} was last modified on ${date.toLocaleDateString()} as ${date.toLocaleTimeString()}`, 5000)
+        return scriptProperties
+    }
+
+    static requiresUploadConfirmation (
+        script: number,
+        newestProperties: ScriptProperties
+    ): { prompt: string } | undefined {
+        const lastProperties = this.vsc.lookupScriptProperties(script)
+        let reasons = []
+
+        if (!lastProperties || !lastProperties.lastModifiedDate || !lastProperties.modifier) {
+            reasons.push(
+                `I haven't seen you download this script before. This could be because you downloaded the script prior`
+                + ` to the safety guard being added. If you want to be extra safe, you can download the script from the`
+                + ` server, compare it with your local copy, and then proceed. At that point I will not warn you again`
+                + ` for this specific reason. You can also proceed now if you are confident that your local copy`
+                + ` should overwrite the server copy.`
+            )
+        }
+        else if (lastProperties.lastModifiedDate.toISOString() !== newestProperties.lastModifiedDate.toISOString()) {
+            reasons.push(
+                `It appears to have been edited since you last downloaded it.`
+                + `\nServer: ${newestProperties.lastModifiedDate}\nLocal: ${lastProperties.lastModifiedDate}`
+            )
+        }
+        const currentAccount = this.vsc.getAccountName()
+        if (currentAccount !== newestProperties.modifier) {
+            reasons.push(
+                `Someone else modified it last.\nLast Modifier: ${newestProperties.modifier}\nYou: ${currentAccount}`
+            )
+        }
+
+        return reasons.length === 0 ? undefined : {
+            prompt:
+                `Overwriting script ${script} requires confirmation for the following reasons:\n\n`
+                + reasons.map((r, i) => `${i + 1}) ${r}`).join('\n\n')
+                + `\n\nWould you like to upload this script anyway?`,
+        }
     }
 }
 
@@ -415,6 +470,10 @@ class VSCodeIntegration {
         this.context.subscriptions.push(subscription)
     }
 
+    private scriptPropsKey(script: string | number): string {
+        return `script_properties.${script}`
+    }
+
     /* privates */
 
     private async getLoginDetails(): Promise<any> {
@@ -531,6 +590,23 @@ class VSCodeIntegration {
         }
         return this.gameClient
     }
+
+    /** @returns account name if configured, else undefined */
+    getAccountName(): string | undefined {
+        const name = this.context.globalState.get(GSLX_DEV_ACCOUNT)
+        if (!name) return
+        return `W_${name}`
+
+    }
+
+    recordScriptProperties(script: string | number, props: ScriptProperties): void {
+        this.context.globalState.update(this.scriptPropsKey(script), ScriptProperties.serialize(props))
+    }
+
+    lookupScriptProperties(script: string | number): ScriptProperties | undefined {
+        const props = this.context.globalState.get<SerializedScriptProperties>(this.scriptPropsKey(script))
+        return props ? ScriptProperties.deserialize(props) : undefined
+    }
 }
 
 class ExtensionLanguageServer {
@@ -600,7 +676,10 @@ export function activate (context: ExtensionContext) {
     context.subscriptions.push(subscription)
 
     subscription = languages.registerDefinitionProvider(
-        selector, new GSLDefinitionProvider()
+        selector,
+        new GSLDefinitionProvider(
+            !!workspace.getConfiguration(GSL_LANGUAGE_ID).get(GSLX_AUTOMATIC_DOWNLOADS)
+        )
     )
     context.subscriptions.push(subscription)
 

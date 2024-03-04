@@ -105,6 +105,13 @@
           "default": 100,
           "description": "Maximum number of problems reported for document"
         },
+        "gsl.automaticallyDownloadScripts": {
+          "type": [
+            "boolean"
+          ],
+          "default": true,
+          "description": "If enabled, scripts will be automatically downloaded when their matchmarker definitions are needed."
+        },
         "gsl.disableLoginAttempts": {
           "type": [
             "boolean"
