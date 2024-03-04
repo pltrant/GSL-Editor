@@ -42,9 +42,8 @@ export class GSLDefinitionProvider implements DefinitionProvider {
                        + workspace.getConfiguration('gsl').get('fileExtension')
         if (!fs.existsSync(scriptFile)) {
           if (!this.enableAutomaticDownloads) {
-            throw new Error(
-              'Failed to find script and automatic downloads are disabled'
-            )
+            console.warn('File not found and automatic downloads disabled')
+            return
           }
           await GSLExtension.downloadScript(Number(scriptNum))
         }
