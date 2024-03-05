@@ -68,7 +68,8 @@ export class GSLExtension {
         return extPath
     }
 
-    static async downloadScript (script: number | string) {
+    /** @returns path of newly downloaded script, or `undefined` if download failed */
+    static async downloadScript (script: number | string): Promise<string | undefined> {
         const error: any = (e: Error) => { error.caught = e }
         const downloadPath = this.getDownloadLocation()
         const fileExtension = workspace.getConfiguration(GSL_LANGUAGE_ID).get('fileExtension')
@@ -89,8 +90,7 @@ export class GSLExtension {
             }
             this.vsc.recordScriptProperties(script, scriptProperties)
             window.setStatusBarMessage("Script download complete!", 5000)
-            const document = await workspace.openTextDocument(scriptPath)
-            await window.showTextDocument(document, { preview: false })
+            return scriptPath
         } else {
             window.showErrorMessage("Could not connect to game?")
         }
@@ -297,7 +297,12 @@ class VSCodeIntegration {
             }
         }
         for (let script of scriptList) {
-            await GSLExtension.downloadScript(script)
+            const scriptPath = await GSLExtension.downloadScript(script)
+            if (!scriptPath) continue
+            await window.showTextDocument(
+                await workspace.openTextDocument(scriptPath),
+                { preview: false }
+            )
         }
     }
 
