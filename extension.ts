@@ -188,7 +188,9 @@ export class GSLExtension {
             )
         }
         const currentAccount = this.vsc.getAccountName()
-        if (currentAccount !== newestProperties.modifier) {
+        // The server truncates the account name to 12 characters, so we have to rely on startsWith.
+        // This means that we have no ability to distinguish between modifiers W_GS4-Alornen and W_GS4-Alorner
+        if (!currentAccount?.startsWith(newestProperties.modifier)) {
             reasons.push(
                 `Someone else modified it last.\nLast Modifier: ${newestProperties.modifier}\nYou: ${currentAccount}`
             )
