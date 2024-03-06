@@ -2,6 +2,14 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.10.0] - 2024-03-06
+
+### Added
+
+- Reimplemented the window dialog to warn you when uploading a script that appears to have been modified on the server since you last downloaded it.
+- There is a new setting to turn off automatic downloads of scripts when navigating by clicking on a callmatch.
+- Hovering over GSL keywords will now provide information about its definition.
+
 ## [1.9.4] - 2023-10-07
 
 ### Changed

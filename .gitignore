@@ -4,3 +4,4 @@ scripts/
 **/*.js.map
 *.vsix
 node_modules
+compile.txt
