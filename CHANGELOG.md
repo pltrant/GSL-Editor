@@ -2,6 +2,12 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.10.1] - 2024-03-06
+
+### Fixed
+
+- Resolved issue with the check against account name for uploads.
+
 ## [1.10.0] - 2024-03-06
 
 ### Added
