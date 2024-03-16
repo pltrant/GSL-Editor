@@ -24,7 +24,7 @@ import {
 import { EAccessClient } from './gsl/eaccessClient'
 import { GameClientOptions } from './gsl/gameClients'
 import { GameTerminal } from './gsl/gameTerminal'
-import { ScriptCompileStatus, ScriptError, EditorClient, ScriptProperties, SerializedScriptProperties } from './gsl/editorClient'
+import { ScriptCompileStatus, ScriptError, EditorClient, ScriptProperties, SerializedScriptProperties, ScriptCompileResults } from './gsl/editorClient'
 
 const GSL_LANGUAGE_ID = 'gsl'
 const GSLX_DEV_ACCOUNT = 'developmentAccount'
@@ -96,7 +96,7 @@ export class GSLExtension {
         }
     }
 
-    static async uploadScript (script: number, document: TextDocument) {
+    static async uploadScript (script: number, document: TextDocument): Promise<ScriptCompileResults | undefined> {
         const error: any = (e: Error) => { error.caught = e }
         const client = await this.vsc.ensureGameConnection().catch(error)
         if (error.caught) { return void window.showErrorMessage(`Failed to connect to game: ${error.caught.message}`) }
@@ -134,32 +134,27 @@ export class GSLExtension {
                 commands.executeCommand('workbench.actions.view.problems')
             } else {
                 this.diagnostics.clear()
-                window.setStatusBarMessage(`Script ${compileResults.script}: Compile OK; ${compileResults.bytes} bytes`, 5000)
                 // Record updated script properties
                 const props = await GSLExtension.getScriptProperties(script)
                 if (!props || !props.lastModifiedDate) throw new Error('Failed to update local script properties')
                 this.vsc.recordScriptProperties(script, props)
             }
+            return compileResults
         } else {
             window.showErrorMessage("Could not connect to game?")
         }
     }
 
-    static async checkModifiedDate (script: number) {
+    static async checkModifiedDate (script: number): Promise<Date | undefined> {
         const props = await GSLExtension.getScriptProperties(script)
         if (!props || !props.lastModifiedDate) return
-        const date = props.lastModifiedDate
-        window.setStatusBarMessage(
-            `Script ${script} was last modified on ${date.toLocaleDateString()} as ${date.toLocaleTimeString()}`,
-            5000
-        )
+        return props.lastModifiedDate
     }
 
     static async getScriptProperties (script: number): Promise<ScriptProperties | undefined> {
         const error: any = (e: Error) => { error.caught = e }
         const client = await this.vsc.ensureGameConnection().catch(error)
         if (error.caught) { return void window.showErrorMessage(`Failed to connect to game: ${error.caught.message}`) }
-        window.setStatusBarMessage(`Checking modification date for script ${script} ...`, 5000)
         let scriptProperties = await client.checkScript(script).catch(error)
         if (error.caught) { return void window.showErrorMessage(`Failed to check modification date: ${error.caught.message}`) }
         return scriptProperties
@@ -324,6 +319,7 @@ class VSCodeIntegration {
             }
         }
         const scriptNumber = scriptNumberFromFileName(document.fileName)
+        let compileResults: ScriptCompileResults | undefined;
         if (rx_script_number.test(scriptNumber) === false) {
             const prompt = "Unable to parse script number from active editor file name."
             const placeHolder = "Script number to upload as?"
@@ -332,10 +328,16 @@ class VSCodeIntegration {
                 return void window.showErrorMessage("Invalid script number provided.")
             }
             const script = Number(input)
-            GSLExtension.uploadScript(script, document)
+            compileResults = await GSLExtension.uploadScript(script, document)
         } else {
             const script = Number(scriptNumber)
-            GSLExtension.uploadScript(script, document)
+            compileResults = await GSLExtension.uploadScript(script, document)
+        }
+        if (compileResults && compileResults.status !== ScriptCompileStatus.Failed) {
+            const {script, bytes, maxBytes} = compileResults
+            const bytesRemaining = maxBytes - bytes
+            const bytesMsg = `${bytes.toLocaleString()} bytes (${bytesRemaining.toLocaleString()} left)`
+            window.setStatusBarMessage(`Script ${script}: Compile OK; ${bytesMsg}`, 5000)
         }
     }
     
@@ -346,7 +348,7 @@ class VSCodeIntegration {
         if (command) { commands.executeCommand(command.name) }
     }
 
-    private commandCheckDate () {
+    private async commandCheckDate () {
         if (!window.activeTextEditor || !window.activeTextEditor.document) {
             return void window.showErrorMessage (
                 "You must have an open script before you can check its date."
@@ -355,7 +357,16 @@ class VSCodeIntegration {
         let scriptNumber = path.basename(window.activeTextEditor.document.fileName)
         scriptNumber = scriptNumber.replace(/\D+/g, '').replace(/^0+/,'')
         const script = Number(scriptNumber)
-        GSLExtension.checkModifiedDate(script)
+        window.setStatusBarMessage(`Checking modification date for script ${script} ...`, 5000)
+        const date = await GSLExtension.checkModifiedDate(script)
+        if (!date) {
+            window.showErrorMessage(`Failed to find modification date for script ${script}`)
+            return
+        }
+        window.setStatusBarMessage(
+            `Script ${script} was last modified on ${date.toLocaleDateString()} at ${date.toLocaleTimeString()}`,
+            5000
+        )
     }
 
     private commandListTokens () {
