@@ -745,7 +745,9 @@ class VSCodeIntegration {
     * function of the same name for convienence of ensuring preconditions and
     * passing common parameters.
     */
-    async withEditorClient (task: (client: EditorClientInterface) => unknown) {
+    async withEditorClient <T>(
+        task: (client: EditorClientInterface) => T
+    ): Promise<T | undefined> {
         if (workspace.getConfiguration(GSL_LANGUAGE_ID).get(GSLX_DISABLE_LOGIN)) {
             return void window.showErrorMessage("Game login is disabled")
         }
@@ -844,7 +846,12 @@ export function activate (context: ExtensionContext) {
     context.subscriptions.push(subscription)
 
     subscription = languages.registerHoverProvider(
-        selector, new GSLHoverProvider()
+        selector,
+        new GSLHoverProvider(async (script: number) => {
+            const config = workspace.getConfiguration(GSL_LANGUAGE_ID)
+            if (!config.get(GSLX_AUTOMATIC_DOWNLOADS)) return
+            return vsc?.withEditorClient(client => client.modifyScript(script))
+        })
     )
     context.subscriptions.push(subscription)
 

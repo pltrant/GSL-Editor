@@ -14,6 +14,7 @@ export interface ScriptProperties {
     path: string,
     lines: number,
     new: boolean,
+    verb?: string,
 }
 
 /**
@@ -33,7 +34,7 @@ export interface ScriptCompileResults {
     maxBytes: number,
     errors: number,
     warnings: number,
-    errorList: Array<ScriptError>
+    errorList: Array<ScriptError>,
 }
 
 export interface ScriptError { line: number, message: string }
@@ -86,7 +87,7 @@ export interface InitOptions {
  * it will be processed as if it is part of the task.
  * @see withEditorClient
 */
-export type ClientTask = (client: EditorClient) => unknown
+export type ClientTask<T> = (client: EditorClient) => T
 
 /**
  * Provides an `EditorClient` object that is guaranteed to be exclusively owned
@@ -96,17 +97,17 @@ export type ClientTask = (client: EditorClient) => unknown
  * @returns a promise that resolves when the task has been processed
  * successfully, or rejects if the task fails.
  */
-export const withEditorClient = async (
+export const withEditorClient = async <T>(
     initOptions: InitOptions,
-    task: ClientTask
-): Promise<void> => {
+    task: ClientTask<T>
+): Promise<T> => {
     return processorSingleton.enqueueTask(initOptions, task)
 }
 
-type TaskController = {
-    task: ClientTask
+type TaskController<T> = {
+    task: ClientTask<T>
     initOptions: InitOptions
-    resolve: () => void
+    resolve: (result: T | Promise<T>) => void
     reject: (error: Error) => void
 }
 
@@ -115,7 +116,7 @@ class TaskQueueProcessor {
     private static FREQUENCY_MILLIS = 250
 
     private client: EditorClient | undefined
-    private taskQueue: TaskController[]
+    private taskQueue: TaskController<any>[]
     private isProcessingTask: boolean
     private nextTick: NodeJS.Timeout | undefined
 
@@ -125,8 +126,8 @@ class TaskQueueProcessor {
         this.nextTick = undefined
     }
 
-    enqueueTask(initOptions: InitOptions, task: ClientTask): Promise<void> {
-        return new Promise((resolve, reject) => {
+    enqueueTask<T>(initOptions: InitOptions, task: ClientTask<T>): Promise<T> {
+        return new Promise<T>((resolve, reject) => {
             this.taskQueue.push({ initOptions, task, resolve, reject })
             this.scheduleTick(0)
         });
@@ -155,7 +156,7 @@ class TaskQueueProcessor {
             while (result && result instanceof Promise) {
                 result = await result
             }
-            resolve()
+            resolve(result)
         }
         catch (e: unknown) {
             reject(e instanceof Error ? e : new Error(String(e)))
@@ -328,6 +329,7 @@ class EditorClient extends BaseGameClient {
                 if (rx_noscript.test(line)) { return modifyFailed(`Script ${script} has not yet been created.`) }
                 match = line.match(rx_getverb)
                 if (match && match.groups) {
+                    scriptProperties.verb = match.groups.command.split(' ').slice(1).join(' ')
                     this.send(match.groups.command, true)
                     return
                 }
