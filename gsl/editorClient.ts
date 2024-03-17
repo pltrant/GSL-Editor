@@ -35,6 +35,7 @@ export interface ScriptCompileResults {
     script: number,
     path: string,
     bytes: number,
+    maxBytes: number,
     errors: number,
     warnings: number,
     errorList: Array<ScriptError>
@@ -269,7 +270,7 @@ export class EditorClient extends BaseGameClient {
     sendScript (lines: Array<string>, newScript: boolean): Promise<ScriptCompileResults> {
         return new Promise ((resolve, reject) => {
             const compileResults: ScriptCompileResults = {
-                script: 0, path: '', bytes: 0, errors: 0, warnings: 0, errorList: [], status: ScriptCompileStatus.Unknown
+                script: 0, path: '', bytes: 0, maxBytes: 0, errors: 0, warnings: 0, errorList: [], status: ScriptCompileStatus.Unknown
             }
             const output = new OutputProcessor ((line: string) => {
                 let match: RegExpMatchArray | null
@@ -303,6 +304,7 @@ export class EditorClient extends BaseGameClient {
                     compileResults.status = ScriptCompileStatus.Compiled
                     compileResults.warnings = Number(match.groups.warnings)
                     compileResults.bytes = Number(match.groups.bytes.replace(/,/g, ''))
+                    compileResults.maxBytes = Number(match.groups.maxBytes.replace(/,/g, ''))
                     return
                 }
                 match = line.match(rx_compile_fail)
