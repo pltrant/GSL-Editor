@@ -112,6 +112,13 @@
           "default": true,
           "description": "If enabled, scripts will be automatically downloaded when their matchmarker definitions are needed."
         },
+        "gsl.enableScriptSyncChecks": {
+          "type": [
+            "boolean"
+          ],
+          "default": true,
+          "description": "Enable to check sync status when downloading scripts."
+        },
         "gsl.disableLoginAttempts": {
           "type": [
             "boolean"

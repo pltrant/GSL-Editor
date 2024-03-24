@@ -35,6 +35,7 @@ const GSLX_NEW_INSTALL_FLAG = 'gslExtNewInstallFlag'
 const GSLX_SAVED_VERSION = 'savedVersion'
 const GSLX_DISABLE_LOGIN = 'disableLoginAttempts'
 const GSLX_AUTOMATIC_DOWNLOADS = 'automaticallyDownloadScripts'
+const GSLX_ENABLE_SCRIPT_SYNC_CHECKS = 'enableScriptSyncChecks'
 const rx_script_number = /^\d{1,5}$/
 const rx_script_number_in_filename = /(\d+)\.gsl/
 
@@ -75,7 +76,10 @@ export class GSLExtension {
     }
 
     /** @returns path of newly downloaded script, or `undefined` if download failed */
-    static async downloadScript (script: number | string): Promise<string | undefined> {
+    static async downloadScript (
+        script: number | string,
+        checkSyncStatus = false
+    ): Promise<string | undefined> {
         const error: any = (e: Error) => { error.caught = e }
         const downloadPath = this.getDownloadLocation()
         const fileExtension = workspace.getConfiguration(GSL_LANGUAGE_ID).get('fileExtension')
@@ -94,12 +98,21 @@ export class GSLExtension {
                     fs.writeFileSync(scriptPath, content)
                 }
             }
+            const scriptNum = Number(scriptFile.match(rx_script_number_in_filename)![1])
+            if (Number.isNaN(scriptNum)) throw new Error('Expected script number, not NaN')
             this.vsc.recordScriptModification(
-                Number(scriptFile.match(rx_script_number_in_filename)![1]),
+                scriptNum,
                 scriptProperties.modifier,
                 scriptProperties.lastModifiedDate,
             )
-            window.setStatusBarMessage("Script download complete!", 5000)
+            if (checkSyncStatus) {
+                const status = await client.showScriptCheckStatus(scriptNum).catch(error)
+                if (error.caught) { return void window.showErrorMessage(`Failed to run show script check: ${error.caught.message}`) }
+                window.setStatusBarMessage(`Script download complete!`, 5000)
+                if (!status.match(/All instances in sync/i)) {
+                    window.showWarningMessage(`Script ${scriptNum} Status: ${status}`)
+                }
+            }
             return scriptPath
         } else {
             window.showErrorMessage("Could not connect to game?")
@@ -304,7 +317,12 @@ class VSCodeIntegration {
             }
         }
         for (let script of scriptList) {
-            const scriptPath = await GSLExtension.downloadScript(script)
+            const scriptPath = await GSLExtension.downloadScript(
+                script,
+                workspace
+                    .getConfiguration(GSL_LANGUAGE_ID)
+                    .get(GSLX_ENABLE_SCRIPT_SYNC_CHECKS)
+            )
             if (!scriptPath) continue
             await window.showTextDocument(
                 await workspace.openTextDocument(scriptPath),
@@ -632,7 +650,6 @@ class VSCodeIntegration {
         modifier: string,
         lastModifiedDate: Date
     ): void {
-        if (Number.isNaN(script)) throw new Error('Expected script number, not NaN')
         this.context.globalState.update(
             this.scriptPropsKey(script),
             { modifier, lastModifiedDate: lastModifiedDate.toISOString() }

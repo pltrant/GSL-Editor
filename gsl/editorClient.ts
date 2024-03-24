@@ -46,7 +46,7 @@ const rx_aborted = /(?:Script edit|Modification) aborted\./
 const rx_getverb = /Error: Script #(?<script>\d+) is a verb\. Please use (?<command>.*?) instead\./
 const rx_noscript = /Error\: Script \#\d+ has not been created yet\./
 const rx_noverb = /Verb not found\./
-const rx_newscript = /New File\: \.\.\/scripts\/S(\d+)\.gsl\./
+const rx_ss_check = /\s\s+\d+\s\s+.*?\s\s+.*?\s\s+.*?/
 
 const rx_ready = /(?:READY FOR ASCII UPLOAD)|(?:Continuing\:)/
 
@@ -159,7 +159,26 @@ export class EditorClient extends BaseGameClient {
             this.trySend(`/ss ${script}`)
         })
     }
-    
+
+    showScriptCheckStatus (script: number): Promise<string> {
+        return new Promise ((resolve, reject) => {
+            const output = new OutputProcessor (line => {
+                if (!line.match(rx_ss_check)) return
+                const tokens = line.split(/\s\s+/)
+                clearTimeout(timeout)
+                this.off('text', processText)
+                resolve(tokens[tokens.length - 1])
+            })
+            const processText = (text: string) => output.accumulate(text)
+            const timeout = setTimeout(() => {
+                this.off('text', processText)
+                reject(new Error ("Script check timed out."))
+            }, delay)
+            this.on('text', processText)
+            this.trySend(`/ss check ${script}`)
+        })
+    }
+
     modifyScript (script: number | string, noQuit?:boolean): Promise<ScriptProperties> {
         const scriptProperties: Partial<ScriptProperties> = {}
         return new Promise ((resolve, reject) => {
