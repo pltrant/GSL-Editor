@@ -120,6 +120,9 @@ export class GSLExtension {
     }
 
     static async uploadScript (script: number, document: TextDocument): Promise<ScriptCompileResults | undefined> {
+        if (document.getText().match(/^\s*$/)) {
+            return void window.showErrorMessage('Cannot upload empty script')
+        }
         const error: any = (e: Error) => { error.caught = e }
         const client = await this.vsc.ensureGameConnection().catch(error)
         if (error.caught) { return void window.showErrorMessage(`Failed to connect to game: ${error.caught.message}`) }
