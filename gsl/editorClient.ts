@@ -2,39 +2,33 @@
 import { BaseGameClient, GameClientOptions } from "./gameClients"
 import { EAccessClient } from "./eaccessClient"
 
+/** Output of `/ms` or `/mv`; captured by `modifyScript()` */
 export interface ScriptProperties {
     lastModifiedDate: Date,
     name: string,
     desc: string,
     owner: string,
     modifier: string,
-    new: boolean,
     path: string,
-    lines: number
+    lines: number,
+    new?: boolean,
 }
 
-export const ScriptProperties = {
-    serialize: (props: ScriptProperties): SerializedScriptProperties => ({
-        ...props,
-        // Convert date to ISO string, otherwise momento object will toString()
-        lastModifiedDate: props.lastModifiedDate.toISOString()
-    }),
-    deserialize: (props: SerializedScriptProperties): ScriptProperties =>({
-        ...props,
-        lastModifiedDate: new Date(props.lastModifiedDate) // restore from ISO string
-    })
-}
-
-/** Same as `ScriptProperties` except not lossy to `JSON.stringify()` */
-export type SerializedScriptProperties = Omit<ScriptProperties, 'lastModifiedDate'> & {
-    lastModifiedDate: string
-}
+/**
+ * Output of `/ss`; captured by `checkScript()`.
+ * The value of `owner` may differ from `ScriptProperties.owner`.
+ */
+export type ShowScriptOutput = Pick<
+    ScriptProperties,
+    'lastModifiedDate' | 'name' | 'desc' | 'owner' | 'modifier'
+>
 
 export interface ScriptCompileResults {
     status: ScriptCompileStatus,
     script: number,
     path: string,
     bytes: number,
+    maxBytes: number,
     errors: number,
     warnings: number,
     errorList: Array<ScriptError>
@@ -52,7 +46,7 @@ const rx_aborted = /(?:Script edit|Modification) aborted\./
 const rx_getverb = /Error: Script #(?<script>\d+) is a verb\. Please use (?<command>.*?) instead\./
 const rx_noscript = /Error\: Script \#\d+ has not been created yet\./
 const rx_noverb = /Verb not found\./
-const rx_newscript = /New File\: \.\.\/scripts\/S(\d+)\.gsl\./
+const rx_ss_check = /\s\s+\d+\s\s+.*?\s\s+.*?\s\s+.*?/
 
 const rx_ready = /(?:READY FOR ASCII UPLOAD)|(?:Continuing\:)/
 
@@ -126,8 +120,8 @@ export class EditorClient extends BaseGameClient {
         } else { super.serverError(error) }
     }
 
-    checkScript (script: number): Promise<ScriptProperties> {
-        const scriptProperties: any = {}
+    showScript (script: number): Promise<ShowScriptOutput> {
+        const result: Partial<ShowScriptOutput> = {}
         return new Promise ((resolve, reject) => {
             const output = new OutputProcessor ((line: string) => {
                 let match: RegExpMatchArray | null
@@ -138,17 +132,19 @@ export class EditorClient extends BaseGameClient {
                         Number(year), monthList.indexOf(month), Number(day),
                         Number(hh), Number(mm), Number(ss)
                     )
-                    scriptProperties.lastModifiedDate = date
+                    result.lastModifiedDate = date
                     this.off('text', processText)
                     clearTimeout(timeout)
-                    resolve(scriptProperties)
+                    resolve(result as ShowScriptOutput)
                     return
                 }
                 match = line.match(rx_details)
                 if (match && match.groups) {
                     for (let property in match.groups) {
                         if (match.groups[property]) {
-                            scriptProperties[property] = match.groups[property]
+                            result[
+                                property as keyof ShowScriptOutput
+                            ] = match.groups[property] as any
                         }
                     }
                     return
@@ -163,9 +159,28 @@ export class EditorClient extends BaseGameClient {
             this.trySend(`/ss ${script}`)
         })
     }
-    
+
+    showScriptCheckStatus (script: number): Promise<string> {
+        return new Promise ((resolve, reject) => {
+            const output = new OutputProcessor (line => {
+                if (!line.match(rx_ss_check)) return
+                const tokens = line.split(/\s\s+/)
+                clearTimeout(timeout)
+                this.off('text', processText)
+                resolve(tokens[tokens.length - 1])
+            })
+            const processText = (text: string) => output.accumulate(text)
+            const timeout = setTimeout(() => {
+                this.off('text', processText)
+                reject(new Error ("Script check timed out."))
+            }, delay)
+            this.on('text', processText)
+            this.trySend(`/ss check ${script}`)
+        })
+    }
+
     modifyScript (script: number | string, noQuit?:boolean): Promise<ScriptProperties> {
-        const scriptProperties: any = {}
+        const scriptProperties: Partial<ScriptProperties> = {}
         return new Promise ((resolve, reject) => {
             const modifyFailed = (reason: string) => {
                 clearTimeout(timeout)
@@ -195,7 +210,9 @@ export class EditorClient extends BaseGameClient {
                 if (match && match.groups) {
                     for (let property in match.groups) {
                         if (match.groups[property]) {
-                            scriptProperties[property] = match.groups[property]
+                            scriptProperties[
+                                property as keyof ScriptProperties
+                            ] = match.groups[property] as any
                         }
                     }
                     return
@@ -213,7 +230,7 @@ export class EditorClient extends BaseGameClient {
                 case (output.peek(4) === 'Edt:'):
                     clearTimeout(timeout)
                     this.off('text', processText)
-                    resolve(scriptProperties)
+                    resolve(scriptProperties as ScriptProperties)
                 }
             }
             this.on('text', processText)
@@ -269,7 +286,7 @@ export class EditorClient extends BaseGameClient {
     sendScript (lines: Array<string>, newScript: boolean): Promise<ScriptCompileResults> {
         return new Promise ((resolve, reject) => {
             const compileResults: ScriptCompileResults = {
-                script: 0, path: '', bytes: 0, errors: 0, warnings: 0, errorList: [], status: ScriptCompileStatus.Unknown
+                script: 0, path: '', bytes: 0, maxBytes: 0, errors: 0, warnings: 0, errorList: [], status: ScriptCompileStatus.Unknown
             }
             const output = new OutputProcessor ((line: string) => {
                 let match: RegExpMatchArray | null
@@ -303,6 +320,7 @@ export class EditorClient extends BaseGameClient {
                     compileResults.status = ScriptCompileStatus.Compiled
                     compileResults.warnings = Number(match.groups.warnings)
                     compileResults.bytes = Number(match.groups.bytes.replace(/,/g, ''))
+                    compileResults.maxBytes = Number(match.groups.maxBytes.replace(/,/g, ''))
                     return
                 }
                 match = line.match(rx_compile_fail)
