@@ -164,8 +164,8 @@
           118
         ],
         "editor.scrollBeyondLastLine": false,
+        "editor.suggest.showWords": false,
         "editor.tabSize": 2,
-        "editor.wordBasedSuggestions": false,
         "editor.wordWrap": "wordWrapColumn",
         "editor.wordWrapColumn": 118,
         "editor.formatOnSave": true,
