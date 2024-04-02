@@ -14,7 +14,7 @@ All notable changes to the GSL Editor extension will be documented in this file.
 ### Fixed
 
 - Restored confirmation of script upload message in Status Bar.
-- Fixed an issue where downloaded script wouldn't record modifier infomation for verb inputs.
+- Fixed an issue where downloaded script wouldn't record modifier information for verb inputs.
 
 ## [1.10.1] - 2024-03-06
 
