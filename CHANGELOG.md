@@ -2,6 +2,20 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.11.0] - 2024-04-02
+
+### Added
+
+- Added bytes remaining on script upload confirmation.
+- When a script is downloaded, it will now perform a `/SS # CHECKEDIT` and if the script is not in sync across all instances, a warning message is displayed. This feature (`enableScriptSyncChecks`) is enabled by default, but can be disabled in the settings.
+- The extension will now validate that a script is not empty before trying to upload it.
+- The `editor.suggest.showWords` setting is now disabled by default for GSL files. This should prevent random words from being displayed in autocomplete.
+
+### Fixed
+
+- Restored confirmation of script upload message in Status Bar.
+- Fixed an issue where downloaded script wouldn't record modifier infomation for verb inputs.
+
 ## [1.10.1] - 2024-03-06
 
 ### Fixed
