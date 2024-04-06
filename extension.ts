@@ -394,10 +394,16 @@ class VSCodeIntegration {
                             .get(GSLX_ENABLE_SCRIPT_SYNC_CHECKS)
                     )
                     if (!result) continue
-                    const {scriptNumber, scriptPath, syncStatus} = result
+                    const { scriptNumber, scriptPath, scriptProperties, syncStatus } = result
                     window.setStatusBarMessage(`Downloaded ${scriptPath}`, 5000)
-                    if (syncStatus && !syncStatus.match(/All instances in sync/i)) {
-                        window.showWarningMessage(`Script ${scriptNumber} Status: ${syncStatus}`)
+                    if (
+                        syncStatus
+                        && !syncStatus.match(/All instances in sync/i)
+                        && scriptProperties.modifier === GSLExtension.getAccountName()
+                    ) {
+                        window.showInformationMessage(
+                            `s${scriptNumber} - instances out of sync - ${syncStatus.toLowerCase()}`
+                        )
                     }
                     await window.showTextDocument(
                         await workspace.openTextDocument(scriptPath),
