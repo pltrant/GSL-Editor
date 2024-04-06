@@ -109,7 +109,8 @@
 					"end": "$",
 					"patterns": [
 						{ "include": "#strings" },
-						{ "include": "#comments" }
+						{ "include": "#comments" },
+						{ "include": "#variables" }
 					]
 				},
 				{
@@ -122,7 +123,8 @@
 					"end": "$",
 					"patterns": [
 						{ "include": "#strings" },
-						{ "include": "#comments" }
+						{ "include": "#comments" },
+						{ "include": "#variables" }
 					]
 				},
 				{
