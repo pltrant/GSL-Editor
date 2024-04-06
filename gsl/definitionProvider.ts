@@ -98,7 +98,7 @@ export class GSLDefinitionProvider implements DefinitionProvider {
         // Return location
         let idx = 0
         if (txtArray[4]) {
-          let fileTxt = fs.readFileSync(scriptFile).toString().split('\r\n')
+          let fileTxt = fs.readFileSync(scriptFile).toString().split(/\r?\n/)
           for (let i = 0; i < fileTxt.length; i++) {
             if (fileTxt[i].toLowerCase().startsWith(': ' + txtArray[2])) {
               idx = i
