@@ -44,7 +44,8 @@
   "scripts": {
     "vscode:prepublish": "npm run compile && cd gsl-language-server && npm run compile",
     "postinstall": "cd gsl-language-server && npm install && cd ..",
-    "compile": "tsc -b"
+    "compile": "tsc -b",
+    "watch": "tsc --watch"
   },
   "main": "extension",
   "contributes": {
