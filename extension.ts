@@ -31,17 +31,11 @@ import {
     withEditorClient,
     EditorClientInterface
 } from './gsl/editorClient'
+import { formatDate } from './gsl/util/dateUtil'
+import { OutOfDateButtonManager } from './gsl/status_bar/scriptOutOfDateButton'
+import { scriptNumberFromFileName } from './gsl/util/scriptUtil'
+import { GSLX_AUTOMATIC_DOWNLOADS, GSLX_DEV_ACCOUNT, GSLX_DEV_CHARACTER, GSLX_DEV_INSTANCE, GSLX_DEV_PASSWORD, GSLX_DISABLE_LOGIN, GSLX_ENABLE_SCRIPT_SYNC_CHECKS, GSLX_NEW_INSTALL_FLAG, GSLX_SAVED_VERSION, GSL_LANGUAGE_ID } from './gsl/const'
 
-const GSL_LANGUAGE_ID = 'gsl'
-const GSLX_DEV_ACCOUNT = 'developmentAccount'
-const GSLX_DEV_INSTANCE = 'developmentInstance'
-const GSLX_DEV_CHARACTER = 'developmentCharacter'
-const GSLX_DEV_PASSWORD = 'developmentPassword'
-const GSLX_NEW_INSTALL_FLAG = 'gslExtNewInstallFlag'
-const GSLX_SAVED_VERSION = 'savedVersion'
-const GSLX_DISABLE_LOGIN = 'disableLoginAttempts'
-const GSLX_AUTOMATIC_DOWNLOADS = 'automaticallyDownloadScripts'
-const GSLX_ENABLE_SCRIPT_SYNC_CHECKS = 'enableScriptSyncChecks'
 const rx_script_number = /^\d{1,5}$/
 const rx_script_number_in_filename = /(\d+)\.gsl/
 
@@ -94,9 +88,7 @@ export class GSLExtension {
     static async downloadScript (
         client: EditorClientInterface,
         script: number | string,
-        checkSyncStatus = false
     ): Promise<DownloadScriptResult> {
-        const downloadPath = this.getDownloadLocation()
         try {
             // Get script properties, keeping editor open
             const scriptProperties = await client.modifyScript(
@@ -106,28 +98,37 @@ export class GSLExtension {
                 throw new Error(`Failed to get script properties: ${e.message}`)
             })
             // Write file
-            const scriptFile = scriptProperties.path.split('/').pop()!
-            const scriptPath = path.join(downloadPath, scriptFile)
+            const destinationPath = path.join(
+                this.getDownloadLocation(),
+                scriptProperties.path.split('/').pop()!
+            )
             if (scriptProperties.new) {
-                fs.writeFileSync(scriptPath, "")
+                fs.writeFileSync(destinationPath, "")
                 await client.exitModifyScript()
             } else {
+                // Note that captureScript closes modifyScript
                 let content = await client.captureScript().catch((e) => {
                     throw new Error(`Failed to download script: ${e.message}`)
                 })
                 if (content) {
                     if (content.slice(-2) !== '\r\n') { content += '\r\n' }
-                    fs.writeFileSync(scriptPath, content)
+                    fs.writeFileSync(destinationPath, content)
                 }
             }
             // Record script modification info
-            const scriptNumber = Number(scriptFile.match(rx_script_number_in_filename)![1])
+            const scriptNumber = Number(
+                path.basename(destinationPath)
+                    .match(rx_script_number_in_filename)![1]
+            )
             if (Number.isNaN(scriptNumber)) throw new Error('Expected script number, not NaN')
             this.recordScriptModification(
                 scriptNumber,
                 scriptProperties.modifier,
                 scriptProperties.lastModifiedDate,
             )
+            const checkSyncStatus = workspace
+                .getConfiguration(GSL_LANGUAGE_ID)
+                .get(GSLX_ENABLE_SCRIPT_SYNC_CHECKS)
             let syncStatus = undefined
             if (
                 checkSyncStatus
@@ -141,7 +142,7 @@ export class GSLExtension {
             return {
                 scriptNumber,
                 scriptProperties,
-                scriptPath,
+                scriptPath: destinationPath,
                 syncStatus
             }
         }
@@ -182,6 +183,7 @@ export class GSLExtension {
             lines.push(document.lineAt(n).text)
         }
         if (lines[lines.length - 1] !== '') { lines.push('') }
+        // Note that sendScript closes modifyScript
         let compileResults = await client.sendScript(lines, scriptProperties.new)
         // Verify success
         if (compileResults.status === ScriptCompileStatus.Failed) {
@@ -231,10 +233,14 @@ export class GSLExtension {
                 + ` should overwrite the server copy.`
             )
         }
-        else if (lastSeenMod.lastModifiedDate.toISOString() !== newestProperties.lastModifiedDate.toISOString()) {
+        else if (
+            lastSeenMod.lastModifiedDate.toISOString()
+            !== newestProperties.lastModifiedDate.toISOString()
+        ) {
             reasons.push(
                 `It appears to have been edited since you last downloaded it.`
-                + `\nServer: ${newestProperties.lastModifiedDate}\nLocal: ${lastSeenMod.lastModifiedDate}`
+                + `\nLocal:  ${formatDate(lastSeenMod.lastModifiedDate)}.`
+                + `\nServer: ${formatDate(newestProperties.lastModifiedDate)}.`
             )
         }
         const currentAccount = this.getAccountName()
@@ -290,18 +296,17 @@ export class GSLExtension {
     }
 }
 
-function scriptNumberFromFileName (fileName: string): string {
-    return path.basename(fileName).replace(/\D+/g,'').replace(/^0+/,'')
-}
-
 interface QuickPickCommandItem extends QuickPickItem { name: string }
 
-class VSCodeIntegration {
+export class VSCodeIntegration {
     private context: ExtensionContext
 
     private downloadButton: StatusBarItem
     private uploadButton: StatusBarItem
     private gslButton: StatusBarItem
+
+    /** Managed entirely by `OutOfDateButtonManager` */
+    private scriptOutOfDateButton: StatusBarItem
 
     private commandList: Array<QuickPickCommandItem>
 
@@ -311,12 +316,16 @@ class VSCodeIntegration {
 
     private loggingEnabled: boolean
 
+    private outOfDateButtonManager: OutOfDateButtonManager
+
     constructor (context: ExtensionContext) {
         this.context = context
 
         this.downloadButton = window.createStatusBarItem(StatusBarAlignment.Left, 50)
         this.uploadButton = window.createStatusBarItem(StatusBarAlignment.Left, 50)
         this.gslButton = window.createStatusBarItem(StatusBarAlignment.Left, 50)
+        // Place out-of-date button as far to the right as possible, but left of status message
+        this.scriptOutOfDateButton = window.createStatusBarItem(StatusBarAlignment.Left, 5)
 
         this.commandList = [
             { label: "Download Script", name: 'gsl.downloadScript' },
@@ -327,26 +336,37 @@ class VSCodeIntegration {
             { label: "Toggle output logging", name: 'gsl.toggleLogging' },
             { label: "Open development terminal", name: 'gsl.openTerminal' },
             { label: "Connect to development server", name: 'gsl.openConnection' },
-            { label: "User Setup", name: 'gsl.userSetup' }
+            { label: "User Setup", name: 'gsl.userSetup' },
         ]
 
         this.outputChannel = window.createOutputChannel("GSL Editor (debug)")
-    
+
         this.loggingEnabled = false
 
         this.registerCommands()
         this.initializeComponents()
+
+        // Watch active editor for files that are out-of-date relative to
+        // the server. If a stale file is seen, highlight the stale file
+        // button, subtly prompting the user to refresh the local copy.
+        this.outOfDateButtonManager = new OutOfDateButtonManager(
+            this.scriptOutOfDateButton,
+            this.withEditorClient.bind(this),
+            this.showDownloadedScript.bind(this),
+            this.context
+        )
+        this.context.subscriptions.push(this.outOfDateButtonManager.activate())
     }
 
     private initializeComponents () {
         this.downloadButton.text = "$(cloud-download) Download"
         this.downloadButton.command = 'gsl.downloadScript'
         this.downloadButton.show()
-    
+
         this.uploadButton.text = "$(cloud-upload) Upload"
         this.uploadButton.command = 'gsl.uploadScript'
         this.uploadButton.show()
-    
+
         this.gslButton.text = "$(ruby) GSL"
         this.gslButton.command = 'gsl.showCommands'
         this.gslButton.show()
@@ -388,27 +408,11 @@ class VSCodeIntegration {
                 for (script of scriptList) {
                     const result = await GSLExtension.downloadScript(
                         client,
-                        script,
-                        workspace
-                            .getConfiguration(GSL_LANGUAGE_ID)
-                            .get(GSLX_ENABLE_SCRIPT_SYNC_CHECKS)
+                        script
                     )
                     if (!result) continue
-                    const { scriptNumber, scriptPath, scriptProperties, syncStatus } = result
-                    window.setStatusBarMessage(`Downloaded ${scriptPath}`, 5000)
-                    if (
-                        syncStatus
-                        && !syncStatus.match(/All instances in sync/i)
-                        && scriptProperties.modifier === GSLExtension.getAccountName()
-                    ) {
-                        window.showInformationMessage(
-                            `s${scriptNumber} - instances out of sync - ${syncStatus.toLowerCase()}`
-                        )
-                    }
-                    await window.showTextDocument(
-                        await workspace.openTextDocument(scriptPath),
-                        { preview: false }
-                    )
+                    this.outOfDateButtonManager.renderButton({ state: 'hidden'})
+                    await vsc?.showDownloadedScript(result)
                 }
             })
         }
@@ -416,6 +420,32 @@ class VSCodeIntegration {
             console.error(e as any)
             const error = `Failed to download script ${script}`
             window.showErrorMessage((e instanceof Error) ? `${error} (${e.message})` : error)
+        }
+    }
+    private async showDownloadedScript(result: DownloadScriptResult) {
+        const { scriptNumber, scriptPath, scriptProperties, syncStatus } = result
+        window.setStatusBarMessage(`Downloaded ${scriptPath}`, 5000)
+        if (
+            syncStatus
+            && !syncStatus.match(/All instances in sync/i)
+            && scriptProperties.modifier === GSLExtension.getAccountName()
+        ) {
+            window.showInformationMessage(
+                `s${scriptNumber} - instances out of sync - ${syncStatus.toLowerCase()}`
+            )
+        }
+        try {
+            // Stop monitoring while we open the document so we don't
+            // trigger an unnecessary download/check
+            this.outOfDateButtonManager.stopMonitoring()
+            await window.showTextDocument(
+                await workspace.openTextDocument(scriptPath),
+                { preview: false }
+            )
+            this.outOfDateButtonManager.renderButton({state: 'hidden'})
+        }
+        finally {
+            this.outOfDateButtonManager.resumeMonitoring()
         }
     }
 
@@ -455,6 +485,7 @@ class VSCodeIntegration {
         } else {
             scriptNum = Number(inferredScriptNum)
         }
+        const uploadMessage = window.setStatusBarMessage(`Uploading Script...`, 60000)
         await this.withEditorClient(async (client) => {
             let compileResults: ScriptCompileResults | undefined
             try {
@@ -463,7 +494,7 @@ class VSCodeIntegration {
                     client,
                     scriptNum,
                     document
-                )
+                ) // closes modifyScript
                 if (!compileResults) return
                 // Display compilation feedback
                 if (compileResults.status === ScriptCompileStatus.Failed) {
@@ -478,6 +509,7 @@ class VSCodeIntegration {
                 const bytesRemaining = maxBytes - bytes
                 const bytesMsg = `${bytes.toLocaleString()} bytes (${bytesRemaining.toLocaleString()} left)`
                 window.setStatusBarMessage(`Script ${script}: Compile OK; ${bytesMsg}`, 5000)
+                this.outOfDateButtonManager.renderButton({state: 'hidden'})
             } catch (e) {
                 const error = `Failed to upload script ${inferredScriptNum}`
                 window.showErrorMessage((e instanceof Error) ? `${error} (${e.message})` : error)
@@ -486,9 +518,12 @@ class VSCodeIntegration {
                 // to exit the editor when something goes wrong.
                 await client.exitModifyScript()
             }
+            finally {
+                uploadMessage.dispose()
+            }
         })
     }
-    
+
     private async commandShowCommands () {
         const command = await window.showQuickPick(
             this.commandList, { placeHolder: 'Select a command to execute.' }
@@ -633,7 +668,7 @@ class VSCodeIntegration {
             window.setStatusBarMessage("Failed to bind terminal to game client", 5000)
         }
     }
-    
+
     private registerCommands () {
         let subscription: Disposable
         subscription = commands.registerCommand('gsl.downloadScript', this.commandDownloadScript, this)

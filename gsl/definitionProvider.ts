@@ -4,16 +4,11 @@ import * as path from "path"
 import * as fs from "fs"
 
 import { GSLExtension, vsc } from "../extension";
-
-interface PromiseWrapper {
-    promise: Promise<void>
-    resolve: () => void
-    reject: (error: Error) => void
-}
+import { PromiseWrapper, makePromiseWrapper } from "./util/promiseUtil";
 
 export class GSLDefinitionProvider implements DefinitionProvider {
   private enableAutomaticDownloads: boolean
-  private inFlightScriptMap: Map<number, PromiseWrapper>
+  private inFlightScriptMap: Map<number, PromiseWrapper<void>>
 
   constructor(enableAutomaticDownloads: boolean) {
     this.enableAutomaticDownloads = enableAutomaticDownloads
@@ -111,16 +106,3 @@ export class GSLDefinitionProvider implements DefinitionProvider {
     }
   }
 }
-
-const makePromiseWrapper = (): PromiseWrapper => {
-  let resolve: () => void
-  let reject: (error: Error) => void
-  const promise = new Promise<void>((resolveFn, rejectFn) =>
-    [resolve, reject] = [resolveFn, rejectFn]
-  )
-  return {
-    promise,
-    resolve: resolve!,
-    reject: reject!
-  }
-};
