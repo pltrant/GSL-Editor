@@ -142,6 +142,7 @@ export class GameTerminal {
     hide () { this.terminal.hide() }
 
     bindClient (client: BaseGameClient) {
+        if (this.gameClient === client) return
         if (this.gameClient) { throw new Error ("Game client is already bound?") }
     
         const unbindClient = () => {
@@ -200,6 +201,5 @@ export class GameTerminal {
 
         this.gameClient = client
     }
-
 }
 

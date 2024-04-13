@@ -4,7 +4,6 @@ import { EventEmitter } from "events";
 import { maxHeaderSize } from "http";
 import * as fs from 'fs';
 import { WriteStream } from "fs";
-import { LoginDetails } from "./eaccessClient";
 
 export interface GameClientOptions {
     debug?: boolean, echo?: boolean,
@@ -113,13 +112,15 @@ export class BaseGameClient extends EventEmitter {
         this.server.send(command + this.newLine)
     }
 
-    toggleLogging() {
+    /** @returns true if logging will be enabled */
+    toggleLogging(): boolean {
         if (this.logStream) {
             this.logStream.end()
             this.logStream = undefined
-        } else {
-            this.logStream = fs.createWriteStream(this.log, { flags: 'a' })
+            return false
         }
+        this.logStream = fs.createWriteStream(this.log, { flags: 'a' })
+        return true
     }
 }
 

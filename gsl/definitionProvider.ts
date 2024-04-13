@@ -3,13 +3,21 @@ import { DefinitionProvider, Location, Position, Uri, workspace } from "vscode"
 import * as path from "path"
 import * as fs from "fs"
 
-import { GSLExtension } from "../extension";
+import { GSLExtension, vsc } from "../extension";
+
+interface PromiseWrapper {
+    promise: Promise<void>
+    resolve: () => void
+    reject: (error: Error) => void
+}
 
 export class GSLDefinitionProvider implements DefinitionProvider {
   private enableAutomaticDownloads: boolean
+  private inFlightScriptMap: Map<number, PromiseWrapper>
 
   constructor(enableAutomaticDownloads: boolean) {
     this.enableAutomaticDownloads = enableAutomaticDownloads
+    this.inFlightScriptMap = new Map()
   }
 
   async provideDefinition (document: any, position: any, token: any) {
@@ -24,33 +32,70 @@ export class GSLDefinitionProvider implements DefinitionProvider {
           }
         }
       } else {
-        let scriptNum = ''
+        // Attempt to find script file
+        let script = ''
         if (txtArray.length === 2) { // call #
-          scriptNum = txtArray[1]
+          script = txtArray[1]
         } else if (txtArray[3] === 'in') { // callmatch must_match "$*" in #
-          scriptNum = txtArray[4]
+          script = txtArray[4]
         } else {
           return
         }
-        if (isNaN(Number(scriptNum))) { // Not a number
-          return
+        const scriptNum = Number(script)
+        if (isNaN(scriptNum)) return
+        while (script.length < 5) {
+          script = '0' + script
         }
-        while (scriptNum.length < 5) {
-          scriptNum = '0' + scriptNum
-        }
-        let scriptFile = path.join(GSLExtension.getDownloadLocation(), 'S' + scriptNum)
-                       + workspace.getConfiguration('gsl').get('fileExtension')
+        let scriptFile = path.join(
+          GSLExtension.getDownloadLocation(),
+          'S' + script
+        ) + workspace.getConfiguration('gsl').get('fileExtension')
         if (!fs.existsSync(scriptFile)) {
+          // Script file not found - attempt to download script
           if (!this.enableAutomaticDownloads) {
             console.warn('File not found and automatic downloads disabled')
             return
           }
-          await GSLExtension.downloadScript(Number(scriptNum))
+          // Block on any in flight requests for the same definition
+          const inFlight = this.inFlightScriptMap.get(scriptNum)
+          if (inFlight) {
+            try {
+              await inFlight.promise
+            }
+            catch (e) {
+              console.error(e)
+              return
+            }
+          }
+          else {
+            try {
+              // Download script
+              this.inFlightScriptMap.set(
+                scriptNum,
+                makePromiseWrapper()
+              )
+              await vsc!.withEditorClient(client => {
+                return GSLExtension.downloadScript(client, Number(script))
+              })
+            }
+            catch (e: unknown) {
+              console.error(e)
+              this.inFlightScriptMap.get(scriptNum)?.reject(
+                (e instanceof Error) ? e : new Error()
+              )
+            }
+            finally {
+              this.inFlightScriptMap.get(scriptNum)?.resolve()
+              this.inFlightScriptMap.delete(scriptNum)
+            }
+          }
         }
         if (!fs.existsSync(scriptFile)) {
+          // Something unknown went wrong
           console.error('Failed to find file')
           return
         }
+        // Return location
         let idx = 0
         if (txtArray[4]) {
           let fileTxt = fs.readFileSync(scriptFile).toString().split('\r\n')
@@ -66,3 +111,16 @@ export class GSLDefinitionProvider implements DefinitionProvider {
     }
   }
 }
+
+const makePromiseWrapper = (): PromiseWrapper => {
+  let resolve: () => void
+  let reject: (error: Error) => void
+  const promise = new Promise<void>((resolveFn, rejectFn) =>
+    [resolve, reject] = [resolveFn, rejectFn]
+  )
+  return {
+    promise,
+    resolve: resolve!,
+    reject: reject!
+  }
+};

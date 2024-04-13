@@ -7,7 +7,7 @@ import {
     TextDocument, Diagnostic, DiagnosticCollection
 } from 'vscode'
 
-import { env, workspace, window, commands, languages, extensions } from 'vscode'
+import { workspace, window, commands, languages, extensions } from 'vscode'
 
 import {
     LanguageClient, LanguageClientOptions, ServerOptions, TransportKind, DiagnosticSeverity
@@ -22,9 +22,15 @@ import {
 } from './gsl'
 
 import { EAccessClient } from './gsl/eaccessClient'
-import { GameClientOptions } from './gsl/gameClients'
 import { GameTerminal } from './gsl/gameTerminal'
-import { ScriptCompileStatus, ScriptError, EditorClient, ScriptProperties, ScriptCompileResults, ShowScriptOutput } from './gsl/editorClient'
+import {
+    ScriptCompileStatus,
+    ScriptError,
+    ScriptProperties,
+    ScriptCompileResults,
+    withEditorClient,
+    EditorClientInterface
+} from './gsl/editorClient'
 
 const GSL_LANGUAGE_ID = 'gsl'
 const GSLX_DEV_ACCOUNT = 'developmentAccount'
@@ -44,14 +50,23 @@ interface LastSeenScriptModification {
     lastModifiedDate: Date
 }
 
-export class GSLExtension {
-    private static vsc: VSCodeIntegration
+interface DownloadScriptResult {
+    scriptNumber: number
+    /** Local file system path of downloaded script */
+    scriptPath: string
+    /** Up-to-date script properties */
+    scriptProperties: ScriptProperties
+    /** Status for "/ss checkedit"; undefined if feature is disabled */
+    syncStatus: string | undefined
+}
 
+export class GSLExtension {
+    private static context: ExtensionContext
     private static diagnostics: DiagnosticCollection
 
-    static init (vsc: VSCodeIntegration) {
+    static init (context: ExtensionContext) {
+        this.context = context
         this.diagnostics = languages.createDiagnosticCollection()
-        this.vsc = vsc
     }
 
     static getDownloadLocation (): string {
@@ -77,120 +92,134 @@ export class GSLExtension {
 
     /** @returns path of newly downloaded script, or `undefined` if download failed */
     static async downloadScript (
+        client: EditorClientInterface,
         script: number | string,
         checkSyncStatus = false
-    ): Promise<string | undefined> {
-        const error: any = (e: Error) => { error.caught = e }
+    ): Promise<DownloadScriptResult> {
         const downloadPath = this.getDownloadLocation()
-        const fileExtension = workspace.getConfiguration(GSL_LANGUAGE_ID).get('fileExtension')
-        const client = await this.vsc.ensureGameConnection().catch(error)
-        if (error.caught) { return void window.showErrorMessage(`Failed to connect to game: ${error.caught.message}`) }
-        if (client) {
-            const scriptProperties = await client.modifyScript(script).catch(error)
-            if (error.caught) { return void window.showErrorMessage(error.caught.message) }
+        try {
+            // Get script properties, keeping editor open
+            const scriptProperties = await client.modifyScript(
+                script,
+                true
+            ).catch((e: any) => {
+                throw new Error(`Failed to get script properties: ${e.message}`)
+            })
+            // Write file
             const scriptFile = scriptProperties.path.split('/').pop()!
             const scriptPath = path.join(downloadPath, scriptFile)
-            if (scriptProperties.new) { fs.writeFileSync(scriptPath, "") } else {
-                let content = await client.captureScript().catch(error)
-                if (error.caught) { return void window.showErrorMessage(`Failed to download script: ${error.caught.message}`) }
+            if (scriptProperties.new) {
+                fs.writeFileSync(scriptPath, "")
+                await client.exitModifyScript()
+            } else {
+                let content = await client.captureScript().catch((e) => {
+                    throw new Error(`Failed to download script: ${e.message}`)
+                })
                 if (content) {
                     if (content.slice(-2) !== '\r\n') { content += '\r\n' }
                     fs.writeFileSync(scriptPath, content)
                 }
             }
-            const scriptNum = Number(scriptFile.match(rx_script_number_in_filename)![1])
-            if (Number.isNaN(scriptNum)) throw new Error('Expected script number, not NaN')
-            this.vsc.recordScriptModification(
-                scriptNum,
+            // Record script modification info
+            const scriptNumber = Number(scriptFile.match(rx_script_number_in_filename)![1])
+            if (Number.isNaN(scriptNumber)) throw new Error('Expected script number, not NaN')
+            this.recordScriptModification(
+                scriptNumber,
                 scriptProperties.modifier,
                 scriptProperties.lastModifiedDate,
             )
-            if (checkSyncStatus && this.vsc.getGameInstance() === 'GS4D') {
-                const status = await client.showScriptCheckStatus(scriptNum).catch(error)
-                if (error.caught) { return void window.showErrorMessage(`Failed to run show script check: ${error.caught.message}`) }
-                window.setStatusBarMessage(`Script download complete!`, 5000)
-                if (!status.match(/All instances in sync/i)) {
-                    window.showWarningMessage(`Script ${scriptNum} Status: ${status}`)
-                }
-            }
-            return scriptPath
-        } else {
-            window.showErrorMessage("Could not connect to game?")
-        }
-    }
-
-    static async uploadScript (script: number, document: TextDocument): Promise<ScriptCompileResults | undefined> {
-        if (document.getText().match(/^\s*$/)) {
-            return void window.showErrorMessage('Cannot upload empty script')
-        }
-        const error: any = (e: Error) => { error.caught = e }
-        const client = await this.vsc.ensureGameConnection().catch(error)
-        if (error.caught) { return void window.showErrorMessage(`Failed to connect to game: ${error.caught.message}`) }
-        if (client) {
-            const lines = []
-            for (let n = 0, nn = document.lineCount; n < nn; n++) {
-                lines.push(document.lineAt(n).text)
-            }
-            if (lines[lines.length - 1] !== '') { lines.push('') }
-            let scriptProperties = await client.modifyScript(script, true).catch(error)
-            if (error.caught) { return void window.showErrorMessage(error.caught.message) }
-            const isNewScript = scriptProperties.new !== undefined
-            const requiresConfirmation = isNewScript ? false :
-                GSLExtension.requiresUploadConfirmation(script, scriptProperties)
-            if (requiresConfirmation) {
-                const confirmation = await window.showWarningMessage(
-                    requiresConfirmation.prompt,
-                    { modal: true },
-                    'Yes'
-                )
-                if (confirmation !== 'Yes') {
-                    await client.exitModifyScript()
-                    return
-                }
-            }
-            let compileResults = await client.sendScript(lines, isNewScript).catch(error)
-            if (error.caught) { return void window.showErrorMessage(error.caught.message) }
-            if (compileResults.status === ScriptCompileStatus.Failed) {
-                const problems = compileResults.errorList.map((error: ScriptError) => {
-                    const line = document.lineAt(error.line - 1)!
-                    return new Diagnostic (line.range, error.message, DiagnosticSeverity.Error)
+            let syncStatus = undefined
+            if (
+                checkSyncStatus
+                && this.context.globalState.get(GSLX_DEV_INSTANCE) === 'GS4D'
+            ) {
+                syncStatus = await client.showScriptCheckStatus(scriptNumber).catch((e: any) => {
+                    throw new Error(`Failed to run show script check: ${e.message}`)
                 })
-                this.diagnostics.set(document.uri, problems)
-                window.showErrorMessage(`Script ${compileResults.script}: Compile failed; ${compileResults.errors} error(s), ${compileResults.warnings} warning(s).`)
-                commands.executeCommand('workbench.actions.view.problems')
-            } else {
-                this.diagnostics.clear()
-                // Record updated script properties
-                const output = await GSLExtension.getShowScriptOutput(script)
-                if (!output) throw new Error('Failed to record script modification')
-                this.vsc.recordScriptModification(script, output.modifier, output.lastModifiedDate)
             }
-            return compileResults
-        } else {
-            window.showErrorMessage("Could not connect to game?")
+            // Return results
+            return {
+                scriptNumber,
+                scriptProperties,
+                scriptPath,
+                syncStatus
+            }
+        }
+        catch (e) {
+            // We passed keepalive=true to `modifyScript`, so we need to make sure
+            // to exit the editor when something goes wrong.
+            await client.exitModifyScript()
+            throw e
         }
     }
 
-    static async checkModifiedDate (script: number): Promise<Date | undefined> {
-        const output = await GSLExtension.getShowScriptOutput(script)
-        if (!output || !output.lastModifiedDate) return
-        return output.lastModifiedDate
+    static async uploadScript (
+        client: EditorClientInterface,
+        script: number,
+        document: TextDocument
+    ): Promise<ScriptCompileResults | undefined> {
+        // Get script properties, keeping editor open
+        const scriptProperties = await client.modifyScript(script, true)
+        // Confirm upload if needed
+        const requiresConfirmation = GSLExtension.requiresUploadConfirmation(
+            script,
+            scriptProperties
+        )
+        if (requiresConfirmation) {
+            const confirmation = await window.showWarningMessage(
+                requiresConfirmation.prompt,
+                { modal: true },
+                'Yes'
+            )
+            if (confirmation !== 'Yes') {
+                await client.exitModifyScript()
+                return
+            }
+        }
+        // Send script
+        const lines = new Array<string>()
+        for (let n = 0, nn = document.lineCount; n < nn; n++) {
+            lines.push(document.lineAt(n).text)
+        }
+        if (lines[lines.length - 1] !== '') { lines.push('') }
+        let compileResults = await client.sendScript(lines, scriptProperties.new)
+        // Verify success
+        if (compileResults.status === ScriptCompileStatus.Failed) {
+            const problems = compileResults.errorList.map((error: ScriptError) => {
+                const line = document.lineAt(error.line - 1)!
+                return new Diagnostic (line.range, error.message, DiagnosticSeverity.Error)
+            })
+            this.diagnostics.set(document.uri, problems)
+            return compileResults
+        }
+        this.diagnostics.clear()
+        // Record updated script properties
+        const newScriptProperties = await client.modifyScript(script)
+        this.recordScriptModification(
+            script,
+            newScriptProperties.modifier,
+            newScriptProperties.lastModifiedDate,
+        )
+        return compileResults
     }
 
-    static async getShowScriptOutput (script: number): Promise<ShowScriptOutput | undefined> {
-        const error: any = (e: Error) => { error.caught = e }
-        const client = await this.vsc.ensureGameConnection().catch(error)
-        if (error.caught) { return void window.showErrorMessage(`Failed to connect to game: ${error.caught.message}`) }
-        const output = await client.showScript(script).catch(error)
-        if (error.caught) { return void window.showErrorMessage(`Failed to get /ss output: ${error.caught.message}`) }
-        return output
+    static async checkModifiedDate (client: EditorClientInterface, script: number): Promise<Date | undefined> {
+        try {
+            const output = await client.showScript(script)
+            if (!output || !output.lastModifiedDate) return
+            return output.lastModifiedDate
+        } catch (e) {
+            console.error(e)
+            throw new Error('Failed to get /ss output')
+        }
     }
 
     static requiresUploadConfirmation (
         script: number,
         newestProperties: ScriptProperties
     ): { prompt: string } | undefined {
-        const lastSeenMod = this.vsc.findLastSeenScriptModification(script)
+        if (newestProperties.new) return // New scripts don't need confirmation
+        const lastSeenMod = this.findLastSeenScriptModification(script)
         let reasons = []
 
         if (!lastSeenMod || !lastSeenMod.lastModifiedDate || !lastSeenMod.modifier) {
@@ -208,7 +237,7 @@ export class GSLExtension {
                 + `\nServer: ${newestProperties.lastModifiedDate}\nLocal: ${lastSeenMod.lastModifiedDate}`
             )
         }
-        const currentAccount = this.vsc.getAccountName()
+        const currentAccount = this.getAccountName()
         // The server truncates the account name to 12 characters, so we have to rely on startsWith.
         // This means that we have no ability to distinguish between modifiers W_GS4-Alornen and W_GS4-Alorner
         if (!currentAccount?.startsWith(newestProperties.modifier)) {
@@ -223,6 +252,41 @@ export class GSLExtension {
                 + reasons.join('\n\n')
                 + `\n\nWould you like to upload this script anyway?`,
         }
+    }
+
+    static recordScriptModification(
+        script: number,
+        modifier: string,
+        lastModifiedDate: Date
+    ): void {
+        this.context.globalState.update(
+            this.scriptPropsKey(script),
+            { modifier, lastModifiedDate: lastModifiedDate.toISOString() }
+        )
+    }
+
+    static findLastSeenScriptModification(
+        script: number
+    ): LastSeenScriptModification | undefined {
+        const output = this.context.globalState.get<{
+            modifier: string;
+            lastModifiedDate: string;
+        }>(this.scriptPropsKey(script))
+        return output ? {
+            modifier: output.modifier,
+            lastModifiedDate: new Date(output.lastModifiedDate) // restore from ISO string
+        } : undefined
+    }
+
+    /** @returns key for storing script modification data */
+    private static scriptPropsKey(script: number): string {
+        return `script_properties.${script}`
+    }
+
+    static getAccountName(): string | undefined {
+        const name = this.context.globalState.get(GSLX_DEV_ACCOUNT)
+        if (!name) return
+        return `W_${name}`
     }
 }
 
@@ -244,7 +308,6 @@ class VSCodeIntegration {
     private outputChannel: OutputChannel
 
     private gameTerminal?: GameTerminal
-    private gameClient?: EditorClient
 
     private loggingEnabled: boolean
 
@@ -311,7 +374,7 @@ class VSCodeIntegration {
                 }
                 for (;low <= high;) { scriptList.push(low++) }
             } else {
-                var script = Number(option)
+                const script = Number(option)
                 if (isNaN(script)) {
                     scriptList.push(option)
                 } else {
@@ -319,18 +382,34 @@ class VSCodeIntegration {
                 }
             }
         }
-        for (let script of scriptList) {
-            const scriptPath = await GSLExtension.downloadScript(
-                script,
-                workspace
-                    .getConfiguration(GSL_LANGUAGE_ID)
-                    .get(GSLX_ENABLE_SCRIPT_SYNC_CHECKS)
-            )
-            if (!scriptPath) continue
-            await window.showTextDocument(
-                await workspace.openTextDocument(scriptPath),
-                { preview: false }
-            )
+        let script: string | number | undefined = undefined
+        try {
+            await this.withEditorClient(async (client) => {
+                for (script of scriptList) {
+                    const result = await GSLExtension.downloadScript(
+                        client,
+                        script,
+                        workspace
+                            .getConfiguration(GSL_LANGUAGE_ID)
+                            .get(GSLX_ENABLE_SCRIPT_SYNC_CHECKS)
+                    )
+                    if (!result) continue
+                    const {scriptNumber, scriptPath, syncStatus} = result
+                    window.setStatusBarMessage(`Downloaded ${scriptPath}`, 5000)
+                    if (syncStatus && !syncStatus.match(/All instances in sync/i)) {
+                        window.showWarningMessage(`Script ${scriptNumber} Status: ${syncStatus}`)
+                    }
+                    await window.showTextDocument(
+                        await workspace.openTextDocument(scriptPath),
+                        { preview: false }
+                    )
+                }
+            })
+        }
+        catch (e: unknown) {
+            console.error(e as any)
+            const error = `Failed to download script ${script}`
+            window.showErrorMessage((e instanceof Error) ? `${error} (${e.message})` : error)
         }
     }
 
@@ -342,34 +421,66 @@ class VSCodeIntegration {
             )
         }
         if (document.isDirty) {
-            let result = await document.save()
+            let result = false
+            let i = 0
+            while (result === false && i++ < 3) {
+                result = await document.save()
+            }
             if (result === false) {
                 return void window.showErrorMessage(
                     "Failed to save active script editor before upload."
                 )
             }
         }
-        const scriptNumber = scriptNumberFromFileName(document.fileName)
-        let compileResults: ScriptCompileResults | undefined;
-        if (rx_script_number.test(scriptNumber) === false) {
+        if (document.getText().match(/^\s*$/)) {
+            return void window.showErrorMessage('Cannot upload empty script')
+        }
+        // Infer script number
+        const inferredScriptNum = scriptNumberFromFileName(document.fileName)
+        let scriptNum: number
+        if (rx_script_number.test(inferredScriptNum) === false) {
             const prompt = "Unable to parse script number from active editor file name."
             const placeHolder = "Script number to upload as?"
             const input = await window.showInputBox({ prompt, placeHolder })
             if (!input || rx_script_number.test(input) === false) {
                 return void window.showErrorMessage("Invalid script number provided.")
             }
-            const script = Number(input)
-            compileResults = await GSLExtension.uploadScript(script, document)
+            scriptNum = Number(input)
         } else {
-            const script = Number(scriptNumber)
-            compileResults = await GSLExtension.uploadScript(script, document)
+            scriptNum = Number(inferredScriptNum)
         }
-        if (compileResults && compileResults.status !== ScriptCompileStatus.Failed) {
-            const {script, bytes, maxBytes} = compileResults
-            const bytesRemaining = maxBytes - bytes
-            const bytesMsg = `${bytes.toLocaleString()} bytes (${bytesRemaining.toLocaleString()} left)`
-            window.setStatusBarMessage(`Script ${script}: Compile OK; ${bytesMsg}`, 5000)
-        }
+        await this.withEditorClient(async (client) => {
+            let compileResults: ScriptCompileResults | undefined
+            try {
+                // Send script
+                compileResults = await GSLExtension.uploadScript(
+                    client,
+                    scriptNum,
+                    document
+                )
+                if (!compileResults) return
+                // Display compilation feedback
+                if (compileResults.status === ScriptCompileStatus.Failed) {
+                    const {script, errors, warnings} = compileResults
+                    window.showErrorMessage(
+                        `Script ${script}: Compile failed; ${errors} error(s), ${warnings} warning(s).`
+                    )
+                    commands.executeCommand('workbench.actions.view.problems')
+                    return
+                }
+                const {script, bytes, maxBytes} = compileResults
+                const bytesRemaining = maxBytes - bytes
+                const bytesMsg = `${bytes.toLocaleString()} bytes (${bytesRemaining.toLocaleString()} left)`
+                window.setStatusBarMessage(`Script ${script}: Compile OK; ${bytesMsg}`, 5000)
+            } catch (e) {
+                const error = `Failed to upload script ${inferredScriptNum}`
+                window.showErrorMessage((e instanceof Error) ? `${error} (${e.message})` : error)
+                console.error(e)
+                // We passed keepalive=true to `modifyScript`, so we need to make sure
+                // to exit the editor when something goes wrong.
+                await client.exitModifyScript()
+            }
+        })
     }
     
     private async commandShowCommands () {
@@ -388,16 +499,18 @@ class VSCodeIntegration {
         let scriptNumber = path.basename(window.activeTextEditor.document.fileName)
         scriptNumber = scriptNumber.replace(/\D+/g, '').replace(/^0+/,'')
         const script = Number(scriptNumber)
-        window.setStatusBarMessage(`Checking modification date for script ${script} ...`, 5000)
-        const date = await GSLExtension.checkModifiedDate(script)
-        if (!date) {
-            window.showErrorMessage(`Failed to find modification date for script ${script}`)
-            return
-        }
-        window.setStatusBarMessage(
-            `Script ${script} was last modified on ${date.toLocaleDateString()} at ${date.toLocaleTimeString()}`,
-            5000
-        )
+        await this.withEditorClient(async (client) => {
+            window.setStatusBarMessage(`Checking modification date for script ${script} ...`, 5000)
+            const date = await GSLExtension.checkModifiedDate(client, script)
+            if (!date) {
+                window.showErrorMessage(`Failed to find modification date for script ${script}`)
+                return
+            }
+            window.setStatusBarMessage(
+                `Script ${script} was last modified on ${date.toLocaleDateString()} at ${date.toLocaleTimeString()}`,
+                5000
+            )
+        })
     }
 
     private commandListTokens () {
@@ -405,14 +518,15 @@ class VSCodeIntegration {
         commands.executeCommand('markdown.showPreview', uri)
     }
 
-    private commandToggleLogging () {
-        this.loggingEnabled = !this.loggingEnabled
-        this.gameClient?.toggleLogging()
-        window.setStatusBarMessage(this.loggingEnabled ? 'Logging enabled.' : 'Logging disabled.', 5000)
+    private async commandToggleLogging () {
+        await this.withEditorClient(async (client) => {
+            this.loggingEnabled = !this.loggingEnabled
+            client.toggleLogging()
+            window.setStatusBarMessage(this.loggingEnabled ? 'Logging enabled.' : 'Logging disabled.', 5000)
+        })
     }
 
     private async commandUserSetup () {
-
         let account = await window.showInputBox({ prompt: "PLAY.NET Account:", ignoreFocusOut: true })
         if (!account) { return void window.showErrorMessage("No account name entered; aborting setup.") }
 
@@ -473,26 +587,45 @@ class VSCodeIntegration {
         this.context.globalState.update(GSLX_DEV_INSTANCE, loginDetails.game)
         this.context.globalState.update(GSLX_DEV_CHARACTER, loginDetails.character)
         await this.context.secrets.store(GSLX_DEV_PASSWORD, password)
+        window.showInformationMessage('Credentials stored for login')
     }
 
     private async commandOpenConnection () {
-        const error: any = (e: Error) => { error.caught = e }
-        await new Promise<void>((resolve, reject) => {
-            if (!this.gameClient) { return void resolve() }
-            this.gameClient.once('quit', () => void resolve())
-            this.gameClient.once('error', () => void reject())
-            this.gameClient.quit()
-        })
-        await this.ensureGameConnection().catch(error)
-        if (error.caught) { return void window.showErrorMessage(`Failed to connect to development server: ${error.caught.message}`) }
+        const msg = window.setStatusBarMessage("Connecting to game...")
+        try {
+            await this.withEditorClient(() => {
+                window.setStatusBarMessage("Connected to game successfully", 5000)
+            })
+        } catch (e) {
+            console.error(e)
+            const error = "Failed to connect to game"
+            window.setStatusBarMessage(error, 5000)
+            window.showErrorMessage((e instanceof Error) ? `${error} (${e.message})` : error)
+        }
+        finally {
+            msg.dispose()
+        }
     }
 
     private async commandOpenTerminal () {
-        if (this.gameTerminal) { return void window.showErrorMessage("Development terminal is already open.") }
-        this.gameTerminal = new GameTerminal (() => { this.gameTerminal = undefined })
-        this.gameTerminal.show(true)
-        if (this.gameClient) { this.gameTerminal.bindClient(this.gameClient) }
-        else { this.ensureGameConnection() }
+        if (this.gameTerminal) {
+            this.gameTerminal.show(true)
+            return
+        }
+        try {
+            const localGameTerminal
+                = this.gameTerminal
+                = new GameTerminal (() => this.gameTerminal = undefined)
+            this.gameTerminal.show(true)
+            await this.withEditorClient((client) => {
+                if (localGameTerminal !== this.gameTerminal) return // stale
+                this.gameTerminal.bindClient(client)
+            })
+        }
+        catch (e) {
+            console.error(e)
+            window.setStatusBarMessage("Failed to bind terminal to game client", 5000)
+        }
     }
     
     private registerCommands () {
@@ -517,24 +650,6 @@ class VSCodeIntegration {
         this.context.subscriptions.push(subscription)
         subscription = commands.registerCommand('gsl.openTerminal', this.commandOpenTerminal, this)
         this.context.subscriptions.push(subscription)
-    }
-
-    /** @returns key for storing script modification data */
-    private scriptPropsKey(script: number): string {
-        return `script_properties.${script}`
-    }
-
-    /* privates */
-
-    private async getLoginDetails(): Promise<any> {
-        const account = this.context.globalState.get(GSLX_DEV_ACCOUNT)
-        const instance = this.context.globalState.get(GSLX_DEV_INSTANCE)
-        const character = this.context.globalState.get(GSLX_DEV_CHARACTER)
-        const password = await this.context.secrets.get(GSLX_DEV_PASSWORD)
-        if (!account || !instance || !character || !password) {
-            return void this.promptUserSetup()
-        }
-        return { account, password, character, instance }
     }
 
     /* public api */
@@ -621,56 +736,47 @@ class VSCodeIntegration {
         }
     }
 
-    async ensureGameConnection (): Promise<EditorClient> {
-        const error: any = (e: Error) => { error.caught = e }
-        const loginDisabled = workspace.getConfiguration(GSL_LANGUAGE_ID).get(GSLX_DISABLE_LOGIN)
-        if (loginDisabled) { return Promise.reject(new Error ("Game login is disabled.")) }
-        const loginDetails = await this.getLoginDetails()
-        if (!loginDetails) { return Promise.reject(new Error ("Could not find login details?")) }
-        if (this.gameClient === undefined) {
-            const console: { log: (...args: any) => void } = {
-                log: (...args: any) => {
-                    this.outputChannel.append(`[console(log): ${args.join(' ')}]\r\n`)
-                }
-            }
-            const log = path.join(GSLExtension.getDownloadLocation(), 'gsl-dev-server.log')
-            const logging = this.loggingEnabled
-            const options: GameClientOptions = { log, logging, debug: true, console, echo: true }
-            this.gameClient = new EditorClient (options)
-            this.gameClient.on('error', () => { this.gameClient = undefined })
-            this.gameClient.on('quit', () => { this.gameClient = undefined })
-            if (this.gameTerminal) { this.gameTerminal.bindClient(this.gameClient) }
-            await this.gameClient.login(loginDetails)
+    /**
+    * Provides an `EditorClient` object that is guaranteed to be exclusively owned
+    * by the caller, so long as all other callers are using this function. This
+    * prevents callers from sending conflicting commands to the game. If the user
+    * hasn't provided their login information yet this will skip execution of `task`
+    * and instead prompt the user to provide that login info. This wraps another
+    * function of the same name for convienence of ensuring preconditions and
+    * passing common parameters.
+    */
+    async withEditorClient (task: (client: EditorClientInterface) => unknown) {
+        if (workspace.getConfiguration(GSL_LANGUAGE_ID).get(GSLX_DISABLE_LOGIN)) {
+            return void window.showErrorMessage("Game login is disabled")
         }
-        return this.gameClient
-    }
-
-    /** @returns account name if configured, else undefined */
-    getAccountName(): string | undefined {
-        const name = this.context.globalState.get(GSLX_DEV_ACCOUNT)
-        if (!name) return
-        return `W_${name}`
-    }
-
-    recordScriptModification(
-        script: number,
-        modifier: string,
-        lastModifiedDate: Date
-    ): void {
-        this.context.globalState.update(
-            this.scriptPropsKey(script),
-            { modifier, lastModifiedDate: lastModifiedDate.toISOString() }
-        )
-    }
-
-    findLastSeenScriptModification(script: number): LastSeenScriptModification | undefined {
-        const output = this.context.globalState.get<{modifier: string, lastModifiedDate: string}>(
-            this.scriptPropsKey(script)
-        )
-        return output ? {
-            modifier: output.modifier,
-            lastModifiedDate: new Date(output.lastModifiedDate) // restore from ISO string
-        } : undefined
+        const account = this.context.globalState.get<string>(GSLX_DEV_ACCOUNT)
+        const instance = this.context.globalState.get<string>(GSLX_DEV_INSTANCE)
+        const character = this.context.globalState.get<string>(GSLX_DEV_CHARACTER)
+        const password = await this.context.secrets.get(GSLX_DEV_PASSWORD)
+        if (!account || !instance || !character || !password) {
+            this.promptUserSetup()
+            return
+        }
+        /** Redirect console to output channel */
+        const consoleAdapter: { log: (...args: any) => void } = {
+            log: (...args: any) => {
+                this.outputChannel.append(`[console(log): ${args.join(' ')}]\r\n`)
+            }
+        }
+        return withEditorClient({
+            login: {
+                account,
+                instance,
+                character,
+                password,
+            },
+            console: consoleAdapter,
+            downloadLocation: GSLExtension.getDownloadLocation(),
+            loggingEnabled: this.loggingEnabled,
+            onCreate: (client) => {
+                this.gameTerminal?.bindClient(client)
+            },
+        }, task)
     }
 }
 
@@ -714,17 +820,19 @@ class ExtensionLanguageServer {
     }
 }
 
+export let vsc: VSCodeIntegration | undefined = undefined
+
 export function activate (context: ExtensionContext) {
-    const vsc = new VSCodeIntegration (context)
+    vsc = new VSCodeIntegration (context)
     // const els = new ExtensionLanguageServer (context)
 
     EAccessClient.console = {
-        log: (...args: any) => { vsc.outputGameChannel(args.join(' ')) }
+        log: (...args: any) => { vsc!.outputGameChannel(args.join(' ')) }
     }
 
     EAccessClient.debug = false
 
-    GSLExtension.init(vsc)
+    GSLExtension.init(context)
 
     const selector: DocumentSelector = { scheme: '*', language: GSL_LANGUAGE_ID }
 
