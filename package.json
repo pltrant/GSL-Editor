@@ -25,7 +25,7 @@
     "onStartupFinished"
   ],
   "engines": {
-    "vscode": "^1.80.0"
+    "vscode": "^1.88.0"
   },
   "dependencies": {
     "vscode-languageclient": "^8.1.0",
@@ -34,7 +34,7 @@
   "devDependencies": {
     "@types/mocha": "^10.0.1",
     "@types/node": "^20.4.5",
-    "@types/vscode": "^1.80.0",
+    "@types/vscode": "^1.88.0",
     "@typescript-eslint/parser": "^6.2.0",
     "@vscode/test-electron": "^2.3.3",
     "eslint": "^8.46.0",
@@ -43,7 +43,7 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile && cd gsl-language-server && npm run compile",
-    "postinstall": "cd gsl-language-server && npm install && cd ..",
+    "postinstall": "cd gsl-language-server && npm ci && cd ..",
     "compile": "tsc -b",
     "watch": "tsc --watch"
   },
