@@ -105,7 +105,7 @@ export class GSLExtension {
                 scriptProperties.modifier,
                 scriptProperties.lastModifiedDate,
             )
-            if (checkSyncStatus) {
+            if (checkSyncStatus && this.vsc.getGameInstance() === 'GS4D') {
                 const status = await client.showScriptCheckStatus(scriptNum).catch(error)
                 if (error.caught) { return void window.showErrorMessage(`Failed to run show script check: ${error.caught.message}`) }
                 window.setStatusBarMessage(`Script download complete!`, 5000)
@@ -538,6 +538,10 @@ class VSCodeIntegration {
     }
 
     /* public api */
+
+    getGameInstance (): string | undefined {
+        return this.context.globalState.get(GSLX_DEV_INSTANCE)
+    }
 
     appendLineToGameChannel (text: string) {
         this.outputChannel.appendLine(text)
