@@ -507,6 +507,72 @@ class EditorClient extends BaseGameClient {
         this.loginDetails = loginDetails
         return await this.reconnect()
     }
+
+    /**
+     * Executes the given `command`.
+     * @returns game output lines seen between `start` and `end`
+     */
+    executeCommand (
+        command: string,
+        {
+            captureStart,
+            captureEnd,
+            timeoutMillis,
+            includeStartLine,
+            includeEndLine
+        }: {
+            captureStart: RegExp,
+            captureEnd: RegExp,
+            timeoutMillis: number,
+            includeStartLine?: boolean,
+            includeEndLine?: boolean
+        }
+    ): Promise<string[]> {
+        const lines: string[] = []
+
+        return new Promise ((resolve, reject) => {
+            let seenStart = false
+
+            // Process game output between `start` and `end`
+            const output = new OutputProcessor ((line: string) => {
+                // Check capture start
+                if (!seenStart) {
+                    if (line.match(captureStart)) {
+                        seenStart = true
+                        if (includeStartLine) {
+                            lines.push(line)
+                        }
+                    }
+                    return
+                }
+
+                // Check capture end
+                if (line.match(captureEnd)) {
+                    if (includeEndLine) lines.push(line)
+                    this.off('text', processText)
+                    clearTimeout(timeout)
+                    resolve(lines)
+                    return
+                }
+
+                // Capture line
+                lines.push(line)
+            })
+
+            // Pipe text to OutputProcessor
+            const processText = (text: string) => output.accumulate(text)
+            this.on('text', processText)
+
+            // Handle timeout
+            const timeout = setTimeout(() => {
+                this.off('text', processText)
+                reject(new Error (`Command timed out: ${command}`))
+            }, timeoutMillis)
+
+            // Send command
+            this.trySend(command)
+        })
+    }
 }
 
 class OutputProcessor {

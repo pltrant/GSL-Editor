@@ -7,7 +7,7 @@ import { GSLX_DEV_PASSWORD, GSL_LANGUAGE_ID } from '../const'
 import { assertNever } from '../util/typeUtil'
 import { showQuickPick } from '../dialog/QuickPick'
 import { EditorClientInterface } from '../editorClient'
-import { scriptNumberFromFileName } from '../util/scriptUtil'
+import { getScriptNumber, scriptNumberFromFileName } from '../util/scriptUtil'
 import { GSLExtension, VSCodeIntegration } from '../../extension'
 
 type OutOfDateButtonState =
@@ -145,7 +145,7 @@ export class OutOfDateButtonManager {
 
             const shouldHideButton = await this.shouldHideButton(document)
             if (this.isExecutionStale(document, localIteration)) return
-            const scriptNum = this.getScriptNumber(document)
+            const scriptNum = getScriptNumber(document)
 
             if (shouldHideButton || !scriptNum) {
                 return void this.renderButton({ state: 'hidden' })
@@ -294,7 +294,7 @@ export class OutOfDateButtonManager {
     async onClickIgnoredScriptButton(): Promise<void> {
         const document = window.activeTextEditor?.document
         if (!document) return
-        const scriptNum = this.getScriptNumber(document)
+        const scriptNum = getScriptNumber(document)
         if (!scriptNum) throw new Error('Failed to get script number')
         this.stopIgnoringScript(scriptNum)
         this.renderButton({ 'state': 'loading' })
@@ -308,7 +308,7 @@ export class OutOfDateButtonManager {
 
         await this.withEditorClient(async client => {
             if (this.isExecutionStale(document, localIteration)) return
-            const scriptNum = this.getScriptNumber(document)
+            const scriptNum = getScriptNumber(document)
             if (!scriptNum) throw new Error('Failed to get script number')
             const {
                 SHOW_COMPARISON,
@@ -386,12 +386,6 @@ export class OutOfDateButtonManager {
                 }
             }
         })
-    }
-
-    private getScriptNumber(document: TextDocument): number | undefined {
-        const scriptNum = Number(scriptNumberFromFileName(document.fileName))
-        if (!scriptNum || Number.isNaN(scriptNum)) return
-        return scriptNum
     }
 
     /**

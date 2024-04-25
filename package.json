@@ -28,6 +28,7 @@
     "vscode": "^1.88.0"
   },
   "dependencies": {
+    "csv-parse": "^5.5.5",
     "vscode-languageclient": "^8.1.0",
     "vscode-languageserver": "^8.1.0"
   },

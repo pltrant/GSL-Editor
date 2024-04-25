@@ -35,6 +35,7 @@ import { formatDate } from './gsl/util/dateUtil'
 import { OutOfDateButtonManager } from './gsl/status_bar/scriptOutOfDateButton'
 import { scriptNumberFromFileName } from './gsl/util/scriptUtil'
 import { GSLX_AUTOMATIC_DOWNLOADS, GSLX_DEV_ACCOUNT, GSLX_DEV_CHARACTER, GSLX_DEV_INSTANCE, GSLX_DEV_PASSWORD, GSLX_DISABLE_LOGIN, GSLX_ENABLE_SCRIPT_SYNC_CHECKS, GSLX_NEW_INSTALL_FLAG, GSLX_SAVED_VERSION, GSL_LANGUAGE_ID } from './gsl/const'
+import { FrozenScriptWarningManager } from './gsl/status_bar/frozenScriptWarning'
 
 const rx_script_number = /^\d{1,5}$/
 const rx_script_number_in_filename = /(\d+)\.gsl/
@@ -304,6 +305,7 @@ export class VSCodeIntegration {
     private downloadButton: StatusBarItem
     private uploadButton: StatusBarItem
     private gslButton: StatusBarItem
+    private frozenScriptWarning: StatusBarItem
 
     /** Managed entirely by `OutOfDateButtonManager` */
     private scriptOutOfDateButton: StatusBarItem
@@ -316,6 +318,7 @@ export class VSCodeIntegration {
 
     private loggingEnabled: boolean
 
+    private frozenScriptWarningManager: FrozenScriptWarningManager | undefined
     private outOfDateButtonManager: OutOfDateButtonManager
 
     constructor (context: ExtensionContext) {
@@ -324,6 +327,7 @@ export class VSCodeIntegration {
         this.downloadButton = window.createStatusBarItem(StatusBarAlignment.Left, 50)
         this.uploadButton = window.createStatusBarItem(StatusBarAlignment.Left, 50)
         this.gslButton = window.createStatusBarItem(StatusBarAlignment.Left, 50)
+        this.frozenScriptWarning = window.createStatusBarItem(StatusBarAlignment.Left, 6)
         // Place out-of-date button as far to the right as possible, but left of status message
         this.scriptOutOfDateButton = window.createStatusBarItem(StatusBarAlignment.Left, 5)
 
@@ -356,6 +360,20 @@ export class VSCodeIntegration {
             this.context
         )
         this.context.subscriptions.push(this.outOfDateButtonManager.activate())
+
+        // Watch active editor for frozen files. Uses periodic polling.
+        if (this.context.globalState.get(GSLX_DEV_INSTANCE) === 'GS4D') {
+            this.frozenScriptWarningManager = new FrozenScriptWarningManager(
+                this.frozenScriptWarning,
+                this.withEditorClient.bind(this)
+            )
+            this.context.subscriptions.push(
+                this.frozenScriptWarningManager.activate()
+            )
+        }
+        else {
+            this.frozenScriptWarning.hide()
+        }
     }
 
     private initializeComponents () {
