@@ -127,15 +127,17 @@ export class GSLExtension {
                 scriptProperties.modifier,
                 scriptProperties.lastModifiedDate,
             )
-            const checkSyncStatus = workspace
-                .getConfiguration(GSL_LANGUAGE_ID)
-                .get(GSLX_ENABLE_SCRIPT_SYNC_CHECKS)
             let syncStatus = undefined
             if (
-                checkSyncStatus
+                workspace
+                    .getConfiguration(GSL_LANGUAGE_ID)
+                    .get(GSLX_ENABLE_SCRIPT_SYNC_CHECKS)
                 && this.context.globalState.get(GSLX_DEV_INSTANCE) === 'GS4D'
+                && this.matchesRemoteAccount(scriptProperties.modifier)
             ) {
-                syncStatus = await client.showScriptCheckStatus(scriptNumber).catch((e: any) => {
+                syncStatus = await client.showScriptCheckStatus(
+                    scriptNumber
+                ).catch((e: any) => {
                     throw new Error(`Failed to run show script check: ${e.message}`)
                 })
             }
