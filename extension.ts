@@ -245,9 +245,7 @@ export class GSLExtension {
             )
         }
         const currentAccount = this.getAccountName()
-        // The server truncates the account name to 12 characters, so we have to rely on startsWith.
-        // This means that we have no ability to distinguish between modifiers W_GS4-Alornen and W_GS4-Alorner
-        if (!currentAccount?.startsWith(newestProperties.modifier)) {
+        if (!this.matchesRemoteAccount(newestProperties.modifier)) {
             reasons.push(
                 `Someone else modified it last.\nLast Modifier: ${newestProperties.modifier}\nYou: ${currentAccount}`
             )
@@ -294,6 +292,16 @@ export class GSLExtension {
         const name = this.context.globalState.get(GSLX_DEV_ACCOUNT)
         if (!name) return
         return `W_${name}`
+    }
+
+    /**
+     * @returns true if the local account name matches the given remote account
+     * name. Note that the server truncates account names to 12 characters, so
+     * this will return false positives in the case where account names exceed
+     * that count.
+     */
+    static matchesRemoteAccount(remoteAccountName: string): boolean {
+        return this.getAccountName()?.startsWith(remoteAccountName) || false
     }
 }
 
@@ -446,7 +454,7 @@ export class VSCodeIntegration {
         if (
             syncStatus
             && !syncStatus.match(/All instances in sync/i)
-            && scriptProperties.modifier === GSLExtension.getAccountName()
+            && GSLExtension.matchesRemoteAccount(scriptProperties.modifier)
         ) {
             window.showInformationMessage(
                 `s${scriptNumber} - instances out of sync - ${syncStatus.toLowerCase()}`

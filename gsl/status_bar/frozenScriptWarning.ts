@@ -80,6 +80,8 @@ export class FrozenScriptWarningManager {
 
         if (data.status === 'FROZEN') {
             let freezer = data.gm
+            // Note that we don't need to use GSLExtension.matchesRemoteAccount
+            // here because `/FREEZE LIST` does not truncate account names.
             if (freezer === GSLExtension.getAccountName()) {
                 freezer = 'you'
                 this.statusBarItem.backgroundColor = undefined
