@@ -138,7 +138,7 @@ export class GSLExtension {
                 syncStatus = await client.showScriptCheckStatus(
                     scriptNumber
                 ).catch((e: any) => {
-                    throw new Error(`Failed to run show script check: ${e.message}`)
+                    console.error('Failed to run show script check', e)
                 })
             }
             // Return results
@@ -146,7 +146,7 @@ export class GSLExtension {
                 scriptNumber,
                 scriptProperties,
                 scriptPath: destinationPath,
-                syncStatus
+                syncStatus: syncStatus || undefined
             }
         }
         catch (e) {

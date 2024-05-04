@@ -68,6 +68,7 @@ const rx_details = /(?:^Name\: (?<name>.*?)$)|(?:^Desc\: (?<desc>.*?)$)|(?:^Owne
 const monthList = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 const clientTimeout = 15000
+const ssCheckeditTimeout = 7500
 
 export interface InitOptions {
     login: {
@@ -309,7 +310,7 @@ class EditorClient extends BaseGameClient {
             const timeout = setTimeout(() => {
                 this.off('text', processText)
                 reject(new Error ("Script check timed out."))
-            }, clientTimeout)
+            }, ssCheckeditTimeout)
             this.on('text', processText)
             this.trySend(`/ss check ${script}`)
         })
