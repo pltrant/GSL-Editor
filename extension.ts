@@ -249,7 +249,10 @@ export class GSLExtension {
         const currentAccount = this.getAccountName()
         if (!this.matchesRemoteAccount(newestProperties.modifier)) {
             reasons.push(
-                `Someone else modified it last.\nLast Modifier: ${newestProperties.modifier}\nYou: ${currentAccount}`
+                "Someone else modified it last."
+                + `\nLast Modifier: ${newestProperties.modifier}`
+                + `  (on ${formatDate(newestProperties.lastModifiedDate)})`
+                + `\nYou: ${currentAccount}`
             )
         }
 
