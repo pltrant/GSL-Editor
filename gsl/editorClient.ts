@@ -177,18 +177,24 @@ class TaskQueueProcessor {
         login,
         onCreate,
     }: InitOptions): Promise<EditorClient> {
-        if (this.client) return this.client
-        this.client = new EditorClient ({
-            log: path.join(downloadLocation, 'gsl-dev-server.log'),
-            logging: loggingEnabled,
-            debug: true,
-            echo: true,
-            console,
-        })
-        onCreate(this.client)
-        this.client.on('error', () => { this.client = undefined })
-        this.client.on('quit', () => { this.client = undefined })
-        await this.client.login(login)
+        // Create a new client if needed
+        if (!this.client) {
+            this.client = new EditorClient ({
+                log: path.join(downloadLocation, 'gsl-dev-server.log'),
+                logging: loggingEnabled,
+                debug: true,
+                echo: true,
+                console,
+            })
+            onCreate(this.client)
+            this.client.on('error', () => { this.client = undefined })
+            this.client.on('quit', () => { this.client = undefined })
+            await this.client.login(login)
+        }
+        // Reconnect if needed
+        if (!this.client.hasServerConnection()) {
+            await this.client.reconnect()
+        }
         return this.client
     }
 }

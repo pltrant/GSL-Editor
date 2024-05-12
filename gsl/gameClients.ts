@@ -47,6 +47,10 @@ export class BaseGameClient extends EventEmitter {
         }
     }
 
+    public hasServerConnection (): boolean {
+        return Boolean(this.server)
+    }
+
     private initializeServer (options: any) {
         this.server = new ServerConnection(options)
         this.server.on('text', text => this.serverText(text))
