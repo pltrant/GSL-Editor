@@ -449,7 +449,7 @@ export class VSCodeIntegration {
         }
         catch (e: unknown) {
             console.error(e as any)
-            const error = `Failed to download script ${script}`
+            const error = `Failed to download script ${script || scriptList[0]}`
             window.showErrorMessage((e instanceof Error) ? `${error} (${e.message})` : error)
         }
     }
