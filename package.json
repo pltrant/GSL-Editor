@@ -2,7 +2,7 @@
   "name": "gsl",
   "displayName": "GSL",
   "description": "GSL Editor",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "publisher": "patricktrant",
   "author": {
     "name": "Patrick Trant",
@@ -165,7 +165,13 @@
         },
         "gsl.scriptPollingDelay": {
           "type": "string",
-          "enum": ["No Delay", "5 Minutes", "10 Minutes", "60 Minutes", "1 Day"],
+          "enum": [
+            "No Delay",
+            "5 Minutes",
+            "10 Minutes",
+            "60 Minutes",
+            "1 Day"
+          ],
           "default": "No Delay",
           "description": "Set the interval for how often the extension checks if the local script is up-to-date with its remote version.  A higher delay can be useful in bandwidth-constrained situations such as on an airplane."
         }
