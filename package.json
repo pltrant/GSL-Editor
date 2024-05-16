@@ -25,16 +25,17 @@
     "onStartupFinished"
   ],
   "engines": {
-    "vscode": "^1.80.0"
+    "vscode": "^1.88.0"
   },
   "dependencies": {
+    "csv-parse": "^5.5.5",
     "vscode-languageclient": "^8.1.0",
     "vscode-languageserver": "^8.1.0"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.1",
     "@types/node": "^20.4.5",
-    "@types/vscode": "^1.80.0",
+    "@types/vscode": "^1.88.0",
     "@typescript-eslint/parser": "^6.2.0",
     "@vscode/test-electron": "^2.3.3",
     "eslint": "^8.46.0",
@@ -43,8 +44,9 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile && cd gsl-language-server && npm run compile",
-    "postinstall": "cd gsl-language-server && npm install && cd ..",
-    "compile": "tsc -b"
+    "postinstall": "cd gsl-language-server && npm ci && cd ..",
+    "compile": "tsc -b",
+    "watch": "tsc --watch"
   },
   "main": "extension",
   "contributes": {
@@ -160,6 +162,12 @@
           ],
           "default": ".gsl",
           "description": "File extension to use for downloaded scripts."
+        },
+        "gsl.scriptPollingDelay": {
+          "type": "string",
+          "enum": ["No Delay", "5 Minutes", "10 Minutes", "60 Minutes", "1 Day"],
+          "default": "No Delay",
+          "description": "Set the interval for how often the extension checks if the local script is up-to-date with its remote version.  A higher delay can be useful in bandwidth-constrained situations such as on an airplane."
         }
       }
     },

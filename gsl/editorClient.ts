@@ -1,4 +1,6 @@
 
+import * as path from 'path'
+
 import { BaseGameClient, GameClientOptions } from "./gameClients"
 import { EAccessClient } from "./eaccessClient"
 
@@ -11,7 +13,8 @@ export interface ScriptProperties {
     modifier: string,
     path: string,
     lines: number,
-    new?: boolean,
+    new: boolean,
+    verb?: string,
 }
 
 /**
@@ -31,7 +34,7 @@ export interface ScriptCompileResults {
     maxBytes: number,
     errors: number,
     warnings: number,
-    errorList: Array<ScriptError>
+    errorList: Array<ScriptError>,
 }
 
 export interface ScriptError { line: number, message: string }
@@ -42,6 +45,7 @@ export enum ScriptCompileStatus {
 
 const rx_login_complete = /^ \* (?<name>\S+) \[(?<account>\S+) \((?<client>[^\)]+)\) (?<index>\d+)] joins the adventure\.$/
 
+const rx_quest_status = /QUEST STATUS/
 const rx_aborted = /(?:Script edit|Modification) aborted\./
 const rx_getverb = /Error: Script #(?<script>\d+) is a verb\. Please use (?<command>.*?) instead\./
 const rx_noscript = /Error\: Script \#\d+ has not been created yet\./
@@ -59,17 +63,156 @@ const rx_compile_error = /^\s*(?<line>\d+)\s:\s(?<message>.*?)$/
 const rx_compiled = /Compile ok\./
 
 const rx_modified = /On\s(?<dow>\w+)\s(?<month>\w+) \s?(?<day>\d+) (?<hh>\d+)\:(?<mm>\d+)\:(?<ss>\d+) (?<year>\d+)$/
-const rx_details = /(?:^Name\: (?<name>.*?)$)|(?:^Desc\: (?<desc>.*?)$)|(?:^Owned by: (?<owner>.*?)$)|(?:^Last modified by: (?<modifier>.*?)$)|(?:^(?<new>New)? ?File\: (?<path>.*?)(?:, (?<lines>\d+) lines?)?\.$)/
+const rx_details = /(?:^Name\: (?<name>.*?)$)|(?:^Desc\: (?<desc>.*?)$)|(?:^Owned by: (?<owner>.*?)$)|(?:^Last modified by: (?<modifier>.*?)$)|(?:^(New)? ?File\: (?<path>.*?)(?:, (?<lines>\d+) lines?)?\.$)/
 
 const monthList = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
-const delay = 15000
+const clientTimeout = 15000
+const ssCheckeditTimeout = 7500
 
-export class EditorClient extends BaseGameClient {
+export interface InitOptions {
+    login: {
+        account: string
+        instance: string
+        character: string
+        password: string
+    }
+    console: { log: (args: any[]) => void }
+    downloadLocation: string
+    loggingEnabled: boolean
+    onCreate: (client: EditorClient) => void
+}
+
+/**
+ * An operation requiring an editor client. If a promise is returned
+ * it will be processed as if it is part of the task.
+ * @see withEditorClient
+*/
+export type ClientTask<T> = (client: EditorClient) => T
+
+/**
+ * Provides an `EditorClient` object that is guaranteed to be exclusively owned
+ * by the caller, so long as all other callers are using this function. This
+ * prevents callers from sending conflicting commands to the game.
+ *
+ * @returns a promise that resolves when the task has been processed
+ * successfully, or rejects if the task fails.
+ */
+export const withEditorClient = async <T>(
+    initOptions: InitOptions,
+    task: ClientTask<T>
+): Promise<T> => {
+    return processorSingleton.enqueueTask(initOptions, task)
+}
+
+type TaskController<T> = {
+    task: ClientTask<T>
+    initOptions: InitOptions
+    resolve: (result: T | Promise<T>) => void
+    reject: (error: Error) => void
+}
+
+class TaskQueueProcessor {
+    /** Frequency of queue processing */
+    private static FREQUENCY_MILLIS = 250
+
+    private client: EditorClient | undefined
+    private taskQueue: TaskController<any>[]
+    private isProcessingTask: boolean
+    private nextTick: NodeJS.Timeout | undefined
+
+    constructor() {
+        this.taskQueue = []
+        this.isProcessingTask = false
+        this.nextTick = undefined
+    }
+
+    enqueueTask<T>(initOptions: InitOptions, task: ClientTask<T>): Promise<T> {
+        return new Promise<T>((resolve, reject) => {
+            this.taskQueue.push({ initOptions, task, resolve, reject })
+            this.scheduleTick(0)
+        });
+    }
+
+    /** Schedule the queue to be processed */
+    scheduleTick(milliseconds: number): void {
+        clearTimeout(this.nextTick)
+        this.nextTick = setTimeout(() => this.tick(), milliseconds)
+    }
+
+    /** Process the next task in the queue, if any */
+    async tick(): Promise<void> {
+        clearTimeout(this.nextTick)
+        if (this.taskQueue.length === 0) return
+        if (this.isProcessingTask) {
+            this.scheduleTick(TaskQueueProcessor.FREQUENCY_MILLIS)
+            return
+        }
+        const { initOptions, task, resolve, reject } = this.taskQueue.shift()!
+
+        this.isProcessingTask = true
+        try {
+            const client = await this.ensureClient(initOptions)
+            let result = await task(client)
+            while (result && result instanceof Promise) {
+                result = await result
+            }
+            resolve(result)
+        }
+        catch (e: unknown) {
+            reject(e instanceof Error ? e : new Error(String(e)))
+        }
+        finally {
+            this.isProcessingTask = false
+            if (this.taskQueue.length > 0) {
+                this.scheduleTick(TaskQueueProcessor.FREQUENCY_MILLIS)
+            }
+        }
+    }
+
+    async ensureClient({
+        downloadLocation,
+        console,
+        loggingEnabled,
+        login,
+        onCreate,
+    }: InitOptions): Promise<EditorClient> {
+        // Create a new client if needed
+        if (!this.client) {
+            this.client = new EditorClient ({
+                log: path.join(downloadLocation, 'gsl-dev-server.log'),
+                logging: loggingEnabled,
+                debug: true,
+                echo: true,
+                console,
+            })
+            onCreate(this.client)
+            this.client.on('error', () => { this.client = undefined })
+            this.client.on('quit', () => { this.client = undefined })
+            await this.client.login(login)
+        }
+        // Reconnect if needed
+        if (!this.client.hasServerConnection()) {
+            await this.client.reconnect()
+        }
+        return this.client
+    }
+}
+const processorSingleton = new TaskQueueProcessor()
+
+/**
+ * The interface of an `EditorClient` instance. This layer of indirection
+ * is necessary in order to prevent export of `EditorClient`. We want
+ * to keep `EditorClient` private to this module so as to manage it as
+ * a singleton.
+ */
+export type EditorClientInterface = InstanceType<typeof EditorClient>
+
+class EditorClient extends BaseGameClient {
     private interactive: boolean
     private loginDetails: any
     private retryCommand: string
-    
+
     constructor (options: GameClientOptions) {
         super(options)
         this.interactive = false
@@ -88,7 +231,7 @@ export class EditorClient extends BaseGameClient {
             const timeout = setTimeout(() => {
                 this.off('text', waitForPrompt)
                 reject()
-            }, delay)
+            }, clientTimeout)
             const waitForPrompt = (text: string) => {
                 output.accumulate(text)
                 if (output.peek(1) === '>') {
@@ -154,7 +297,7 @@ export class EditorClient extends BaseGameClient {
             const timeout = setTimeout(() => {
                 this.off('text', processText)
                 reject(new Error ("Script check timed out."))
-            }, delay)
+            }, clientTimeout)
             this.on('text', processText)
             this.trySend(`/ss ${script}`)
         })
@@ -173,14 +316,14 @@ export class EditorClient extends BaseGameClient {
             const timeout = setTimeout(() => {
                 this.off('text', processText)
                 reject(new Error ("Script check timed out."))
-            }, delay)
+            }, ssCheckeditTimeout)
             this.on('text', processText)
             this.trySend(`/ss check ${script}`)
         })
     }
 
-    modifyScript (script: number | string, noQuit?:boolean): Promise<ScriptProperties> {
-        const scriptProperties: Partial<ScriptProperties> = {}
+    modifyScript (script: number | string, keepalive?: boolean): Promise<ScriptProperties> {
+        const scriptProperties: Partial<ScriptProperties> = {new: false}
         return new Promise ((resolve, reject) => {
             const modifyFailed = (reason: string) => {
                 clearTimeout(timeout)
@@ -193,6 +336,7 @@ export class EditorClient extends BaseGameClient {
                 if (rx_noscript.test(line)) { return modifyFailed(`Script ${script} has not yet been created.`) }
                 match = line.match(rx_getverb)
                 if (match && match.groups) {
+                    scriptProperties.verb = match.groups.command.split(' ').slice(1).join(' ')
                     this.send(match.groups.command, true)
                     return
                 }
@@ -218,18 +362,23 @@ export class EditorClient extends BaseGameClient {
                     return
                 }
             })
-            const timeout = setTimeout(() => modifyFailed("Modification timed out."), delay)
-            const processText = (text: string) => {
+            const timeout = setTimeout(() => modifyFailed("Modification timed out."), clientTimeout)
+            const processText = async (text: string) => {
                 output.accumulate(text)
-                switch (true) {
-                case (output.peek(5) === '001] '):
-                    if (noQuit !== true) {
-                        this.send('')
-                        this.send('Q')
-                    }
-                case (output.peek(4) === 'Edt:'):
-                    clearTimeout(timeout)
+                let done = false
+                if (output.peek(5) === '001] ') {
                     this.off('text', processText)
+                    this.send('')
+                    done = true
+                    scriptProperties.new = true
+                }
+                else if (output.peek(4) === 'Edt:') {
+                    this.off('text', processText)
+                    done = true
+                }
+                if (done) {
+                    clearTimeout(timeout)
+                    if (!keepalive) await this.exitModifyScript()
                     resolve(scriptProperties as ScriptProperties)
                 }
             }
@@ -245,11 +394,13 @@ export class EditorClient extends BaseGameClient {
                     this.off('text', processText)
                     reject('Modification exit timed out.')
                 },
-                delay
+                clientTimeout
             );
             const processText = (text:string) => output.accumulate(text)
             const output = new OutputProcessor((line: string) => {
-                if (!line.match(rx_aborted)) return
+                if (!line.match(rx_aborted) && !line.match(rx_quest_status)) {
+                    return
+                }
                 this.off('text', processText)
                 clearTimeout(timeout)
                 resolve()
@@ -268,13 +419,13 @@ export class EditorClient extends BaseGameClient {
             }
             const scriptLines: Array<string> = []
             const output = new OutputProcessor ((line: string) => scriptLines.push(line))
-            const timeout = setTimeout(() => captureFailed("Capture timed out."), delay)
-            const processText = (text: string) => {
+            const timeout = setTimeout(() => captureFailed("Capture timed out."), clientTimeout)
+            const processText = async (text: string) => {
                 output.accumulate(text)
                 if (output.peek(4) === 'Edt:') {
                     clearTimeout(timeout)
                     this.off('text', processText)
-                    this.send('Q')
+                    await this.exitModifyScript()
                     resolve(scriptLines.join('\r\n'))
                 }
             }
@@ -282,7 +433,7 @@ export class EditorClient extends BaseGameClient {
             this.trySend('P')
         })
     }
-    
+
     sendScript (lines: Array<string>, newScript: boolean): Promise<ScriptCompileResults> {
         return new Promise ((resolve, reject) => {
             const compileResults: ScriptCompileResults = {
@@ -331,15 +482,15 @@ export class EditorClient extends BaseGameClient {
                     return
                 }
             })
-            const processText = (text: string) => {
+            const processText = async (text: string) => {
                 output.accumulate(text)
                 if (output.peek(4) === 'Edt:') {
                     if (compileResults.status === ScriptCompileStatus.Uploaded) {
                         this.send('G')
                     } else if (compileResults.status === ScriptCompileStatus.Compiled) {
-                        this.send('Q')
+                        await this.exitModifyScript()
                     } else if (compileResults.status === ScriptCompileStatus.Failed) {
-                        this.send('Q')
+                        await this.exitModifyScript()
                     }
                     output.flush()
                 }
@@ -363,6 +514,72 @@ export class EditorClient extends BaseGameClient {
         this.loginDetails = loginDetails
         return await this.reconnect()
     }
+
+    /**
+     * Executes the given `command`.
+     * @returns game output lines seen between `start` and `end`
+     */
+    executeCommand (
+        command: string,
+        {
+            captureStart,
+            captureEnd,
+            timeoutMillis,
+            includeStartLine,
+            includeEndLine
+        }: {
+            captureStart: RegExp,
+            captureEnd: RegExp,
+            timeoutMillis: number,
+            includeStartLine?: boolean,
+            includeEndLine?: boolean
+        }
+    ): Promise<string[]> {
+        const lines: string[] = []
+
+        return new Promise ((resolve, reject) => {
+            let seenStart = false
+
+            // Process game output between `start` and `end`
+            const output = new OutputProcessor ((line: string) => {
+                // Check capture start
+                if (!seenStart) {
+                    if (line.match(captureStart)) {
+                        seenStart = true
+                        if (includeStartLine) {
+                            lines.push(line)
+                        }
+                    }
+                    return
+                }
+
+                // Check capture end
+                if (line.match(captureEnd)) {
+                    if (includeEndLine) lines.push(line)
+                    this.off('text', processText)
+                    clearTimeout(timeout)
+                    resolve(lines)
+                    return
+                }
+
+                // Capture line
+                lines.push(line)
+            })
+
+            // Pipe text to OutputProcessor
+            const processText = (text: string) => output.accumulate(text)
+            this.on('text', processText)
+
+            // Handle timeout
+            const timeout = setTimeout(() => {
+                this.off('text', processText)
+                reject(new Error (`Command timed out: ${command}`))
+            }, timeoutMillis)
+
+            // Send command
+            this.trySend(command)
+        })
+    }
 }
 
 class OutputProcessor {
@@ -377,13 +594,13 @@ class OutputProcessor {
         let last = -2, nl = this.buffer.indexOf('\r\n')
         while (nl > -1) {
             let line = this.buffer.substring(last + 2, nl)
-            this.handler(line)            
+            this.handler(line)
             last = nl
             nl = this.buffer.indexOf('\r\n', nl + 2)
         }
         if (last !== -2) {
             this.buffer = this.buffer.substring(last + 2)
-        }        
+        }
     }
     peek (n: number = 0): string { return (n <= 0) ? this.buffer : this.buffer.substring(this.buffer.length - n, this.buffer.length) }
     flush (): string { return this.buffer = '' }

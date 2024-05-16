@@ -1,5 +1,6 @@
-import { HoverProvider, Hover } from "vscode"
-import { GslSnippet, snippets } from '../snippets/GslSnippets'
+import { HoverProvider, Hover, TextDocument, Position } from "vscode"
+import { snippets } from '../snippets/GslSnippets'
+import { ScriptProperties } from "./editorClient"
 
 const skippedSnippets = new Set(['if', 'ifnot', 'else', 'loop', 'when'])
 
@@ -16,6 +17,8 @@ const snippetDescriptionMap = Object.values(snippets).reduce(
     {} as Record<string, string[]>
 )
 
+type GetScriptProperties = (script: number) => Promise<ScriptProperties | undefined>;
+
 export class GSLHoverProvider implements HoverProvider {
     private nodeInfo: any;
     private varInfo: any;
@@ -27,8 +30,12 @@ export class GSLHoverProvider implements HoverProvider {
     private tokenRegex: RegExp;
     private systemRegex: RegExp;
     private tableRegex: RegExp;
+    private callmatchLineRegex: RegExp;
+    private callmatchScriptNumberRegex: RegExp;
+    private getScriptProperties: GetScriptProperties;
 
-    constructor() {
+    constructor(getScriptProperties: GetScriptProperties) {
+        this.getScriptProperties = getScriptProperties
         this.nodeInfo = {
             'O': {
                 'A': 'article',
@@ -115,12 +122,23 @@ export class GSLHoverProvider implements HoverProvider {
         this.tokenRegex = /\$([$\\^QR*+']|ZE)/
         this.systemRegex = /\$:(\$[A-Z]+)/
         this.tableRegex = /\$:(\d+)(\[\d+,\d+,\d+\])/
+        this.callmatchLineRegex = /^\s*callmatch .*? in (\d+)/i
+        this.callmatchScriptNumberRegex = /\d+\s*(!.*)?$/
     }
 
-    provideHover(document: any, position: any, token: any) {
+    provideHover(document: TextDocument, position: Position, token: any): Hover | Promise<Hover | undefined> | undefined {
+        // Check for hover over callmatch script number
+        if (document.getWordRangeAtPosition(position, this.callmatchScriptNumberRegex)) {
+            const line = document.lineAt(position.line).text
+            const callmatchMatch = this.callmatchLineRegex.exec(line)
+            if (callmatchMatch !== null) {
+                return this.callmatchHover(Number(callmatchMatch[1]))
+            }
+        }
+
+        // Check for hover over words
         let wordRange = document.getWordRangeAtPosition(position, this.baseHoverRegex)
         if (!wordRange) return
-
         const word = document.getText(wordRange)?.trim()
         const snippets = snippetDescriptionMap[word.toLowerCase()]
 
@@ -185,5 +203,21 @@ export class GSLHoverProvider implements HoverProvider {
         let tokenTypes = this.tableRegex.exec(word)
         if (tokenTypes == null) { return; }
         return new Hover('table #' + tokenTypes[1] + ': value in ' + tokenTypes[2])
+    }
+
+    async callmatchHover(script: number): Promise<Hover | undefined> {
+        const scriptProperties = await this.getScriptProperties(script)
+        if (!scriptProperties) return
+        const {desc, name, owner, modifier, lastModifiedDate} = scriptProperties
+        const dateStr = lastModifiedDate.toLocaleDateString()
+        const timeStr = lastModifiedDate.toLocaleTimeString()
+        const firstLine = desc || scriptProperties.verb || ''
+        return new Hover(
+            (firstLine ? `${firstLine}\n` : '')
+            + (name ? `- Name: ${name}\n` : '')
+            + `- Owner: ${owner}\n`
+            + `- Last modified by: ${modifier}\n`
+            + `- Last modified on: ${dateStr} at ${timeStr}\n`
+        )
     }
 }
