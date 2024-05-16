@@ -2,6 +2,28 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.12.0] - 2024-05-16
+
+### Added
+
+- Hover tips for callmatch script numbers.
+- There is now Status Bar button that monitors if the active script is out of date.
+- Added a "Frozen" Status Bar warning to indicate that active script has been marked frozen with `/FREEZE`.
+- Add modified time to script upload confirmation.
+
+### Changed
+
+- Game commands are now serialized, which should help avoid a few issues where multiple commands would interfere with each other.
+- The "instances out of sync" messaging when downloading a script has been updated to be more concise.
+
+### Fixed
+
+- Fixed syntax highlighting node references for `msg`, `prempt`, and `msgw`.
+- Fixed Go to Definition on files with inconsistent line endings.
+- Fixed a bug where accounts with greater than 12 characters wouldn't be shown "instances out of sync" message.
+- Fixed an issue where the client wouldn't reconnect after a disconnect.
+- Fixed a bug that would cause scripts to fail to download.
+
 ## [1.11.0] - 2024-04-02
 
 ### Added
