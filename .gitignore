@@ -5,3 +5,5 @@ scripts/
 *.vsix
 node_modules
 compile.txt
+.vscode-test/
+tsconfig.tsbuildinfo
