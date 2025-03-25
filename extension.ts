@@ -410,7 +410,7 @@ export class VSCodeIntegration {
     /* commands */
 
     private async commandDownloadScript () {
-        const prompt = 'Script number or verb name to download?'
+        const prompt = 'Script number(s) or verb name(s) to download?'
         const input = await window.showInputBox({ prompt })
         if (!input) { return }
         const scriptOptions = input.replace(/\s/g, '').split(';')
