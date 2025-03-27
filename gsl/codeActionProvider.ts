@@ -23,6 +23,12 @@ export class GSLCodeActionProvider implements CodeActionProvider {
         const actions: CodeAction[] = []
         const line = document.lineAt(range.start.line)
 
+        // Add Align Comments action if multiple comments exist and can be aligned
+        const alignCommentsAction = getAlignCommentsAction(document, range)
+        if (alignCommentsAction) {
+            actions.push(alignCommentsAction)
+        }
+
         // Add Combine Multiple Messages action if multiple messages exist in sequence
         const combineMessagesAction = getCombineMessagesAction(document, line)
         if (combineMessagesAction) {
@@ -192,4 +198,55 @@ const getCombineMessagesAction = (
     )
     combineAction.edit = combineEdit
     return combineAction
+}
+
+const getAlignCommentsAction = (
+    document: TextDocument,
+    range: Range
+): CodeAction | null => {
+    if (range.isSingleLine) return null
+
+    // First pass: check if there are comments and find max code length
+    let hasComments = false
+    let maxCodeLength = 0
+
+    for (let i = range.start.line; i <= range.end.line; i++) {
+        const line = document.lineAt(i)
+        const commentIndex = line.text.indexOf('!')
+        if (commentIndex > 0) {
+            hasComments = true
+            const desiredPos = Math.min(commentIndex, MAX_LINE_LENGTH - line.text.substring(commentIndex).length)
+            maxCodeLength = Math.max(maxCodeLength, desiredPos)
+        }
+    }
+    if (!hasComments) return null
+
+    // Second pass: align comments
+    const alignEdit = new WorkspaceEdit()
+
+    for (let i = range.start.line; i <= range.end.line; i++) {
+        const line = document.lineAt(i)
+        if (line.text.trimStart().indexOf('!') === 0) continue
+        const commentIndex = line.text.indexOf('!')
+        if (commentIndex > 0) {
+            const code = line.text.substring(0, commentIndex).trimEnd()
+            const comment = line.text.substring(commentIndex)
+            const maxPossiblePadding = MAX_LINE_LENGTH - (code.length + comment.length) - 2
+            const desiredPadding = maxCodeLength - code.length
+            const padding = ' '.repeat(Math.min(desiredPadding, maxPossiblePadding))
+            alignEdit.replace(
+                document.uri,
+                line.range,
+                code + padding + comment
+            )
+        }
+    }
+
+    // Create action
+    const alignAction = new CodeAction(
+        ACTION_ALIGN_COMMENTS,
+        CodeActionKind.RefactorInline
+    )
+    alignAction.edit = alignEdit
+    return alignAction
 }
