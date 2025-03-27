@@ -2,9 +2,21 @@ import { MAX_LINE_LENGTH } from "../diagnostics";
 
 export const QUOTE_CONTINUATION = `" +\\\n`
 export const WRAPPED_TEXT_LINE_REGEX = /"\s*\+\s*\\$/;
-const WRAPPABLE_LINE_REGEX = /^(\s*)(msgp|msg\s+NP\d+|msgr|msgrxp|msgrx2|set.*?to)\s*\(?"(.*)"\s*(!.*)?/i;
+export const MESSAGE_LINE_REGEX = /^(\s*)(msgp|msg\s+NP\d|msgr|msgrxp|msgrx2)\s+"(.*?)(\$\\)?"\s*(!\s*.*)?/i;
+const WRAPPABLE_LINE_REGEX = /^(\s*)(msgp|msg\s+NP\d|msgr|msgrxp|msgrx2|set.*?to)\s*\(?"(.*)"\s*(!.*)?/i;
 
-// TODO handle multiline msgps
+export interface MessageCommand {
+    /** A series of space characters. */
+    indentation: string;
+    /** @example 'msgp' | 'msg NP0' | 'msgr' */
+    command: string;
+    /** @example 'Hello World' */
+    content: string;
+    /** True if the line ended with a $\ symbol. */
+    skipNewline: boolean;
+    /** Contains the trailing comment, if one exists. */
+    comment: string | null;
+}
 
 /**
  * Collapse multiline string to a single line.
@@ -21,6 +33,21 @@ export const isWrappedString = (text: string): boolean => Boolean(
     && text.trimEnd().endsWith('\\')
     && text.match(WRAPPED_TEXT_LINE_REGEX)
 )
+
+export const getMessageCommand = (text: string): MessageCommand | null => {
+    const match = text.match(MESSAGE_LINE_REGEX)
+    if (match) {
+        const [_, indentation, command, content, skipNewlineSymbol, comment] = match;
+        return {
+            indentation,
+            command,
+            content,
+            skipNewline: Boolean(skipNewlineSymbol),
+            comment: comment ? comment.slice(1).trimStart() : null
+        }
+    }
+    return null
+}
 
 const stripUnnecessaryParans = (text: string): string => {
     if (text.indexOf("\n") !== -1) {

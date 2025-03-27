@@ -1,6 +1,6 @@
 import * as assert from 'assert'
 import * as vscode from 'vscode'
-import { GSLCodeActionProvider, ACTION_WRAP_TO_MULTIPLE, ACTION_COLLAPSE_MULTILINE, ACTION_REDISTRIBUTE_MULTILINE } from '../../gsl/codeActionProvider'
+import { GSLCodeActionProvider, ACTION_WRAP_TO_MULTIPLE, ACTION_COLLAPSE_MULTILINE, ACTION_REDISTRIBUTE_MULTILINE, COMBINE_MULTIPLE_MESSAGES } from '../../gsl/codeActionProvider'
 import { LINE_TOO_LONG } from '../../gsl/diagnostics'
 import { QUOTE_CONTINUATION } from '../../gsl/util/formattingUtil'
 
@@ -165,7 +165,7 @@ suite('GSLCodeActionProvider Test Suite', () => {
     })
 
     test('should collapse multiline string', async () => {
-        const multiLineString = 
+        const multiLineString =
             `msgp ("This is a test" +\\
             " that spans multiple" +\\
             " lines")`
@@ -176,7 +176,7 @@ suite('GSLCodeActionProvider Test Suite', () => {
     })
 
     test('should collapse multiline string with indentation', async () => {
-        const multiLineString = 
+        const multiLineString =
             `    msgp ("This is a test" +\\
             " that spans multiple" +\\
             " lines")`
@@ -187,7 +187,7 @@ suite('GSLCodeActionProvider Test Suite', () => {
     })
 
     test('should redistribute multiline string to one line if possible, removing parantheses', async () => {
-        const multiLineString = 
+        const multiLineString =
             `    msgp ("This is a test" +\\
             " that spans multiple" +\\
             " lines")`
@@ -198,15 +198,59 @@ suite('GSLCodeActionProvider Test Suite', () => {
     })
 
     test('should redistribute multiline string to shortest number of lines if one line is not possible', async () => {
-        const multiLineString = 
-        `    msg NP1 ("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus${QUOTE_CONTINUATION}` +
-        `    " elementum , eu${QUOTE_CONTINUATION}` +
-        `    " facilisis Praesent dapibus est eu${QUOTE_CONTINUATION}` +
-        `    " blandit scelerisque.")`
+        const multiLineString =
+            `    msg NP1 ("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus${QUOTE_CONTINUATION}` +
+            `    " elementum , eu${QUOTE_CONTINUATION}` +
+            `    " facilisis Praesent dapibus est eu${QUOTE_CONTINUATION}` +
+            `    " blandit scelerisque.")`
         assert.equal(
             await getReplacementText(multiLineString, ACTION_REDISTRIBUTE_MULTILINE),
             `    msg NP1 ("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus${QUOTE_CONTINUATION}` +
             `    " elementum , eu facilisis Praesent dapibus est eu blandit scelerisque.")`
+        )
+    })
+
+    test('should combine messages if the line skips newline and the command is identical', async () => {
+        const multiLineString =
+            `    msgp "Foo$\\"\n` +
+            `    msgp "Bar"`
+        assert.equal(
+            await getReplacementText(multiLineString, COMBINE_MULTIPLE_MESSAGES),
+            `    msgp "FooBar"`
+        )
+    })
+
+    test('should not combine messages if the line skips newline and the command isnt identical', async () => {
+        const multiLineString =
+            `    msgp "Foo$\\"\n` +
+            `    msgp "Bar$\\"\n` +
+            `    msgr "Baz"`
+        assert.equal(
+            await getReplacementText(multiLineString, COMBINE_MULTIPLE_MESSAGES),
+            `    msgp "FooBar$\\"`
+        )
+    })
+
+    test('should combine messages with msg NPX sequence', async () => {
+        const multiLineString =
+            `    msg NP0 "Foo$\\"\n` +
+            `    msg NP0 "Bar$\\"\n` +
+            `    msg NP1 "Baz$\\"\n`
+        assert.equal(
+            await getReplacementText(multiLineString, COMBINE_MULTIPLE_MESSAGES),
+            `    msg NP0 "FooBar$\\"`
+        )
+    })
+
+    test('should not destroy trailing comments', async () => {
+        const multiLineString =
+            `    msg NP0 "Foo$\\" ! Comment1\n` +
+            `    msg NP0 "Bar" ! Comment2\n`
+        assert.equal(
+            await getReplacementText(multiLineString, COMBINE_MULTIPLE_MESSAGES),
+            `    msg NP0 "FooBar"\n` +
+            `    ! Comment1\n` +
+            `    ! Comment2`
         )
     })
 })
