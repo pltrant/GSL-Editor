@@ -97,6 +97,11 @@
         "command": "gsl.openConnection",
         "title": "Open Development Server Connection",
         "category": "GSL"
+      },
+      {
+        "command": "gsl.formatIndentation",
+        "title": "Format Document Indentation",
+        "category": "GSL"
       }
     ],
     "configuration": {

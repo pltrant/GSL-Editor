@@ -297,9 +297,9 @@ suite('GSLCodeActionProvider Test Suite', () => {
                 `msgr "Bar biz baz rawr" ! Bar\n`,
                 ACTION_ALIGN_COMMENTS
             ),
-            'msgr "a"                ! A\n' +
-            'msgp "Foo"              ! Foo\n' +
-            'msgr "Bar biz baz rawr" ! Bar\n'
+            'msgr "a"                                                    ! A\n' +
+            'msgp "Foo"                                                  ! Foo\n' +
+            'msgr "Bar biz baz rawr"                                     ! Bar\n'
         )
     })
 
@@ -311,9 +311,23 @@ suite('GSLCodeActionProvider Test Suite', () => {
                 `  msgr "FooBar" ! FooBar\n`,
                 ACTION_ALIGN_COMMENTS
             ),
-            '  msgp "a"      ! A\n' +
+            '  msgp "a"                                                  ! A\n' +
             '  ! This is a whole line comment\n' +
-            '  msgr "FooBar" ! FooBar\n'
+            '  msgr "FooBar"                                             ! FooBar\n'
+        )
+    })
+
+    test('should align comments leftwards if comments are unnecessarily deeply indented', async () => {
+        assert.equal(
+            await applyCodeActionToSelection(
+                `msgr "a"                                     ! A\n` +
+                `msgp "Foo"                                           ! Foo\n` +
+                `msgr "Bar biz baz rawr"                                    ! Bar\n`,
+                ACTION_ALIGN_COMMENTS
+            ),
+            'msgr "a"                                                    ! A\n' +
+            'msgp "Foo"                                                  ! Foo\n' +
+            'msgr "Bar biz baz rawr"                                     ! Bar\n'
         )
     })
 
@@ -325,7 +339,39 @@ suite('GSLCodeActionProvider Test Suite', () => {
                 ACTION_ALIGN_COMMENTS
             ),
             '  msgp "a"             ! Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus\n' +
-            '  msgr "b"                                                                               ! B\n'
+            '  msgr "b"                                                  ! B\n'
+        )
+    })
+
+    test('should ignore exclamation points in strings', async () => {
+        assert.equal(
+            await applyCodeActionToSelection(
+                `msgr "a" ! A\n` +
+                `msgp "Foo!" ! Foo\n` +
+                `msgr "Bar biz baz rawr" ! Bar\n`,
+                ACTION_ALIGN_COMMENTS
+            ),
+            'msgr "a"                                                    ! A\n' +
+            'msgp "Foo!"                                                 ! Foo\n' +
+            'msgr "Bar biz baz rawr"                                     ! Bar\n'
+        )
+    })
+
+    test('should ignore exclamation points in parantheses', async () => {
+        assert.equal(
+            await applyCodeActionToSelection(
+                `if (A1 != A2) then\n` +
+                `  msgr "a" ! A\n` +
+                `  msgp "Foo!" ! Foo\n` +
+                `  msgr "Bar biz baz rawr" ! Bar\n` +
+                `.\n`,
+                ACTION_ALIGN_COMMENTS
+            ),
+            `if (A1 != A2) then\n` +
+            '  msgr "a"                                                  ! A\n' +
+            '  msgp "Foo!"                                               ! Foo\n' +
+            '  msgr "Bar biz baz rawr"                                   ! Bar\n' +
+            '.\n'
         )
     })
 })

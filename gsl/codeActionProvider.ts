@@ -198,7 +198,7 @@ const getCombineMessagesAction = (
     )
     combineAction.edit = combineEdit
     return combineAction
-}
+}      
 
 const getAlignCommentsAction = (
     document: TextDocument,
@@ -206,40 +206,43 @@ const getAlignCommentsAction = (
 ): CodeAction | null => {
     if (range.isSingleLine) return null
 
-    // First pass: check if there are comments and find max code length
+    // Check if there are comments to align
     let hasComments = false
-    let maxCodeLength = 0
-
     for (let i = range.start.line; i <= range.end.line; i++) {
         const line = document.lineAt(i)
-        const commentIndex = line.text.indexOf('!')
-        if (commentIndex > 0) {
+        if (line.text.includes('!') && !line.text.trimStart().startsWith('!')) {
             hasComments = true
-            const desiredPos = Math.min(commentIndex, MAX_LINE_LENGTH - line.text.substring(commentIndex).length)
-            maxCodeLength = Math.max(maxCodeLength, desiredPos)
+            break
         }
     }
+    
     if (!hasComments) return null
 
-    // Second pass: align comments
+    // Align comments
+    const TARGET_POSITION = 60
     const alignEdit = new WorkspaceEdit()
 
     for (let i = range.start.line; i <= range.end.line; i++) {
         const line = document.lineAt(i)
-        if (line.text.trimStart().indexOf('!') === 0) continue
-        const commentIndex = line.text.indexOf('!')
-        if (commentIndex > 0) {
-            const code = line.text.substring(0, commentIndex).trimEnd()
-            const comment = line.text.substring(commentIndex)
-            const maxPossiblePadding = MAX_LINE_LENGTH - (code.length + comment.length) - 2
-            const desiredPadding = maxCodeLength - code.length
-            const padding = ' '.repeat(Math.min(desiredPadding, maxPossiblePadding))
-            alignEdit.replace(
-                document.uri,
-                line.range,
-                code + padding + comment
-            )
-        }
+        const commentInfo = getLineCommentInfo(line.text)
+        if (!commentInfo || commentInfo.isWholeLineComment) continue
+
+        const { commentIndex } = commentInfo
+        const code = line.text.substring(0, commentIndex).trimEnd()
+        const comment = line.text.substring(commentIndex)
+        
+        // Calculate maximum possible padding without exceeding MAX_LINE_LENGTH
+        const maxPadding = Math.max(0, MAX_LINE_LENGTH - code.length - comment.length - 2);
+        const targetPadding = TARGET_POSITION - code.length;
+        
+        // Use target position if possible, otherwise use maximum allowed padding
+        const padding = ' '.repeat(Math.min(maxPadding, targetPadding));
+        
+        alignEdit.replace(
+            document.uri,
+            line.range,
+            code + padding + comment
+        )
     }
 
     // Create action
@@ -249,4 +252,41 @@ const getAlignCommentsAction = (
     )
     alignAction.edit = alignEdit
     return alignAction
+}
+
+const getLineCommentInfo = (text: string): {
+    isWholeLineComment: boolean;
+    commentIndex: number;
+} | undefined => {
+    if (text.trimStart().startsWith('!')) {
+        return {
+            isWholeLineComment: true,
+            commentIndex: text.indexOf('!')
+        }
+    }
+    let inString = false
+    let inParans = false
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i]
+        if (inString) {
+            if (char === '"') inString = false
+            continue
+        }
+        if (inParans) {
+            if (char === ')') inParans = false
+            continue
+        }
+        if (char === '!') {
+            return {
+                isWholeLineComment: false,
+                commentIndex: i
+            }
+        }
+        if (char === '"') {
+            inString = true
+        }
+        else if (char === '(') {
+            inParans = true
+        }
+    }
 }

@@ -5,7 +5,7 @@ import {
     ExtensionContext, StatusBarAlignment, Disposable, DocumentSelector,
     Uri, QuickPickItem, StatusBarItem, OutputChannel,
     TextDocument, Diagnostic, DiagnosticCollection,
-    CodeActionKind
+    CodeActionKind, Range
 } from 'vscode'
 
 import { workspace, window, commands, languages, extensions } from 'vscode'
@@ -38,7 +38,8 @@ import { scriptNumberFromFileName } from './gsl/util/scriptUtil'
 import { GSLX_AUTOMATIC_DOWNLOADS, GSLX_DEV_ACCOUNT, GSLX_DEV_CHARACTER, GSLX_DEV_INSTANCE, GSLX_DEV_PASSWORD, GSLX_DISABLE_LOGIN, GSLX_ENABLE_SCRIPT_SYNC_CHECKS, GSLX_NEW_INSTALL_FLAG, GSLX_SAVED_VERSION, GSL_LANGUAGE_ID } from './gsl/const'
 import { FrozenScriptWarningManager } from './gsl/status_bar/frozenScriptWarning'
 import { GSLCodeActionProvider } from './gsl/codeActionProvider'
-import { subscribeToDocumentChanges, LINE_TOO_LONG } from './gsl/diagnostics';
+import { subscribeToDocumentChanges } from './gsl/diagnostics';
+import { formatIndentation } from './gsl/util/formattingUtil';
 
 const rx_script_number = /^\d{1,5}$/
 const rx_script_number_in_filename = /(\d+)\.gsl/
@@ -357,6 +358,7 @@ export class VSCodeIntegration {
             { label: "Open development terminal", name: 'gsl.openTerminal' },
             { label: "Connect to development server", name: 'gsl.openConnection' },
             { label: "User Setup", name: 'gsl.userSetup' },
+            { label: "Format Document Indentation", name: 'gsl.formatIndentation' },
         ]
 
         this.outputChannel = window.createOutputChannel("GSL Editor (debug)")
@@ -703,6 +705,65 @@ export class VSCodeIntegration {
         }
     }
 
+    private async commandFormatIndentation() {
+        const editor = window.activeTextEditor;
+        if (!editor || editor.document.languageId !== GSL_LANGUAGE_ID) {
+            return void window.showWarningMessage("Format indentation requires an active GSL script editor");
+        }
+
+        try {
+            // Store the original text line by line
+            const originalLines: string[] = [];
+            for (let i = 0; i < editor.document.lineCount; i++) {
+                originalLines.push(editor.document.lineAt(i).text);
+            }
+
+            // Format the document
+            const formattedText = formatIndentation(editor.document);
+            const formattedLines = formattedText.split('\n');
+
+            // Count changed lines
+            let changedLines = 0;
+            for (let i = 0; i < Math.min(originalLines.length, formattedLines.length); i++) {
+                if (originalLines[i] !== formattedLines[i]) {
+                    changedLines++;
+                }
+            }
+
+            // Account for added or removed lines
+            changedLines += Math.abs(originalLines.length - formattedLines.length);
+
+            if (!changedLines) {
+                // Display the number of changed lines
+                window.setStatusBarMessage(
+                    `Document indentation formatted (no changes)`,
+                    3000
+                )
+                return
+            }
+
+            // Replace the entire document text with the formatted text
+            const entireDocument = new Range(
+                0, 0,
+                editor.document.lineCount - 1,
+                editor.document.lineAt(editor.document.lineCount - 1).text.length
+            );
+
+            await editor.edit(editBuilder => {
+                editBuilder.replace(entireDocument, formattedText);
+            });
+
+            // Display the number of changed lines
+            window.setStatusBarMessage(
+                `Document indentation formatted (${changedLines} line${changedLines !== 1 ? 's' : ''} changed)`,
+                3000
+            );
+        } catch (e) {
+            console.error(e);
+            window.showErrorMessage(`Formatting failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
+        }
+    }
+
     private registerCommands () {
         let subscription: Disposable
         subscription = commands.registerCommand('gsl.downloadScript', this.commandDownloadScript, this)
@@ -724,6 +785,8 @@ export class VSCodeIntegration {
         subscription = commands.registerCommand('gsl.openConnection', this.commandOpenConnection, this)
         this.context.subscriptions.push(subscription)
         subscription = commands.registerCommand('gsl.openTerminal', this.commandOpenTerminal, this)
+        this.context.subscriptions.push(subscription)
+        subscription = commands.registerCommand('gsl.formatIndentation', this.commandFormatIndentation, this)
         this.context.subscriptions.push(subscription)
     }
 
