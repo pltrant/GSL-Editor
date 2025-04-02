@@ -109,24 +109,73 @@ export class GSLDocumentHighlightProvider implements DocumentHighlightProvider {
             }
         }
 
-        // Nothing matched. Just highlight the word range of the original position (if any).
-        if (!word) return []
+        // Nothing matched. Highlight each instance of the node, token, or word.
+        return this.highlightEachInstanceOfWord(
+            document,
+            this.translateWordToRegex(document, position, word)
+        )
+    }
+
+    private translateWordToRegex(
+        document: TextDocument,
+        position: Position,
+        word: string | undefined
+    ): RegExp | undefined {
+        // Handle nodes by matching against node regex
+        const nodeMatch = word?.match(/^N([OPCER])(\d)$/i)
+        if (nodeMatch) {
+            let tokenPrefix = nodeMatch[1].toLowerCase()
+            // P and C nodes should match X tokens
+            if (tokenPrefix === 'p') {
+                tokenPrefix = '[px]'
+            } else if (tokenPrefix === 'c') {
+                tokenPrefix = '[cx]'
+            }
+            const num = nodeMatch[2]
+            return new RegExp(`\\b${word}\\b|\\$${tokenPrefix}${num}[a-z]?`, 'gi')
+        }
+        // Handle tokens by matching on range with leading dollar sign
+        const rangeWithDollar = document.getWordRangeAtPosition(position, /\$\w+\b/)
+        const wordWithDollar = rangeWithDollar
+            ? document.getText(document.getWordRangeAtPosition(position, /\$\w+\b/))
+            : undefined
+        const tokenMatch = wordWithDollar?.match(/^\$([OPCERX])(\d)/i)
+        if (tokenMatch) {
+            let nodePrefix = tokenMatch[1]
+            let tokenPrefix = tokenMatch[1]
+            // X tokens should match P and C nodes (and other X tokens)
+            if (tokenMatch[1].toLowerCase() === 'x') {
+                nodePrefix = '[pc]'
+                tokenPrefix = '[pcx]'
+            }
+            const num = tokenMatch[2]
+            return new RegExp(`\\bN${nodePrefix}${num}\\b|\\$${tokenPrefix}${num}[a-z]?`, 'gi')
+        }
+        // Handle normal words
+        if (!word) return
+        return new RegExp(`\\b${word}\\b`, 'gi')
+    }
+
+    private highlightEachInstanceOfWord(
+        document: TextDocument,
+        regex: RegExp | undefined
+    ): DocumentHighlight[] {
+        if (!regex) return []
         const highlights: DocumentHighlight[] = []
-        
+
         for (let lineNum = 0; lineNum < document.lineCount; lineNum++) {
             const lineText = document.lineAt(lineNum).text
             let match: RegExpExecArray | null
-            const regex = new RegExp(`\\b${word}\\b`, 'gi')
-            
+
             while ((match = regex.exec(lineText)) !== null) {
                 const range = new Range(
                     new Position(lineNum, match.index),
-                    new Position(lineNum, match.index + word.length)
+                    new Position(lineNum, match.index + match[0].length)
                 )
                 highlights.push(new DocumentHighlight(range, DocumentHighlightKind.Text))
             }
         }
-        
+
         return highlights
     }
 

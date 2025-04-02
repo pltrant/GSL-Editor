@@ -678,4 +678,160 @@ suite('Highlight Provider Test Suite', () => {
             `----.----\n`,
         )
     })
+
+    test('Should highlight object tokens', async () => {
+        await testHighlights(
+            `set |NO1 to NO2\n` +
+            `msgp "$O1N"`,
+            // Expects:
+            `set ----NO1---- to NO2\n` +
+            `msgp "----$O1N----"`,
+        )
+    })
+
+    test('Should highlight object tokens (reverse)', async () => {
+        await testHighlights(
+            `set NO1 to NO2\n` +
+            `msgp "$|O1N"`,
+            // Expects:
+            `set ----NO1---- to NO2\n` +
+            `msgp "----$O1N----"`,
+        )
+    })
+
+    test('Should highlight player tokens', async () => {
+        await testHighlights(
+            `set |NP1 to NP2\n` +
+            `msgp "$P1N"`,
+            // Expects:
+            `set ----NP1---- to NP2\n` +
+            `msgp "----$P1N----"`,
+        )
+    })
+
+    test('Should highlight player tokens (reverse)', async () => {
+        await testHighlights(
+            `set NP1 to NP2\n` +
+            `msgp "$|P1N"`,
+            // Expects:
+            `set ----NP1---- to NP2\n` +
+            `msgp "----$P1N----"`,
+        )
+    })
+
+    test('Should highlight creature tokens', async () => {
+        await testHighlights(
+            `set |NC1 to NC2\n` +
+            `msgp "$C1N"`,
+            // Expects:
+            `set ----NC1---- to NC2\n` +
+            `msgp "----$C1N----"`,
+        )
+    })
+
+    test('Should highlight creature tokens (reverse)', async () => {
+        await testHighlights(
+            `set NC1 to NC2\n` +
+            `msgp "$|C1N"`,
+            // Expects:
+            `set ----NC1---- to NC2\n` +
+            `msgp "----$C1N----"`,
+        )
+    })
+
+    test('Should highlight event tokens', async () => {
+        await testHighlights(
+            `set |NE1 to NE2\n` +
+            `msgp "$E1N"`,
+            // Expects:
+            `set ----NE1---- to NE2\n` +
+            `msgp "----$E1N----"`,
+        )
+    })
+
+    test('Should highlight event tokens (reverse)', async () => {
+        await testHighlights(
+            `set NE1 to NE2\n` +
+            `msgp "$|E1N"`,
+            // Expects:
+            `set ----NE1---- to NE2\n` +
+            `msgp "----$E1N----"`,
+        )
+    })
+
+    test('Should highlight room tokens', async () => {
+        await testHighlights(
+            `set |NR1 to NR2\n` +
+            `msgp "$r1"`,
+            // Expects:
+            `set ----NR1---- to NR2\n` +
+            `msgp "----$r1----"`,
+        )
+    })
+
+    test('Should highlight room tokens (reverse)', async () => {
+        await testHighlights(
+            `set NR1 to NR2\n` +
+            `msgp "|$r1"`,
+            // Expects:
+            `set ----NR1---- to NR2\n` +
+            `msgp "----$r1----"`,
+        )
+    })
+
+    test('Should highlight x tokens for player', async () => {
+        await testHighlights(
+            `set NC1 to NC2\n` +
+            `set |NP1 to NP2\n` +
+            `msgp "$X1"`,
+            // Expects:
+            `set NC1 to NC2\n` +
+            `set ----NP1---- to NP2\n` +
+            `msgp "----$X1----"`,
+        )
+    })
+
+    test('Should highlight x tokens for creature', async () => {
+        await testHighlights(
+            `set |NC1 to NC2\n` +
+            `set NP1 to NP2\n` +
+            `msgp "$X1"`,
+            // Expects:
+            `set ----NC1---- to NC2\n` +
+            `set NP1 to NP2\n` +
+            `msgp "----$X1----"`,
+        )
+    })
+
+    test('Should highlight player/creature tokens for x token', async () => {
+        await testHighlights(
+            `set NC1 to NC2\n` +
+            `set NP1 to NP2\n` +
+            `msgp "$|X1"`,
+            // Expects:
+            `set ----NC1---- to NC2\n` +
+            `set ----NP1---- to NP2\n` +
+            `msgp "----$X1----"`,
+        )
+    })
+
+    test('Should highlight A register in string', async () => {
+        await testHighlights(
+            `set |A1 to 3\n` +
+            `msgp "$A1"`,
+            // Expects:
+            `set ----A1---- to 3\n` +
+            `msgp "$----A1----"`,
+        )
+    })
+
+    test('Should highlight A register in string (reverse)', async () => {
+        await testHighlights(
+            `set A1 to 3\n` +
+            `msgp "$|A1"`,
+            // Expects:
+            `set ----A1---- to 3\n` +
+            `msgp "$----A1----"`,
+        )
+    })
 })
