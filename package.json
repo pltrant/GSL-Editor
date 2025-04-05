@@ -102,6 +102,11 @@
         "command": "gsl.formatIndentation",
         "title": "Format Document Indentation",
         "category": "GSL"
+      },
+      {
+        "command": "gsl.alignComments",
+        "title": "Align Document Comments",
+        "category": "GSL"
       }
     ],
     "configuration": {

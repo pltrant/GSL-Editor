@@ -37,7 +37,7 @@ import { OutOfDateButtonManager } from './gsl/status_bar/scriptOutOfDateButton'
 import { scriptNumberFromFileName } from './gsl/util/scriptUtil'
 import { GSLX_AUTOMATIC_DOWNLOADS, GSLX_DEV_ACCOUNT, GSLX_DEV_CHARACTER, GSLX_DEV_INSTANCE, GSLX_DEV_PASSWORD, GSLX_DISABLE_LOGIN, GSLX_ENABLE_SCRIPT_SYNC_CHECKS, GSLX_NEW_INSTALL_FLAG, GSLX_SAVED_VERSION, GSL_LANGUAGE_ID } from './gsl/const'
 import { FrozenScriptWarningManager } from './gsl/status_bar/frozenScriptWarning'
-import { GSLCodeActionProvider } from './gsl/codeActionProvider'
+import { getAlignCommentsAction, GSLCodeActionProvider } from './gsl/codeActionProvider'
 import { subscribeToDocumentChanges } from './gsl/diagnostics';
 import { formatIndentation } from './gsl/util/formattingUtil';
 
@@ -764,6 +764,48 @@ export class VSCodeIntegration {
         }
     }
 
+    private async commandAlignComments() {
+        const editor = window.activeTextEditor;
+        if (!editor || editor.document.languageId !== GSL_LANGUAGE_ID) {
+            return void window.showWarningMessage("Aligning comments requires an active GSL script editor");
+        }
+
+        try {
+            // Create a range that covers the entire document
+            const entireDocument = new Range(
+                0, 0,
+                editor.document.lineCount - 1,
+                editor.document.lineAt(editor.document.lineCount - 1).text.length
+            );
+
+            // Get the alignment action from the code action provider
+            const alignAction = getAlignCommentsAction(editor.document, entireDocument);
+
+            if (!alignAction || !alignAction.edit) {
+                window.setStatusBarMessage("Comments aligned (no changes)", 3000);
+                return;
+            }
+
+            // Count how many edits will be made
+            let changedLines = 0;
+            alignAction.edit.entries().forEach(([_, edits]) => {
+                changedLines += edits.length;
+            });
+
+            // Apply the edits
+            await workspace.applyEdit(alignAction.edit);
+
+            // Display the number of changed lines
+            window.setStatusBarMessage(
+                `Comments aligned (${changedLines} line${changedLines !== 1 ? 's' : ''} changed)`,
+                3000
+            );
+        } catch (e) {
+            console.error(e);
+            window.showErrorMessage(`Comment alignment failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
+        }
+    }
+
     private registerCommands () {
         let subscription: Disposable
         subscription = commands.registerCommand('gsl.downloadScript', this.commandDownloadScript, this)
@@ -787,6 +829,8 @@ export class VSCodeIntegration {
         subscription = commands.registerCommand('gsl.openTerminal', this.commandOpenTerminal, this)
         this.context.subscriptions.push(subscription)
         subscription = commands.registerCommand('gsl.formatIndentation', this.commandFormatIndentation, this)
+        this.context.subscriptions.push(subscription)
+        subscription = commands.registerCommand('gsl.alignComments', this.commandAlignComments, this)
         this.context.subscriptions.push(subscription)
     }
 

@@ -186,64 +186,69 @@ const getCombineMessagesAction = (
     })
 
     // Create action
-    const combineEdit = new WorkspaceEdit();
+    const combineEdit = new WorkspaceEdit()
     combineEdit.replace(
         document.uri,
         multiLineRange,
         result
-    );
+    )
     const combineAction = new CodeAction(
         COMBINE_MULTIPLE_MESSAGES,
         CodeActionKind.RefactorInline
     )
     combineAction.edit = combineEdit
     return combineAction
-}      
+}
 
-const getAlignCommentsAction = (
+export const getAlignCommentsAction = (
     document: TextDocument,
     range: Range
 ): CodeAction | null => {
-    if (range.isSingleLine) return null
-
-    // Check if there are comments to align
-    let hasComments = false
-    for (let i = range.start.line; i <= range.end.line; i++) {
-        const line = document.lineAt(i)
-        if (line.text.includes('!') && !line.text.trimStart().startsWith('!')) {
-            hasComments = true
-            break
-        }
-    }
-    
-    if (!hasComments) return null
-
-    // Align comments
-    const TARGET_POSITION = 60
     const alignEdit = new WorkspaceEdit()
 
+    // Loop through lines in range
     for (let i = range.start.line; i <= range.end.line; i++) {
         const line = document.lineAt(i)
         const commentInfo = getLineCommentInfo(line.text)
-        if (!commentInfo || commentInfo.isWholeLineComment) continue
+        if (
+            !commentInfo
+            || commentInfo.isWholeLineComment
+            || commentInfo.isMultiLineSegment
+        ) {
+            continue
+        }
 
-        const { commentIndex } = commentInfo
-        const code = line.text.substring(0, commentIndex).trimEnd()
-        const comment = line.text.substring(commentIndex)
-        
-        // Calculate maximum possible padding without exceeding MAX_LINE_LENGTH
-        const maxPadding = Math.max(0, MAX_LINE_LENGTH - code.length - comment.length - 2);
-        const targetPadding = TARGET_POSITION - code.length;
-        
-        // Use target position if possible, otherwise use maximum allowed padding
-        const padding = ' '.repeat(Math.min(maxPadding, targetPadding));
-        
-        alignEdit.replace(
-            document.uri,
-            line.range,
-            code + padding + comment
-        )
+        // Attempt column alignment at 64 (the auchand standard) and 90 (some number I just made up)
+        const preferredIndexes = [64, 90]
+        const { code, comment } = commentInfo
+        let result = line.text
+
+        for (let j = 0; j < preferredIndexes.length; j++) {
+            const colIndex = preferredIndexes[j] - 2
+            const padding = colIndex - code.length
+            if (padding <= 0) continue
+            const contentLength = code.length + padding + comment.length
+            if (contentLength + 3 <= MAX_LINE_LENGTH) {
+                result = `${code}${' '.repeat(padding)} ! ${comment}` // Ideal
+                break
+            }
+            else if (contentLength + 2 <= MAX_LINE_LENGTH) {
+                result = `${code}${' '.repeat(padding)} !${comment}` // Close to ideal
+                break
+            }
+            else if (contentLength + 1 <= MAX_LINE_LENGTH) {
+                result = `${code}${' '.repeat(padding)}!${comment}` // Close enough
+                break
+            }
+            else if (j === preferredIndexes.length - 1) {
+                result = `${code} ! ${comment}` // At least space it out pretty
+            }
+        }
+        if (line.text !== result && result.length <= MAX_LINE_LENGTH) {
+            alignEdit.replace(document.uri, line.range, result)
+        }
     }
+    if (alignEdit.entries().length === 0) return null
 
     // Create action
     const alignAction = new CodeAction(
@@ -256,37 +261,92 @@ const getAlignCommentsAction = (
 
 const getLineCommentInfo = (text: string): {
     isWholeLineComment: boolean;
-    commentIndex: number;
+    isMultiLineSegment: boolean;
+    code: string;
+    comment: string;
 } | undefined => {
+    // Handle whole line comments
     if (text.trimStart().startsWith('!')) {
+        const match = text.match(/!\s*(.*)/)
         return {
             isWholeLineComment: true,
-            commentIndex: text.indexOf('!')
+            isMultiLineSegment: false,
+            code: text.substring(0, text.indexOf('!')).trimEnd(),
+            comment: match ? match[1].trim() : ''
         }
     }
+    // Handle multiline case
     let inString = false
-    let inParans = false
     for (let i = 0; i < text.length; i++) {
         const char = text[i]
+        // Process string state
         if (inString) {
+            // Continue until end of string
             if (char === '"') inString = false
             continue
         }
-        if (inParans) {
-            if (char === ')') inParans = false
+        if (char === '"') {
+            // Begin string state
+            inString = true
+            continue
+        }
+        if (char === '\\') {
+            // Return comment info with multiline segment as true
+            const match = text.substring(i + 1).match(/!\s*(.*)/)
+            return {
+                isWholeLineComment: false,
+                isMultiLineSegment: true,
+                code: text.substring(0, i + 1).trimEnd(),
+                comment: match ? match[1].trim() : ''
+            }
+        }
+    }
+
+    // Handle all other cases
+    inString = false
+    let paransCount = 0
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i]
+        // Process string state
+        if (inString) {
+            // Continue until end of string
+            if (char === '"') inString = false
+            continue
+        }
+        if (char === '"') {
+            // Begin string state
+            inString = true
+            continue
+        }
+        if (char === '(') {
+            // Track parans count
+            paransCount++
+            continue
+        }
+        if (char === '\\') {
+            // Return comment info with multiline segment as true
+            const match = text.substring(i + 1).match(/!\s*(.*)/)
+            return {
+                isWholeLineComment: false,
+                isMultiLineSegment: true,
+                code: text.substring(0, i + 1).trimEnd(),
+                comment: match ? match[1].trim() : ''
+            }
+        }
+        if (paransCount) {
+            // Update parans count and continue
+            if (char === ')') paransCount--
             continue
         }
         if (char === '!') {
+            // Return comment info
+            const match = text.substring(i).match(/!\s*(.*)/)
             return {
                 isWholeLineComment: false,
-                commentIndex: i
+                isMultiLineSegment: false,
+                code: text.substring(0, i).trimEnd(),
+                comment: match ? match[1].trim() : ''
             }
-        }
-        if (char === '"') {
-            inString = true
-        }
-        else if (char === '(') {
-            inParans = true
         }
     }
 }

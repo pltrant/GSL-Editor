@@ -297,9 +297,9 @@ suite('GSLCodeActionProvider Test Suite', () => {
                 `msgr "Bar biz baz rawr" ! Bar\n`,
                 ACTION_ALIGN_COMMENTS
             ),
-            'msgr "a"                                                    ! A\n' +
-            'msgp "Foo"                                                  ! Foo\n' +
-            'msgr "Bar biz baz rawr"                                     ! Bar\n'
+            'msgr "a"                                                       ! A\n' +
+            'msgp "Foo"                                                     ! Foo\n' +
+            'msgr "Bar biz baz rawr"                                        ! Bar\n'
         )
     })
 
@@ -311,9 +311,9 @@ suite('GSLCodeActionProvider Test Suite', () => {
                 `  msgr "FooBar" ! FooBar\n`,
                 ACTION_ALIGN_COMMENTS
             ),
-            '  msgp "a"                                                  ! A\n' +
+            '  msgp "a"                                                     ! A\n' +
             '  ! This is a whole line comment\n' +
-            '  msgr "FooBar"                                             ! FooBar\n'
+            '  msgr "FooBar"                                                ! FooBar\n'
         )
     })
 
@@ -325,9 +325,9 @@ suite('GSLCodeActionProvider Test Suite', () => {
                 `msgr "Bar biz baz rawr"                                    ! Bar\n`,
                 ACTION_ALIGN_COMMENTS
             ),
-            'msgr "a"                                                    ! A\n' +
-            'msgp "Foo"                                                  ! Foo\n' +
-            'msgr "Bar biz baz rawr"                                     ! Bar\n'
+            'msgr "a"                                                       ! A\n' +
+            'msgp "Foo"                                                     ! Foo\n' +
+            'msgr "Bar biz baz rawr"                                        ! Bar\n'
         )
     })
 
@@ -338,8 +338,8 @@ suite('GSLCodeActionProvider Test Suite', () => {
                 '  msgr "b"                                                                               ! B\n',
                 ACTION_ALIGN_COMMENTS
             ),
-            '  msgp "a"             ! Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus\n' +
-            '  msgr "b"                                                  ! B\n'
+            '  msgp "a" ! Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus\n' +
+            '  msgr "b"                                                     ! B\n'
         )
     })
 
@@ -351,9 +351,9 @@ suite('GSLCodeActionProvider Test Suite', () => {
                 `msgr "Bar biz baz rawr" ! Bar\n`,
                 ACTION_ALIGN_COMMENTS
             ),
-            'msgr "a"                                                    ! A\n' +
-            'msgp "Foo!"                                                 ! Foo\n' +
-            'msgr "Bar biz baz rawr"                                     ! Bar\n'
+            'msgr "a"                                                       ! A\n' +
+            'msgp "Foo!"                                                    ! Foo\n' +
+            'msgr "Bar biz baz rawr"                                        ! Bar\n'
         )
     })
 
@@ -368,10 +368,44 @@ suite('GSLCodeActionProvider Test Suite', () => {
                 ACTION_ALIGN_COMMENTS
             ),
             `if (A1 != A2) then\n` +
-            '  msgr "a"                                                  ! A\n' +
-            '  msgp "Foo!"                                               ! Foo\n' +
-            '  msgr "Bar biz baz rawr"                                   ! Bar\n' +
+            '  msgr "a"                                                     ! A\n' +
+            '  msgp "Foo!"                                                  ! Foo\n' +
+            '  msgr "Bar biz baz rawr"                                      ! Bar\n' +
             '.\n'
+        )
+    })
+
+    test('should ignore exclamation points in parantheses - 2nd case', async () => {
+        assert.equal(
+            await applyCodeActionToSelection(
+                `  if ((NR0 / 1000) != 3031) then\n` +
+                `      stop                                                    ! Failure, not in Nelemar\n` +
+                `  .\n`,
+                ACTION_ALIGN_COMMENTS
+            ),
+            `  if ((NR0 / 1000) != 3031) then\n` +
+            `      stop                                                     ! Failure, not in Nelemar\n` +
+            `  .\n`
+        )
+    })
+
+    test('should skip multiline segments', async () => {
+        assert.equal(
+            await applyCodeActionToSelection(
+                `msgp "foo" ! a\n` +
+                `if ( \\ ! b\n` +
+                `  (NR0 / 1000) != 3031 \\ ! c\n` +
+                `) then ! d\n` +
+                `    stop ! e\n` +
+                `.! f\n`,
+                ACTION_ALIGN_COMMENTS
+            ),
+            `msgp "foo"                                                     ! a\n` +
+            `if ( \\ ! b\n` +
+            `  (NR0 / 1000) != 3031 \\ ! c\n` +
+            `) then                                                         ! d\n` +
+            `    stop                                                       ! e\n` +
+            `.                                                              ! f\n`,
         )
     })
 })
