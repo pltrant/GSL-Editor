@@ -2,6 +2,21 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.13.0] - 2025-05-02
+
+### Added
+
+- 120 character max width diagnostic, along with Quick Fix to redistribute the content over multiple lines. Also includes a new "Redistribute Multiline String" Code Action.
+- "Collapse Multiline String" Code Action. Allows strings that span multiple lines to be collapsed to a single line, allowing for easier copy/paste/editing.
+- "Combine Messages" Code Action. Same as above but for message commands. Allows a sequence of identical message commands to be collapsed into a single command, e.g. `msgp "foo$\"\nmsgp "bar"` becomes `msgp "foobar"`.
+- "Align Comments" Code Action. Right-aligns comments while still respecting the 120 character limit. Will not edit whole-line comments.
+- "Format Document Indentation" Command. Will autoformat all indentation in the document. Respects early stops with pop/fastpop, i.e. recognizes that it should not unindent in those cases.
+
+### Fixed
+
+- Clarification in the Download Script/Verb prompt that multiple scripts/verbs may be downloaded, using terminology `script(s)` and `verb(s)`.
+- Updated highlight provider to be smarter about blocks, including early stops with `fastpop`/`pop`. If block highlights are not applicable, revert to the default vscode behavior of highlighting all instances of the word in range.
+
 ## [1.12.0] - 2024-05-16
 
 ### Added
