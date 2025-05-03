@@ -2,15 +2,16 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
-## [1.13.0] - 2025-05-02
+## [1.13.0] - 2025-05-03
 
 ### Added
 
-- 120 character max width diagnostic, along with Quick Fix to redistribute the content over multiple lines. Also includes a new "Redistribute Multiline String" Code Action.
-- "Collapse Multiline String" Code Action. Allows strings that span multiple lines to be collapsed to a single line, allowing for easier copy/paste/editing.
-- "Combine Messages" Code Action. Same as above but for message commands. Allows a sequence of identical message commands to be collapsed into a single command, e.g. `msgp "foo$\"\nmsgp "bar"` becomes `msgp "foobar"`.
-- "Align Comments" Code Action. Right-aligns comments while still respecting the 120 character limit. Will not edit whole-line comments.
-- "Format Document Indentation" Command. Will autoformat all indentation in the document. Respects early stops with pop/fastpop, i.e. recognizes that it should not unindent in those cases.
+- New Code Action: "Collapse Lines". Allows strings that span multiple lines to be collapsed to a single line, allowing for easier copy/paste/editing.
+- New Code Action: "Redistribute Lines". Evenly distributes a sequence of lines, respecting max line length. Currently works on multiline strings, as well as lines with consecutive msg commands.
+- New Code Action: "Align Comments". Attempts to align comments to columns 64 and 90.
+- New Command: "Align Document Comments". Applies the "Align Comments" code action to the entire document.
+- New Command: "Format Document Indentation". Autoformats all indentation in the document.
+- New Code Diagnostic: "line-too-long". Offers "Redistribute Lines" as a Quick Fix if applicable.
 
 ### Fixed
 
