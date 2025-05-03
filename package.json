@@ -39,6 +39,7 @@
     "@typescript-eslint/parser": "^6.2.0",
     "@vscode/test-electron": "^2.3.3",
     "eslint": "^8.46.0",
+    "glob": "^11.0.1",
     "mocha": "^10.8.2",
     "typescript": "^5.1.6"
   },
@@ -46,7 +47,8 @@
     "vscode:prepublish": "npm run compile && cd gsl-language-server && npm run compile",
     "postinstall": "cd gsl-language-server && npm ci && cd ..",
     "compile": "tsc -b",
-    "watch": "tsc --watch"
+    "watch": "tsc --watch",
+    "test": "node test/runTests.js"
   },
   "main": "extension",
   "contributes": {
@@ -94,6 +96,16 @@
       {
         "command": "gsl.openConnection",
         "title": "Open Development Server Connection",
+        "category": "GSL"
+      },
+      {
+        "command": "gsl.formatIndentation",
+        "title": "Format Document Indentation",
+        "category": "GSL"
+      },
+      {
+        "command": "gsl.alignComments",
+        "title": "Align Document Comments",
         "category": "GSL"
       }
     ],
