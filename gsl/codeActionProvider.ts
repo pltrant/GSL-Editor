@@ -2,12 +2,10 @@ import * as vscode from 'vscode'
 
 import { CodeActionProvider, CodeAction, CodeActionKind, Range, TextDocument, TextLine, WorkspaceEdit } from 'vscode'
 import { LINE_TOO_LONG, MAX_LINE_LENGTH } from './diagnostics'
-import { fixLineTooLong, collapseMultiline, isWrappedString, getMessageCommand, MessageCommand } from './util/formattingUtil'
+import { fixLineTooLong, collapseMultiline, getMessageCommand, MessageCommand, getFullCommand, isWrappedString } from './util/formattingUtil'
 
-export const COMBINE_MULTIPLE_MESSAGES = 'Combine Messages'
-export const ACTION_REDISTRIBUTE_MULTILINE = 'Redistribute Multiline String'
-export const ACTION_COLLAPSE_MULTILINE = 'Collapse Multiline String'
-export const ACTION_WRAP_TO_MULTIPLE = 'Wrap to Multiple Lines'
+export const ACTION_REDISTRIBUTE_LINES = 'Redistribute Lines'
+export const ACTION_COLLAPSE_LINES = 'Collapse Lines'
 export const ACTION_ALIGN_COMMENTS = 'Align Comments'
 
 export class GSLCodeActionProvider implements CodeActionProvider {
@@ -29,92 +27,67 @@ export class GSLCodeActionProvider implements CodeActionProvider {
             actions.push(alignCommentsAction)
         }
 
-        // Add Combine Multiple Messages action if multiple messages exist in sequence
-        const combineMessagesAction = getCombineMessagesAction(document, line)
-        if (combineMessagesAction) {
-            actions.push(combineMessagesAction)
-        }
+        // Add Collapse and Combine actions
+        getMultilineActions(document, line, context).forEach(action => {
+            actions.push(action)
+        })
 
-        // Add Collapse Multiline String action if the line can be collapsed
-        if (isWrappedString(line.text)) {
-            let startLine = line
-            // Seek to start of wrapped string
-            while (startLine.range.start.line > 1) {
-                const prevLine = document.lineAt(startLine.range.start.line - 1)
-                if (!isWrappedString(prevLine.text)) break
-                startLine = prevLine
-            }
-            let endLine = startLine.range.start.line
-            let fullText = startLine.text
-
-            // Keep reading lines until we find one that doesn't end with \
-            while (endLine < document.lineCount - 1) {
-                const nextLine = document.lineAt(endLine + 1)
-                if (!nextLine.text.trimEnd().endsWith('\\')) {
-                    fullText += '\n' + nextLine.text
-                    endLine++
-                    break
-                }
-                fullText += '\n' + nextLine.text
-                endLine++
-            }
-
-            // Identify range
-            const multiLineRange = new Range(
-                startLine.range.start.line,
-                0,
-                endLine,
-                document.lineAt(endLine).text.length
-            )
-
-            // Add Redistribute Multiline String
-            const redistributed = fixLineTooLong(collapseMultiline(fullText))
-            if (redistributed !== fullText) {
-                const redistributeEdit = new WorkspaceEdit()
-                redistributeEdit.replace(
-                    document.uri,
-                    multiLineRange,
-                    redistributed
-                )
-                const redistributeAction = new CodeAction(
-                    ACTION_REDISTRIBUTE_MULTILINE,
-                    CodeActionKind.RefactorInline
-                )
-                redistributeAction.edit = redistributeEdit
-                actions.push(redistributeAction)
-            }
-
-            // Add Collapse Multiline String
-            const collapseEdit = new WorkspaceEdit()
-            collapseEdit.replace(
-                document.uri,
-                multiLineRange,
-                collapseMultiline(fullText)
-            )
-            const collapseAction = new CodeAction(
-                ACTION_COLLAPSE_MULTILINE,
-                CodeActionKind.RefactorInline
-            )
-            collapseAction.edit = collapseEdit
-            actions.push(collapseAction)
-        }
-
-        // Add Wrap action if line is too long
-        if (context.diagnostics.some(diag => String(diag.code) === LINE_TOO_LONG)) {
-            const fixed = fixLineTooLong(line.text)
-            if (line.text !== fixed) {
-                const wrapAction = new CodeAction(
-                    ACTION_WRAP_TO_MULTIPLE,
-                    CodeActionKind.QuickFix
-                )
-                const wrapEdit = new WorkspaceEdit()
-                wrapEdit.replace(document.uri, line.range, fixed)
-                wrapAction.edit = wrapEdit
-                actions.push(wrapAction)
-            }
-        }
         return actions
     }
+}
+
+const getMultilineActions = (
+    document: TextDocument,
+    line: TextLine,
+    context: vscode.CodeActionContext
+): CodeAction[] => {
+    const actions = new Array<CodeAction>()
+
+    // Identify full command (possibly multiline)
+    const cmd = getFullCommand(document, line)
+
+    // Handle "Collapse Multiline String"
+    const collapsed = collapseMultiline(cmd.text)
+    if (collapsed !== cmd.text) {
+        const collapseEdit = new WorkspaceEdit()
+        collapseEdit.replace(
+            document.uri,
+            cmd.range,
+            collapseMultiline(cmd.text)
+        )
+
+        const collapseAction = new CodeAction(
+            ACTION_COLLAPSE_LINES,
+            CodeActionKind.RefactorInline
+        )
+        collapseAction.edit = collapseEdit
+        actions.push(collapseAction)
+    }
+
+    // Handle "Redistribute Lines"
+    const redistributeMsgAction = getRedistributeMsgAction(document, line, context)
+    if (redistributeMsgAction) {
+        // If "redistribute msg" action is available, prefer that, because it's smartest
+        return [...actions, redistributeMsgAction]
+    }
+    const redistributed = fixLineTooLong(collapseMultiline(cmd.text))
+    if (redistributed !== cmd.text) {
+        const redistributeEdit = new WorkspaceEdit()
+        redistributeEdit.replace(
+            document.uri,
+            cmd.range,
+            redistributed
+        )
+        const redistributeAction = new CodeAction(
+            ACTION_REDISTRIBUTE_LINES,
+            context.diagnostics.some(diag =>
+                String(diag.code) === LINE_TOO_LONG
+            ) ? CodeActionKind.QuickFix : CodeActionKind.RefactorInline
+        )
+        redistributeAction.edit = redistributeEdit
+        actions.push(redistributeAction)
+    }
+    return actions
 }
 
 const getNextLine = (document: TextDocument, line: TextLine): TextLine | null => {
@@ -136,9 +109,10 @@ const isSequenceOfMessageCmd = (
     return lineCmd.command.toLowerCase() === nextLineCmd.command.toLowerCase()
 }
 
-const getCombineMessagesAction = (
+const getRedistributeMsgAction = (
     document: TextDocument,
-    line: TextLine
+    line: TextLine,
+    context: vscode.CodeActionContext
 ): CodeAction | undefined => {
     const messageCmd = getMessageCommand(line.text)
     if (!messageCmd || !isSequenceOfMessageCmd(document, line, messageCmd)) {
@@ -192,9 +166,12 @@ const getCombineMessagesAction = (
         multiLineRange,
         result
     )
+    const isLineTooLong = context.diagnostics.some(diag =>
+        String(diag.code) === LINE_TOO_LONG
+    )
     const combineAction = new CodeAction(
-        COMBINE_MULTIPLE_MESSAGES,
-        CodeActionKind.RefactorInline
+        ACTION_REDISTRIBUTE_LINES,
+        isLineTooLong ? CodeActionKind.QuickFix : CodeActionKind.RefactorInline
     )
     combineAction.edit = combineEdit
     return combineAction

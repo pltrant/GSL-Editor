@@ -1,4 +1,4 @@
-import { TextDocument } from "vscode"
+import { Range, TextDocument, TextLine } from "vscode"
 import { MAX_LINE_LENGTH } from "../diagnostics"
 
 export const QUOTE_CONTINUATION = `" +\\\n`
@@ -206,4 +206,62 @@ export const formatIndentation = (document: TextDocument): string => {
     }
 
     return formattedLines.join('\n')
+}
+
+/**
+ * Returns info for the full command on the given line
+ * (and possibly subsequent lines if "\"" is seen).
+ */
+export const getFullCommand = (
+    document: TextDocument,
+    line: TextLine,
+): {
+    text: string,
+    range: Range
+} => {
+    // Case: Identify single line string
+    if (!isWrappedString(line.text)) {
+        return {
+            text: line.text,
+            range: new Range(
+                line.range.start.line,
+                0,
+                line.range.start.line,
+                line.text.length
+            )
+        }
+    }
+
+    // Case: Identify multiline string
+    let startLine = line
+
+    // Seek to start of wrapped string
+    while (startLine.range.start.line > 1) {
+        const prevLine = document.lineAt(startLine.range.start.line - 1)
+        if (!isWrappedString(prevLine.text)) break
+        startLine = prevLine
+    }
+    let endLineNum = startLine.range.start.line
+    let text = startLine.text
+
+    // Keep reading lines until we find one that doesn't end with \
+    while (endLineNum < document.lineCount - 1) {
+        const nextLine = document.lineAt(endLineNum + 1)
+        if (!nextLine.text.trimEnd().endsWith('\\')) {
+            text += '\n' + nextLine.text
+            endLineNum++
+            break
+        }
+        text += '\n' + nextLine.text
+        endLineNum++
+    }
+
+    const range = new Range(
+        startLine.range.start.line,
+        0,
+        endLineNum,
+        document.lineAt(endLineNum).text.length
+    )
+
+    return {text, range}
 }
