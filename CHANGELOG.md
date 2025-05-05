@@ -2,6 +2,12 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.14.1] - 2025-05-05
+
+### Added
+
+- Added extension icon.
+
 ## [1.14.0] - 2025-05-05
 
 ### Added
@@ -20,7 +26,7 @@ All notable changes to the GSL Editor extension will be documented in this file.
 
 ## [1.13.0] - 2025-05-05
 
-No change.  Publish error bumped up to 1.14.0.
+No change. Publish error bumped up to 1.14.0.
 
 ## [1.12.0] - 2024-05-16
 
@@ -98,7 +104,7 @@ No change.  Publish error bumped up to 1.14.0.
 
 ### Added
 
-- Add spellcheck to your code/comments by installing the [Code Spell Checker](https://marketplace.visualstudio.com/items?itemName=streetsidesoftware.code-spell-checker).  Follow the link, then click on the green Install button.  Next, open your Visual Studio Code Settings by hitting F1, then type in or copy/paste "Preferences: Open Settings (JSON)", and hit enter.  In the file, add this line `"cSpell.ignorePaths": []`, then save and close the file.
+- Add spellcheck to your code/comments by installing the [Code Spell Checker](https://marketplace.visualstudio.com/items?itemName=streetsidesoftware.code-spell-checker). Follow the link, then click on the green Install button. Next, open your Visual Studio Code Settings by hitting F1, then type in or copy/paste "Preferences: Open Settings (JSON)", and hit enter. In the file, add this line `"cSpell.ignorePaths": []`, then save and close the file.
 
 ### Changed
 
@@ -126,7 +132,7 @@ No change.  Publish error bumped up to 1.14.0.
 
 ## [1.8.0] - 2022-03-03
 
--- No change.  Accidental publish.
+-- No change. Accidental publish.
 
 ## [1.7.10] - 2020-07-24
 
@@ -176,7 +182,7 @@ No change.  Publish error bumped up to 1.14.0.
 
 ### Changed
 
-- Going forward, the GSL Editor extension will no longer use Visual Studio Code's settings.json file to store your login credentials.  Such information, except your password, is now stored in a separate storage object provided by the extension API.  More importantly, your password is stored in your operating system's secure keychain (Credential Vault on Windows, Keychain on macOS, etc).  For more information see [node-keytar](https://github.com/atom/node-keytar).  __All users must run the new User Setup process__ which will prompt you for this information, then store it as noted above.  To run the new User Setup, click the GSL button from the Status Bar, then select User Setup.
+- Going forward, the GSL Editor extension will no longer use Visual Studio Code's settings.json file to store your login credentials. Such information, except your password, is now stored in a separate storage object provided by the extension API. More importantly, your password is stored in your operating system's secure keychain (Credential Vault on Windows, Keychain on macOS, etc). For more information see [node-keytar](https://github.com/atom/node-keytar). __All users must run the new User Setup process__ which will prompt you for this information, then store it as noted above. To run the new User Setup, click the GSL button from the Status Bar, then select User Setup.
 
 ## [1.6.8] - 2019-02-14
 
@@ -186,7 +192,7 @@ No change.  Publish error bumped up to 1.14.0.
 
 ## [1.6.6-7] - 2018-02-14
 
-No change.  Publish error bumped up to 1.6.7.
+No change. Publish error bumped up to 1.6.7.
 
 ## [1.6.5] - 2018-12-03
 
@@ -245,18 +251,18 @@ No change.  Publish error bumped up to 1.6.7.
 
 ### Changed
 
-- The Matchmarkers view has been depreciated in favor of the new built-in [Outline view](https://code.visualstudio.com/updates/v1_24#_outline-view), which achieves the same goal, but has more options (follow cursor, sort type, filter, etc).  The referenced link has instructions on how to enable it.
+- The Matchmarkers view has been depreciated in favor of the new built-in [Outline view](https://code.visualstudio.com/updates/v1_24#_outline-view), which achieves the same goal, but has more options (follow cursor, sort type, filter, etc). The referenced link has instructions on how to enable it.
 
 ## [1.5.0] - 2018-06-11
 
-No change.  Publish error bumped up to 1.5.0.
+No change. Publish error bumped up to 1.5.0.
 
 ## [1.4.0] - 2018-06-11
 
 ### Added
 
 - Scripts are now scanned when saved (which also happens on upload) to remove non-printable characters (usually the result from copy/pasting from a Word document or web browser).
-- There is a new 'disableLoginAttempts' setting.  When enabled, the editor will no longer try to log you into the game to perform various actions (such as to download/upload scripts) - this also means those actions will silently fail when invoked.
+- There is a new 'disableLoginAttempts' setting. When enabled, the editor will no longer try to log you into the game to perform various actions (such as to download/upload scripts) - this also means those actions will silently fail when invoked.
 
 ### Changed
 
@@ -274,7 +280,7 @@ No change.  Publish error bumped up to 1.5.0.
 
 ### Changed
 
-- Rewrote some of the logic for the document highlighter (when the cursor is on an open/close control keyword, highlighting it and its counterpart).  This also fixed a bug when placing the cursor on the closing period of a matchmarker.  These changes should mostly be invisible to users.
+- Rewrote some of the logic for the document highlighter (when the cursor is on an open/close control keyword, highlighting it and its counterpart). This also fixed a bug when placing the cursor on the closing period of a matchmarker. These changes should mostly be invisible to users.
 
 ## [1.3.2] - 2018-02-12
 
@@ -296,7 +302,7 @@ No change.  Publish error bumped up to 1.5.0.
 
 ### Changed
 
-- Set highlight similiar matches on selection to disabled by default. (e.g. clicking on 'word' will no longer highlight all other instances of 'word').  You can override this in the settings.
+- Set highlight similiar matches on selection to disabled by default. (e.g. clicking on 'word' will no longer highlight all other instances of 'word'). You can override this in the settings.
 
 ### Fixed
 
@@ -320,7 +326,7 @@ No change.  Publish error bumped up to 1.5.0.
 
 ### Added
 
-- Implemented Go to/Peek Definitions.  You can now click on a line with a call(match), then hit F12 or right-click > Go to Definition to automatically open up that script and go to that matchmarker in it.  If you have an existing local copy already, it will open it; otherwise will download it from the server.  Keep in mind if it opens the local copy, the script could be out of date and not have changes that are implemented on the server.  Using Peek Definition allows you to view it in a frame instead of a new tab so you never have to leave your existing script.  Give both a try!
+- Implemented Go to/Peek Definitions. You can now click on a line with a call(match), then hit F12 or right-click > Go to Definition to automatically open up that script and go to that matchmarker in it. If you have an existing local copy already, it will open it; otherwise will download it from the server. Keep in mind if it opens the local copy, the script could be out of date and not have changes that are implemented on the server. Using Peek Definition allows you to view it in a frame instead of a new tab so you never have to leave your existing script. Give both a try!
 
 ### Changed
 
@@ -330,7 +336,7 @@ No change.  Publish error bumped up to 1.5.0.
 
 ### Added
 
-- New command to manually enable logging for debugging.  Defaults to off and does not log any SGE connection data (account, password hash, etc).
+- New command to manually enable logging for debugging. Defaults to off and does not log any SGE connection data (account, password hash, etc).
 
 ## [1.1.0] - 2017-10-05
 
@@ -341,7 +347,7 @@ No change.  Publish error bumped up to 1.5.0.
 
 ### Changed
 
-- Compile errors, detected when uploading, are now displayed using the diagnostic API for Visual Studio Code.  When an error is found, it will display the Problems view which lists all errors.  You can click on each error to go directly to that line.  A red squiggly line will also show up under the text for the line with the error, which will persist until you upload again and error is resolved.
+- Compile errors, detected when uploading, are now displayed using the diagnostic API for Visual Studio Code. When an error is found, it will display the Problems view which lists all errors. You can click on each error to go directly to that line. A red squiggly line will also show up under the text for the line with the error, which will persist until you upload again and error is resolved.
 - A few minor adjustments to the colors in the GSL Light theme.
 
 ### Fixed
@@ -354,7 +360,7 @@ No change.  Publish error bumped up to 1.5.0.
 ### Added
 
 - Hover over any token (e.g. $P0H = "his/her") to get a description of what it represents!
-- Get a listing of all tokens with the new List Tokens command.  Available by hitting F1 (to display the Command Palette), type in "gsl", then select List Tokens or use Ctrl+Alt+L.
+- Get a listing of all tokens with the new List Tokens command. Available by hitting F1 (to display the Command Palette), type in "gsl", then select List Tokens or use Ctrl+Alt+L.
 - Status Bar text when logging into the game.
 
 ## [1.0.4] - 2017-09-18
@@ -362,14 +368,14 @@ No change.  Publish error bumped up to 1.5.0.
 ### Added
 
 - There is a new GSL Vibrant theme.
-- There is now a configuration settings to specify the file extension to use for downloaded scripts.  It defaults to .gsl.
+- There is now a configuration settings to specify the file extension to use for downloaded scripts. It defaults to .gsl.
 - Enabled TCP socket KeepAlive functionality, which should help in detecting disconnects.
 
 ## [1.0.3] - 2017-09-14
 
 ### Added
 
-- Upload script check: a timestamp is now stored when you download any script.  That timestamp is then referenced against the server before any upload.  If they are different, you will be prompted before continuing.  This should help ensure you don't upload a version of the script that is now out of date.
+- Upload script check: a timestamp is now stored when you download any script. That timestamp is then referenced against the server before any upload. If they are different, you will be prompted before continuing. This should help ensure you don't upload a version of the script that is now out of date.
 - Empty matchmarker is now listed as "" at the top of the Matchmarkers view and symbol list.
 
 ### Changed
@@ -380,19 +386,19 @@ No change.  Publish error bumped up to 1.5.0.
 
 ### Added
 
-- There is now a Date Check command, thanks to Don/Konacon, that will display the last modified date of a script from the game (e.g. /ss script#) to assist with QC.  You can manually invoke the command from the Command Palette (F1, then type in GSL), from the keybinding Ctrl+Alt+C, or you can add a Check Date button to the Status Bar by enabling it under Settings.
+- There is now a Date Check command, thanks to Don/Konacon, that will display the last modified date of a script from the game (e.g. /ss script#) to assist with QC. You can manually invoke the command from the Command Palette (F1, then type in GSL), from the keybinding Ctrl+Alt+C, or you can add a Check Date button to the Status Bar by enabling it under Settings.
 - Matchmarkers are now considered symbols (for go to symbol functionality (Ctrl+Shift+O)).
 
 ### Changed
 
 - More language definition updates:
-  - fixed comments on GATHER and REMOVEVARFIELD lines
-  - added MATCH and REPLYADDRESS system string vars
-  - added highlighting for RMCALL statements
-  - added MSGW to messaging statement definition
-  - added better definition for MSG statement
-  - added $X#T token
-  - fixed negative numbers not highlighting the - sign
+ - fixed comments on GATHER and REMOVEVARFIELD lines
+ - added MATCH and REPLYADDRESS system string vars
+ - added highlighting for RMCALL statements
+ - added MSGW to messaging statement definition
+ - added better definition for MSG statement
+ - added $X#T token
+ - fixed negative numbers not highlighting the - sign
 - Moved GSL Editor repository to [https://github.com/pltrant/GSL-Editor](https://github.com/pltrant/GSL-Editor).
 
 ### Fixed
@@ -415,18 +421,18 @@ No change.  Publish error bumped up to 1.5.0.
 
 ### Added
 
-- The extension now includes 2 default color themes for GSL, aptly named GSL Light and GSL Dark.  __The GSL Dark theme is strongly recommended.  To change your color theme, go to File > Preferences > Color Theme (or Ctrl+K Ctrl+T).__  It should be noted that you color customize any element of code.  If you don't like the red that is used for `kill`, you can change it to any other color you want.
+- The extension now includes 2 default color themes for GSL, aptly named GSL Light and GSL Dark. __The GSL Dark theme is strongly recommended. To change your color theme, go to File > Preferences > Color Theme (or Ctrl+K Ctrl+T).__ It should be noted that you color customize any element of code. If you don't like the red that is used for `kill`, you can change it to any other color you want.
 
 ### Changed
 
-- The language definition file for GSL was significantly updated and now fully supports almost every element of GSL.  This mostly comes into play for the color customization noted above.
-- Snippets have been updated to provide choices where appropriate.  For example, if you're using `checkeffect`, the first placeholder is always a node, so it will display a dropdown listing all valid nodes (NP#, NC#, NO#, NE#, NR#, where # is 0-9).  You don't have to scroll through the entire list, you can start to type which option you want and it will narrow down the list for you.
+- The language definition file for GSL was significantly updated and now fully supports almost every element of GSL. This mostly comes into play for the color customization noted above.
+- Snippets have been updated to provide choices where appropriate. For example, if you're using `checkeffect`, the first placeholder is always a node, so it will display a dropdown listing all valid nodes (NP#, NC#, NO#, NE#, NR#, where # is 0-9). You don't have to scroll through the entire list, you can start to type which option you want and it will narrow down the list for you.
 
 ## [0.0.33] - 2017-08-11
 
 ### Fixed
 
-- Downloading a script should no longer overwrite the last script downloaded.  It will always open in a new tab.
+- Downloading a script should no longer overwrite the last script downloaded. It will always open in a new tab.
 
 ## [0.0.32] - 2017-07-31
 

@@ -11,6 +11,7 @@
   "categories": [
     "Programming Languages"
   ],
+  "icon": "images/gsl_icon.png",
   "license": "GPL-3.0",
   "private": false,
   "repository": {
