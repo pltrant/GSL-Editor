@@ -2,7 +2,7 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
-## [1.13.0] - 2025-05-05
+## [1.14.0] - 2025-05-05
 
 ### Added
 
@@ -17,6 +17,10 @@ All notable changes to the GSL Editor extension will be documented in this file.
 
 - Clarification in the Download Script/Verb prompt that multiple scripts/verbs may be downloaded, using terminology `script(s)` and `verb(s)`.
 - Updated highlight provider to be smarter about blocks, including early stops with `fastpop`/`pop`. If block highlights are not applicable, revert to the default vscode behavior of highlighting all instances of the word in range.
+
+## [1.13.0] - 2025-05-05
+
+No change.  Publish error bumped up to 1.14.0.
 
 ## [1.12.0] - 2024-05-16
 
