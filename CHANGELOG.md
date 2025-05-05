@@ -2,7 +2,7 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
-## [1.13.0] - 2025-05-03
+## [1.13.0] - 2025-05-05
 
 ### Added
 
