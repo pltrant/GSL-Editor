@@ -1,6 +1,6 @@
 import * as assert from 'assert'
 import * as vscode from 'vscode'
-import { GSLCodeActionProvider, ACTION_WRAP_TO_MULTIPLE, ACTION_COLLAPSE_MULTILINE, ACTION_REDISTRIBUTE_MULTILINE, COMBINE_MULTIPLE_MESSAGES, ACTION_ALIGN_COMMENTS } from '../../gsl/codeActionProvider'
+import { GSLCodeActionProvider, ACTION_COLLAPSE_LINES, ACTION_REDISTRIBUTE_LINES, ACTION_ALIGN_COMMENTS } from '../../gsl/codeActionProvider'
 import { LINE_TOO_LONG } from '../../gsl/diagnostics'
 import { QUOTE_CONTINUATION } from '../../gsl/util/formattingUtil'
 
@@ -73,9 +73,9 @@ suite('GSLCodeActionProvider Test Suite', () => {
         )
     }
 
-    test('should offer wrap action for long set command', async () => {
+    test('should offer redistribute action for long set command', async () => {
         const longText = 'set T9 to ("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus fidddsibudds elementum ac nec ligula. Proin hendrerit, lorem in sagittis consequat, metus massa aliquet magna, eu facilisis sapien nulla ut eros. Etiam facilisis eros ut ligula consequat malesuada. Praesent dapibus est eu blandit scelerisque.")'
-        const replacement = await applyCodeAction(longText, ACTION_WRAP_TO_MULTIPLE)
+        const replacement = await applyCodeAction(longText, ACTION_REDISTRIBUTE_LINES)
         assert.equal(
             replacement,
             `set T9 to ("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus fidddsibudds${QUOTE_CONTINUATION}` +
@@ -85,9 +85,9 @@ suite('GSLCodeActionProvider Test Suite', () => {
         )
     })
 
-    test('should offer wrap action for long set command (with table)', async () => {
+    test('should offer redistribute action for long set command (with table)', async () => {
         const longText = 'set table:12345[3,2,4] to ("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus fidddsibudds elementum ac nec ligula. Proin hendrerit, lorem in sagittis consequat, metus massa aliquet magna, eu facilisis sapien nulla ut eros. Etiam facilisis eros ut ligula consequat malesuada. Praesent dapibus est eu blandit scelerisque.")'
-        const replacement = await applyCodeAction(longText, ACTION_WRAP_TO_MULTIPLE)
+        const replacement = await applyCodeAction(longText, ACTION_REDISTRIBUTE_LINES)
         assert.equal(
             replacement,
             `set table:12345[3,2,4] to ("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus${QUOTE_CONTINUATION}` +
@@ -97,9 +97,9 @@ suite('GSLCodeActionProvider Test Suite', () => {
         )
     })
 
-    test('should offer wrap action for msg command', async () => {
+    test('should offer redistribute action for msg command', async () => {
         const longText = 'msg NP1 ("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus elementum ac nec ligula. Proin hendrerit, lorem in sagittis consequat, metus massa aliquet magna, eu facilisis sapien nulla ut eros. Etiam facilisis eros ut ligula consequat malesuada. Praesent dapibus est eu blandit scelerisque.")'
-        const replacement = await applyCodeAction(longText, ACTION_WRAP_TO_MULTIPLE)
+        const replacement = await applyCodeAction(longText, ACTION_REDISTRIBUTE_LINES)
         assert.equal(
             replacement,
             `msg NP1 ("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus elementum${QUOTE_CONTINUATION}` +
@@ -108,9 +108,9 @@ suite('GSLCodeActionProvider Test Suite', () => {
         )
     })
 
-    test('should offer wrap action for msg command, adding parantheses', async () => {
+    test('should offer redistribute action for msg command, adding parantheses', async () => {
         const longText = 'msg NP1 "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus elementum ac nec ligula. Proin hendrerit, lorem in sagittis consequat, metus massa aliquet magna, eu facilisis sapien nulla ut eros. Etiam facilisis eros ut ligula consequat malesuada. Praesent dapibus est eu blandit scelerisque."'
-        const replacement = await applyCodeAction(longText, ACTION_WRAP_TO_MULTIPLE)
+        const replacement = await applyCodeAction(longText, ACTION_REDISTRIBUTE_LINES)
         assert.equal(
             replacement,
             `msg NP1 ("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus elementum${QUOTE_CONTINUATION}` +
@@ -119,9 +119,9 @@ suite('GSLCodeActionProvider Test Suite', () => {
         )
     })
 
-    test('should offer wrap action for msgp command, adding parantheses', async () => {
+    test('should offer redistribute action for msgp command, adding parantheses', async () => {
         const longText = 'msgp "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus elementum ac nec ligula. Proin hendrerit, lorem in sagittis consequat, metus massa aliquet magna, eu facilisis sapien nulla ut eros. Etiam facilisis eros ut ligula consequat malesuada. Praesent dapibus est eu blandit scelerisque."'
-        const replacement = await applyCodeAction(longText, ACTION_WRAP_TO_MULTIPLE)
+        const replacement = await applyCodeAction(longText, ACTION_REDISTRIBUTE_LINES)
         assert.equal(
             replacement,
             `msgp ("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus elementum ac${QUOTE_CONTINUATION}` +
@@ -130,9 +130,9 @@ suite('GSLCodeActionProvider Test Suite', () => {
         )
     })
 
-    test('should offer wrap action for msgr command, adding parantheses', async () => {
+    test('should offer redistribute action for msgr command, adding parantheses', async () => {
         const longText = 'msgr "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus elementum ac nec ligula. Proin hendrerit, lorem in sagittis consequat, metus massa aliquet magna, eu facilisis sapien nulla ut eros. Etiam facilisis eros ut ligula consequat malesuada. Praesent dapibus est eu blandit scelerisque."'
-        const replacement = await applyCodeAction(longText, ACTION_WRAP_TO_MULTIPLE)
+        const replacement = await applyCodeAction(longText, ACTION_REDISTRIBUTE_LINES)
         assert.equal(
             replacement,
             `msgr ("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus elementum ac${QUOTE_CONTINUATION}` +
@@ -141,9 +141,9 @@ suite('GSLCodeActionProvider Test Suite', () => {
         )
     })
 
-    test('should offer wrap action for msgrxp command, adding parantheses', async () => {
+    test('should offer redistribute action for msgrxp command, adding parantheses', async () => {
         const longText = 'msgrxp "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus elementum ac nec ligula. Proin hendrerit, lorem in sagittis consequat, metus massa aliquet magna, eu facilisis sapien nulla ut eros. Etiam facilisis eros ut ligula consequat malesuada. Praesent dapibus est eu blandit scelerisque."'
-        const replacement = await applyCodeAction(longText, ACTION_WRAP_TO_MULTIPLE)
+        const replacement = await applyCodeAction(longText, ACTION_REDISTRIBUTE_LINES)
         assert.equal(
             replacement,
             `msgrxp ("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus elementum${QUOTE_CONTINUATION}` +
@@ -152,9 +152,9 @@ suite('GSLCodeActionProvider Test Suite', () => {
         )
     })
 
-    test('should offer wrap action for msgrx2 command, adding parantheses', async () => {
+    test('should offer redistribute action for msgrx2 command, adding parantheses', async () => {
         const longText = 'msgrx2 "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus elementum ac nec ligula. Proin hendrerit, lorem in sagittis consequat, metus massa aliquet magna, eu facilisis sapien nulla ut eros. Etiam facilisis eros ut ligula consequat malesuada. Praesent dapibus est eu blandit scelerisque."'
-        const replacement = await applyCodeAction(longText, ACTION_WRAP_TO_MULTIPLE)
+        const replacement = await applyCodeAction(longText, ACTION_REDISTRIBUTE_LINES)
         assert.equal(
             replacement,
             `msgrx2 ("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus elementum${QUOTE_CONTINUATION}` +
@@ -165,7 +165,7 @@ suite('GSLCodeActionProvider Test Suite', () => {
 
     test('should handle indentation', async () => {
         const longText = '    msg NP1 "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus elementum ac nec ligula. Proin hendrerit, lorem in sagittis consequat, metus massa aliquet magna, eu facilisis sapien nulla ut eros. Etiam facilisis eros ut ligula consequat malesuada. Praesent dapibus est eu blandit scelerisque."'
-        const replacement = await applyCodeAction(longText, ACTION_WRAP_TO_MULTIPLE)
+        const replacement = await applyCodeAction(longText, ACTION_REDISTRIBUTE_LINES)
         assert.equal(
             replacement,
             `    msg NP1 ("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus${QUOTE_CONTINUATION}` +
@@ -177,7 +177,7 @@ suite('GSLCodeActionProvider Test Suite', () => {
 
     test('should handle comments', async () => {
         const longText = '    msg NP1 "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus elementum ac nec ligula. Proin hendrerit, lorem in sagittis consequat, metus massa aliquet magna, eu facilisis sapien nulla ut eros. Etiam facilisis eros ut ligula consequat malesuada. Praesent dapibus est eu blandit scelerisque." ! foobar biz baz'
-        const replacement = await applyCodeAction(longText, ACTION_WRAP_TO_MULTIPLE)
+        const replacement = await applyCodeAction(longText, ACTION_REDISTRIBUTE_LINES)
         assert.equal(
             replacement,
             `    msg NP1 ("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus${QUOTE_CONTINUATION}` +
@@ -189,7 +189,7 @@ suite('GSLCodeActionProvider Test Suite', () => {
 
     test('should handle a long unbroken string', async () => {
         const longText = '  msgp ("testingtestingtestingtestingtestingtestingtestingtestingtestingtestingtestingtestingtestingtestintestingtestingtestingtestingtestingtestingtestingtestingtestingtestingtestingtestingtestingtestinFoobarfoo")'
-        const replacement = await applyCodeAction(longText, ACTION_WRAP_TO_MULTIPLE)
+        const replacement = await applyCodeAction(longText, ACTION_REDISTRIBUTE_LINES)
         assert.equal(
             replacement,
             `  msgp ("testingtestingtestingtestingtestingtestingtestingtestingtestingtestingtestingtestingtestingtestintestingt${QUOTE_CONTINUATION}` +
@@ -203,7 +203,7 @@ suite('GSLCodeActionProvider Test Suite', () => {
             " that spans multiple" +\\
             " lines")`
         assert.equal(
-            await applyCodeAction(multiLineString, ACTION_COLLAPSE_MULTILINE),
+            await applyCodeAction(multiLineString, ACTION_COLLAPSE_LINES),
             'msgp "This is a test that spans multiple lines"'
         )
     })
@@ -214,7 +214,7 @@ suite('GSLCodeActionProvider Test Suite', () => {
             " that spans multiple" +\\
             " lines")`
         assert.equal(
-            await applyCodeAction(multiLineString, ACTION_COLLAPSE_MULTILINE),
+            await applyCodeAction(multiLineString, ACTION_COLLAPSE_LINES),
             '    msgp "This is a test that spans multiple lines"'
         )
     })
@@ -225,7 +225,7 @@ suite('GSLCodeActionProvider Test Suite', () => {
             " that spans multiple" +\\
             " lines")`
         assert.equal(
-            await applyCodeAction(multiLineString, ACTION_REDISTRIBUTE_MULTILINE),
+            await applyCodeAction(multiLineString, ACTION_REDISTRIBUTE_LINES),
             '    msgp "This is a test that spans multiple lines"'
         )
     })
@@ -237,7 +237,7 @@ suite('GSLCodeActionProvider Test Suite', () => {
             `    " facilisis Praesent dapibus est eu${QUOTE_CONTINUATION}` +
             `    " blandit scelerisque.")`
         assert.equal(
-            await applyCodeAction(multiLineString, ACTION_REDISTRIBUTE_MULTILINE),
+            await applyCodeAction(multiLineString, ACTION_REDISTRIBUTE_LINES),
             `    msg NP1 ("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus${QUOTE_CONTINUATION}` +
             `    " elementum , eu facilisis Praesent dapibus est eu blandit scelerisque.")`
         )
@@ -248,7 +248,7 @@ suite('GSLCodeActionProvider Test Suite', () => {
             `    msgp "Foo$\\"\n` +
             `    msgp "Bar"`
         assert.equal(
-            await applyCodeAction(multiLineString, COMBINE_MULTIPLE_MESSAGES),
+            await applyCodeAction(multiLineString, ACTION_REDISTRIBUTE_LINES),
             `    msgp "FooBar"`
         )
     })
@@ -259,7 +259,7 @@ suite('GSLCodeActionProvider Test Suite', () => {
             `    msgp "Bar$\\"\n` +
             `    msgr "Baz"`
         assert.equal(
-            await applyCodeAction(multiLineString, COMBINE_MULTIPLE_MESSAGES),
+            await applyCodeAction(multiLineString, ACTION_REDISTRIBUTE_LINES),
             `    msgp "FooBar$\\"\n` +
             `    msgr "Baz"`
         )
@@ -271,9 +271,22 @@ suite('GSLCodeActionProvider Test Suite', () => {
             `    msg NP0 "Bar$\\"\n` +
             `    msg NP1 "Baz$\\"\n`
         assert.equal(
-            await applyCodeAction(multiLineString, COMBINE_MULTIPLE_MESSAGES),
+            await applyCodeAction(multiLineString, ACTION_REDISTRIBUTE_LINES),
             `    msg NP0 "FooBar$\\"\n` +
             `    msg NP1 "Baz$\\"\n`
+        )
+    })
+
+    
+    test('should not consume subsequent text', async () => {
+        const multiLineString =
+            `set table:999999[9,9,9] to ("A random paragraph can also be an excellent way for a writer to tackle writers' block. Writing")\n` +
+            `msgp "bar"\n`
+        assert.equal(
+            await applyCodeAction(multiLineString, ACTION_REDISTRIBUTE_LINES),
+            `set table:999999[9,9,9] to ("A random paragraph can also be an excellent way for a writer to tackle writers'" +\\\n` +
+            `" block. Writing")\n` +
+            `msgp "bar"\n`
         )
     })
 
@@ -282,7 +295,7 @@ suite('GSLCodeActionProvider Test Suite', () => {
             `    msg NP0 "Foo$\\" ! Comment1\n` +
             `    msg NP0 "Bar" ! Comment2\n`
         assert.equal(
-            await applyCodeAction(multiLineString, COMBINE_MULTIPLE_MESSAGES),
+            await applyCodeAction(multiLineString, ACTION_REDISTRIBUTE_LINES),
             `    msg NP0 "FooBar"\n` +
             `    ! Comment1\n` +
             `    ! Comment2\n`
