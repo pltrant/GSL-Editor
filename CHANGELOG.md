@@ -2,6 +2,12 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.14.2] - 2025-05-13
+
+### Added
+
+- Fixed issue where "line-too-long" diagnostic would trigger on non-GSL documents.
+
 ## [1.14.1] - 2025-05-05
 
 ### Added

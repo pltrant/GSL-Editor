@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { GSL_LANGUAGE_ID } from './const';
 
 export const LINE_TOO_LONG = 'line-too-long';
 export const MAX_LINE_LENGTH = 118;
@@ -19,6 +20,11 @@ function refreshDiagnostics(
     document: vscode.TextDocument,
     lineLengthDiagnostics: vscode.DiagnosticCollection
 ): void {
+    // Only run diagnostics for GSL language documents
+    if (document.languageId !== GSL_LANGUAGE_ID) {
+        return;
+    }
+
     const diagnostics: vscode.Diagnostic[] = [];
 
     for (let lineIndex = 0; lineIndex < document.lineCount; lineIndex++) {
