@@ -24,3 +24,14 @@ Join the [#gsl-editor](https://discord.gg/kjX79pB) channel on the official GemSt
 ## Release Notes
 
 All notable changes will be documented in the [changelog](https://github.com/pltrant/GSL-Editor/blob/master/CHANGELOG.md).
+
+## Build Custom VSIX File
+
+Run the following to create a custom build of the extension:
+
+- Update `package.json` version property to indicate pre-release build, e.g. `1.14.1-jul2025beta`
+- `git clean -dxf` (Optional; prevents packaging of unnecessary files. WARNING: WILL DELETE FILES THAT AREN'T CHECKED IN!)
+- `npm ci`
+- `vsce package` (will run compile)
+
+This will create a VSIX file that you can install via `Ctrl+Shift+P` -> `Extensions: Install from VSIX...` in VSCode.
