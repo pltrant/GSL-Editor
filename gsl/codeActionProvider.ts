@@ -2,11 +2,13 @@ import * as vscode from 'vscode'
 
 import { CodeActionProvider, CodeAction, CodeActionKind, Range, TextDocument, TextLine, WorkspaceEdit } from 'vscode'
 import { LINE_TOO_LONG, MAX_LINE_LENGTH } from './diagnostics'
-import { fixLineTooLong, collapseMultiline, getMessageCommand, MessageCommand, getFullCommand, isWrappedString } from './util/formattingUtil'
+import { fixLineTooLong, collapseMultiline, getMessageCommand, MessageCommand, getFullCommand } from './util/formattingUtil'
 
 export const ACTION_REDISTRIBUTE_LINES = 'Redistribute Lines'
 export const ACTION_COLLAPSE_LINES = 'Collapse Lines'
 export const ACTION_ALIGN_COMMENTS = 'Align Comments'
+
+const PREFERRED_COMMENT_COLUMN = 64 // The "Auchand standard"
 
 export class GSLCodeActionProvider implements CodeActionProvider {
     public static readonly providedCodeActionKinds = [
@@ -195,30 +197,23 @@ export const getAlignCommentsAction = (
             continue
         }
 
-        // Attempt column alignment at 64 (the auchand standard) and 90 (some number I just made up)
-        const preferredIndexes = [64, 90]
         const { code, comment } = commentInfo
-        let result = line.text
+        let result = `${code} ! ${comment}` // Default
 
-        for (let j = 0; j < preferredIndexes.length; j++) {
-            const colIndex = preferredIndexes[j] - 2
-            const padding = colIndex - code.length
-            if (padding <= 0) continue
-            const contentLength = code.length + padding + comment.length
-            if (contentLength + 3 <= MAX_LINE_LENGTH) {
+        // Attempt column alignment at PREFERRED_COMMENT_COLUMN
+        // (or as close as possible, accounting for comment length)
+        const targetColumn = Math.min(PREFERRED_COMMENT_COLUMN, MAX_LINE_LENGTH - comment.length - 1)
+        const padding = targetColumn - code.length - 2 // Leave room for " !"
+        if (padding >= 0) {
+            const lineLength = code.length + padding + comment.length
+            if (lineLength + 3 <= MAX_LINE_LENGTH) {
                 result = `${code}${' '.repeat(padding)} ! ${comment}` // Ideal
-                break
             }
-            else if (contentLength + 2 <= MAX_LINE_LENGTH) {
-                result = `${code}${' '.repeat(padding)} !${comment}` // Close to ideal
-                break
+            else if (lineLength + 2 <= MAX_LINE_LENGTH) {
+                result = `${code}${' '.repeat(padding)} !${comment}` // Second best
             }
-            else if (contentLength + 1 <= MAX_LINE_LENGTH) {
-                result = `${code}${' '.repeat(padding)}!${comment}` // Close enough
-                break
-            }
-            else if (j === preferredIndexes.length - 1) {
-                result = `${code} ! ${comment}` // At least space it out pretty
+            else if (lineLength <= MAX_LINE_LENGTH) {
+                result = `${code}${' '.repeat(padding)}!${comment}` // Third best
             }
         }
         if (line.text !== result && result.length <= MAX_LINE_LENGTH) {
