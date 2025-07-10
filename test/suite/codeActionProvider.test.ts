@@ -17,14 +17,14 @@ suite('GSLCodeActionProvider Test Suite', () => {
 
     /**
      * Finds the first Code Action applicable to the given `content` in the given
-     * `range`, applies it to `content`, and returns the result. Asserts that at
-     * least one Code Action of `actionTitle` is found. 
+     * `range`, applies it to `content`, and returns the result. Returns
+     * `undefined` if no action is available for the content.
      */
     async function applyCodeAction(
         content: string,
         actionTitle: string,
-        range: vscode.Range = new vscode.Range(0, 0, 0, content.length)
-    ): Promise<string> {
+        range: vscode.Range = new vscode.Range(0, 0, 0, content.length),
+    ): Promise<string | undefined> {
         // Open a new document with provided content.
         document = await vscode.workspace.openTextDocument({
             language: 'gsl',
@@ -39,7 +39,7 @@ suite('GSLCodeActionProvider Test Suite', () => {
         }
         const actions = await Promise.resolve(provider.provideCodeActions(document, range, context))
         const action = actions?.find(a => a.title === actionTitle)
-        assert.ok(action, `Expected to find action with title "${actionTitle}"`)
+        if (!action) return
         const edit = action.edit
         assert.ok(edit, 'Expected WorkspaceEdit to be defined')
         const edits = edit.get(document.uri)
@@ -63,8 +63,8 @@ suite('GSLCodeActionProvider Test Suite', () => {
      */
     async function applyCodeActionToSelection(
         content: string,
-        actionTitle: string
-    ): Promise<string> {
+        actionTitle: string,
+    ): Promise<string | undefined> {
         const lineCount = content.split("\n").length
         return applyCodeAction(
             content,
@@ -351,7 +351,7 @@ suite('GSLCodeActionProvider Test Suite', () => {
                 '  msgr "b"                                                                               ! B\n',
                 ACTION_ALIGN_COMMENTS
             ),
-            '  msgp "a" ! Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus\n' +
+            '  msgp "a"             ! Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus\n' +
             '  msgr "b"                                                     ! B\n'
         )
     })
@@ -419,6 +419,54 @@ suite('GSLCodeActionProvider Test Suite', () => {
             `) then                                                         ! d\n` +
             `    stop                                                       ! e\n` +
             `.                                                              ! f\n`,
+        )
+    })
+
+    test('should handle content length 62', async () => {
+        [
+            `  callmatch must_match "$FOOOOOOOOOOOOOOOOOOOOOOOOOO" in 12345!This is a test\n`,
+            `  callmatch must_match "$FOOOOOOOOOOOOOOOOOOOOOOOOOO" in 12345! This is a test\n`,
+            `  callmatch must_match "$FOOOOOOOOOOOOOOOOOOOOOOOOOO" in 12345  ! This is a test\n`,
+            `  callmatch must_match "$FOOOOOOOOOOOOOOOOOOOOOOOOOO" in 12345     ! This is a test\n`,
+        ].forEach(async input => {
+            assert.equal(
+                await applyCodeActionToSelection(input, ACTION_ALIGN_COMMENTS),
+                `  callmatch must_match "$FOOOOOOOOOOOOOOOOOOOOOOOOOO" in 12345 ! This is a test\n`
+            )
+        })
+    })
+
+    test('should handle full width comments', async () => {
+        assert.equal(
+            await applyCodeActionToSelection(
+                `  msgp "a"!Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibusnec lacus fini\n`,
+                ACTION_ALIGN_COMMENTS
+            ),
+            undefined
+        )
+        assert.equal(
+            await applyCodeActionToSelection(
+                `msgp "a" ! Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibusnec lacus fini\n`,
+                ACTION_ALIGN_COMMENTS
+            ),
+            undefined
+        )
+    })
+
+    test('should still push content rightwards even if ideal column is unachievable', async () => {
+        assert.equal(
+            await applyCodeActionToSelection(
+                `  msgp "a"      ! Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus\n`,
+                ACTION_ALIGN_COMMENTS
+            ),
+            `  msgp "a"             ! Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus\n`,
+        )
+        assert.equal(
+            await applyCodeActionToSelection(
+                `  msgp "a"! Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus finibus fin\n`,
+                ACTION_ALIGN_COMMENTS
+            ),
+            `  msgp "a" ! Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eget turpis nec lacus finibus finibus fin\n`,
         )
     })
 })
