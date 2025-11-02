@@ -1059,7 +1059,7 @@ export function activate (context: ExtensionContext) {
         languages.registerCodeActionsProvider(
             GSL_LANGUAGE_ID,
             new GSLCodeActionProvider(),
-            { providedCodeActionKinds: [CodeActionKind.QuickFix] }
+            { providedCodeActionKinds: GSLCodeActionProvider.providedCodeActionKinds }
         )
     )
 

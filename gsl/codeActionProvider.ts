@@ -8,11 +8,15 @@ export const ACTION_REDISTRIBUTE_LINES = 'Redistribute Lines'
 export const ACTION_COLLAPSE_LINES = 'Collapse Lines'
 export const ACTION_ALIGN_COMMENTS = 'Align Comments'
 
+const REDISTRIBUTE_LINES_FIX_ALL_LABEL = 'Redistribute Lines (Fix All)'
+
 const PREFERRED_COMMENT_COLUMN = 64 // The "Auchand standard"
+const FIX_ALL_REDISTRIBUTE_KIND = vscode.CodeActionKind.SourceFixAll.append('gsl.redistributeLines')
 
 export class GSLCodeActionProvider implements CodeActionProvider {
     public static readonly providedCodeActionKinds = [
-        vscode.CodeActionKind.QuickFix
+        vscode.CodeActionKind.QuickFix,
+        FIX_ALL_REDISTRIBUTE_KIND
     ]
 
     provideCodeActions(
@@ -20,6 +24,17 @@ export class GSLCodeActionProvider implements CodeActionProvider {
         range: Range,
         context: vscode.CodeActionContext
     ): CodeAction[] {
+        // Handle Fix All requests
+        const fixAllRequested =
+            context.only?.contains(FIX_ALL_REDISTRIBUTE_KIND) ||
+            context.only?.contains(vscode.CodeActionKind.SourceFixAll)
+
+        if (fixAllRequested) {
+            const fixAll = this.getFixAllRedistributeAction(document)
+            return fixAll ? [fixAll] : []
+        }
+
+        // Handle all other requests
         const actions: CodeAction[] = []
         const line = document.lineAt(range.start.line)
 
@@ -35,6 +50,38 @@ export class GSLCodeActionProvider implements CodeActionProvider {
         })
 
         return actions
+    }
+
+    private getFixAllRedistributeAction(document: TextDocument): CodeAction | undefined {
+        const diagnostics = vscode.languages
+            .getDiagnostics(document.uri)
+            .filter(diag => String(diag.code) === LINE_TOO_LONG)
+
+        if (diagnostics.length === 0) {
+            return
+        }
+
+        const edit = new WorkspaceEdit()
+        diagnostics.forEach(diag => {
+            const line = document.lineAt(diag.range.start.line)
+            const cmd = getFullCommand(document, line)
+            const redistributed = fixLineTooLong(collapseMultiline(cmd.text))
+            if (redistributed !== cmd.text) {
+                edit.replace(document.uri, cmd.range, redistributed)
+            }
+        })
+
+        if (edit.entries().length === 0) {
+            return
+        }
+
+        const fixAllAction = new CodeAction(
+            REDISTRIBUTE_LINES_FIX_ALL_LABEL,
+            FIX_ALL_REDISTRIBUTE_KIND
+        )
+        fixAllAction.edit = edit
+        fixAllAction.diagnostics = diagnostics
+        return fixAllAction
     }
 }
 

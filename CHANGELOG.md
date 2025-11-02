@@ -2,11 +2,12 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
-## [1.14.2] - 2025-05-13
+## [1.14.2] - 2025-11-02
 
 ### Added
 
 - Fixed issue where "line-too-long" diagnostic would trigger on non-GSL documents.
+- Add "Fix All" support to "Redistribute Lines" as a fix for "line-too-long" diagnostic. Accessible via ctrl+shift+p with selection "Fix All".
 
 ## [1.14.1] - 2025-05-05
 
