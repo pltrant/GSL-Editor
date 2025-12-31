@@ -421,6 +421,8 @@ export class VSCodeIntegration {
         const scriptOptions = input.replace(/\s/g, '').split(';')
         const scriptList: Array<number|string> = []
         for (let option of scriptOptions) {
+            // Normalize: strip leading 's'/'S' and trailing '.gsl'
+            option = option.replace(/s/ig, '').replace(/\.gsl/ig, '')
             if (option.indexOf('-') > -1) {
                 let [first, second] = option.split('-')
                 let low = parseInt(first)
