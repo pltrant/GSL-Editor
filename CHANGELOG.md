@@ -2,6 +2,12 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.16.1] - 2025-12-31
+
+### Changed
+
+- Updated extension to bundle javascript files.
+
 ## [1.16.0] - 2025-12-31
 
 ### Added
