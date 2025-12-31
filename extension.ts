@@ -418,7 +418,7 @@ export class VSCodeIntegration {
         const prompt = 'Script number(s) or verb name(s) to download?'
         const input = await window.showInputBox({ prompt })
         if (!input) { return }
-        const scriptOptions = input.replace(/\s/g, '').split(';')
+        const scriptOptions = input.split(/[\s,;]+/).filter(Boolean)
         const scriptList: Array<number|string> = []
         for (let option of scriptOptions) {
             // Normalize: strip leading 's'/'S' and trailing '.gsl'
