@@ -494,6 +494,12 @@ export class VSCodeIntegration {
                 "Script upload requires an active GSL script editor"
             )
         }
+        const fileName = path.basename(document.fileName)
+        if (!/^s\d+\.gsl$/i.test(fileName)) {
+            return void window.showErrorMessage(
+                `Invalid script filename: "${fileName}". Expected format: s<number>.gsl`
+            )
+        }
         if (document.isDirty) {
             let result = false
             let i = 0
