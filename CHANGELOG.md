@@ -2,6 +2,21 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.16.0] - 2025-12-31
+
+### Added
+
+- Hover tips for callmatch script numbers now show the script's header comments from the local file.
+- Hover tips for callmatch script numbers now show a "Newer in Dev" warning when the script is out of sync between instances.
+- Download script input now accepts s-prefixed and .gsl-suffixed script numbers (e.g., `s12345`, `12345.gsl`).
+- Download script input now accepts comma or whitespace separated lists for multiple scripts.
+- Download script input now shows placeholder examples.
+
+### Fixed
+
+- Script filename format is now validated before upload.
+- EditorClient is now properly cleared when login fails.
+
 ## [1.15.0] - 2025-11-02
 
 ### Added
