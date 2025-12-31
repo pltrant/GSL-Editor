@@ -416,11 +416,14 @@ export class VSCodeIntegration {
 
     private async commandDownloadScript () {
         const prompt = 'Script number(s) or verb name(s) to download?'
-        const input = await window.showInputBox({ prompt })
+        const placeHolder = '29, s07890.gsl, 9800-9805'
+        const input = await window.showInputBox({ prompt, placeHolder })
         if (!input) { return }
-        const scriptOptions = input.replace(/\s/g, '').split(';')
+        const scriptOptions = input.split(/[\s,;]+/).filter(Boolean)
         const scriptList: Array<number|string> = []
         for (let option of scriptOptions) {
+            // Normalize: strip leading 's'/'S' and trailing '.gsl'
+            option = option.replace(/s/ig, '').replace(/\.gsl/ig, '')
             if (option.indexOf('-') > -1) {
                 let [first, second] = option.split('-')
                 let low = parseInt(first)
@@ -490,6 +493,12 @@ export class VSCodeIntegration {
         if (!document || !(document.languageId === GSL_LANGUAGE_ID)) {
             return void window.showWarningMessage(
                 "Script upload requires an active GSL script editor"
+            )
+        }
+        const fileName = path.basename(document.fileName)
+        if (!/^s\d+\.gsl$/i.test(fileName)) {
+            return void window.showErrorMessage(
+                `Invalid script filename: "${fileName}". Expected format: s<number>.gsl`
             )
         }
         if (document.isDirty) {
@@ -1029,11 +1038,20 @@ export function activate (context: ExtensionContext) {
 
     subscription = languages.registerHoverProvider(
         selector,
-        new GSLHoverProvider(async (script: number) => {
-            const config = workspace.getConfiguration(GSL_LANGUAGE_ID)
-            if (!config.get(GSLX_AUTOMATIC_DOWNLOADS)) return
-            return vsc?.withEditorClient(client => client.modifyScript(script))
-        })
+        new GSLHoverProvider(
+            async (script: number) => {
+                const config = workspace.getConfiguration(GSL_LANGUAGE_ID)
+                if (!config.get(GSLX_AUTOMATIC_DOWNLOADS)) return
+                return vsc?.withEditorClient(client => client.modifyScript(script))
+            },
+            async (script: number) => {
+                const config = workspace.getConfiguration(GSL_LANGUAGE_ID)
+                if (!config.get(GSLX_AUTOMATIC_DOWNLOADS)) return
+                if (!config.get(GSLX_ENABLE_SCRIPT_SYNC_CHECKS)) return
+                if (context.globalState.get(GSLX_DEV_INSTANCE) !== 'GS4D') return
+                return vsc?.withEditorClient(client => client.showScriptCheckStatus(script))
+            }
+        )
     )
     context.subscriptions.push(subscription)
 

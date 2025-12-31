@@ -77,7 +77,7 @@ export interface InitOptions {
         character: string
         password: string
     }
-    console: { log: (args: any[]) => void }
+    console: { log: (...args: any[]) => void }
     downloadLocation: string
     loggingEnabled: boolean
     onCreate: (client: EditorClient) => void
@@ -178,6 +178,14 @@ class TaskQueueProcessor {
         onCreate,
     }: InitOptions): Promise<EditorClient> {
         // Create a new client if needed
+        if (this.client && !this.client.hasServerConnection()) {
+            try {
+                this.client.quit()
+            } catch (e) {
+                console.log(e)
+            }
+            this.client = undefined
+        }
         if (!this.client) {
             this.client = new EditorClient ({
                 log: path.join(downloadLocation, 'gsl-dev-server.log'),
@@ -189,11 +197,13 @@ class TaskQueueProcessor {
             onCreate(this.client)
             this.client.on('error', () => { this.client = undefined })
             this.client.on('quit', () => { this.client = undefined })
-            await this.client.login(login)
-        }
-        // Reconnect if needed
-        if (!this.client.hasServerConnection()) {
-            await this.client.reconnect()
+            try {
+                await this.client.login(login)
+            } catch (e) {
+                // Clear the client so subsequent calls can create a fresh one
+                this.client = undefined
+                throw e
+            }
         }
         return this.client
     }

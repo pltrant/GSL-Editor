@@ -1,3 +1,6 @@
+import * as path from 'path'
+import * as fs from 'fs'
+
 import { HoverProvider, Hover, TextDocument, Position } from "vscode"
 import { snippets } from '../snippets/GslSnippets'
 import { ScriptProperties } from "./editorClient"
@@ -18,6 +21,7 @@ const snippetDescriptionMap = Object.values(snippets).reduce(
 )
 
 type GetScriptProperties = (script: number) => Promise<ScriptProperties | undefined>;
+type GetSyncStatus = (script: number) => Promise<string | undefined>;
 
 export class GSLHoverProvider implements HoverProvider {
     private nodeInfo: any;
@@ -33,9 +37,11 @@ export class GSLHoverProvider implements HoverProvider {
     private callmatchLineRegex: RegExp;
     private callmatchScriptNumberRegex: RegExp;
     private getScriptProperties: GetScriptProperties;
+    private getSyncStatus?: GetSyncStatus;
 
-    constructor(getScriptProperties: GetScriptProperties) {
+    constructor(getScriptProperties: GetScriptProperties, getSyncStatus?: GetSyncStatus) {
         this.getScriptProperties = getScriptProperties
+        this.getSyncStatus = getSyncStatus
         this.nodeInfo = {
             'O': {
                 'A': 'article',
@@ -132,7 +138,7 @@ export class GSLHoverProvider implements HoverProvider {
             const line = document.lineAt(position.line).text
             const callmatchMatch = this.callmatchLineRegex.exec(line)
             if (callmatchMatch !== null) {
-                return this.callmatchHover(Number(callmatchMatch[1]))
+                return this.callmatchHover(Number(callmatchMatch[1]), document)
             }
         }
 
@@ -205,19 +211,88 @@ export class GSLHoverProvider implements HoverProvider {
         return new Hover('table #' + tokenTypes[1] + ': value in ' + tokenTypes[2])
     }
 
-    async callmatchHover(script: number): Promise<Hover | undefined> {
+    async callmatchHover(script: number, document: TextDocument): Promise<Hover | undefined> {
         const scriptProperties = await this.getScriptProperties(script)
-        if (!scriptProperties) return
-        const {desc, name, owner, modifier, lastModifiedDate} = scriptProperties
-        const dateStr = lastModifiedDate.toLocaleDateString()
-        const timeStr = lastModifiedDate.toLocaleTimeString()
-        const firstLine = desc || scriptProperties.verb || ''
-        return new Hover(
-            (firstLine ? `${firstLine}\n` : '')
-            + (name ? `- Name: ${name}\n` : '')
-            + `- Owner: ${owner}\n`
-            + `- Last modified by: ${modifier}\n`
-            + `- Last modified on: ${dateStr} at ${timeStr}\n`
-        )
+        const syncStatus = await this.getSyncStatus?.(script)
+        const folder = path.dirname(document.uri.fsPath)
+        const scriptHeader = this.getScriptHeader(script, folder)
+
+        // If we have neither properties nor header, return undefined
+        if (!scriptProperties && !scriptHeader) return
+
+        let hoverContent = ''
+
+        // Show sync warning if newer in dev
+        if (syncStatus && !/All instances in sync/i.test(syncStatus)) {
+            hoverContent += `⚠️ **Newer in Dev** - ${syncStatus.toLowerCase()}\n\n`
+        }
+
+        // Add script properties if available
+        if (scriptProperties) {
+            const {desc, name, owner, modifier, lastModifiedDate} = scriptProperties
+            const dateStr = lastModifiedDate.toLocaleDateString()
+            const timeStr = lastModifiedDate.toLocaleTimeString()
+            const firstLine = desc || scriptProperties.verb || ''
+            hoverContent += (firstLine ? `${firstLine}\n` : '')
+                + (name ? `- Name: ${name}\n` : '')
+                + `- Owner: ${owner}\n`
+                + `- Last modified by: ${modifier}\n`
+                + `- Last modified on: ${dateStr} at ${timeStr}\n`
+        }
+
+        // Add script header comments if available
+        if (scriptHeader) {
+            hoverContent += scriptHeader + '\n\n---\n\n'
+        }
+        if (!hoverContent.trim()) return new Hover(`Script not found`)
+
+        return new Hover(hoverContent.trim())
+    }
+
+    /**
+     * Reads the script header (leading comment lines) from a local script file.
+     * Returns undefined if the file doesn't exist or has no header comments.
+     */
+    private getScriptHeader(script: number, folder: string): string | undefined {
+        const paddedScript = script.toString().padStart(5, '0')
+        const scriptPath = path.join(folder, `S${paddedScript}.gsl`)
+        if (!fs.existsSync(scriptPath)) {
+            return undefined
+        }
+
+        try {
+            const content = fs.readFileSync(scriptPath, 'utf-8')
+            const lines = content.split(/\r?\n/)
+            const headerLines: string[] = []
+
+            // Collect all leading lines that are comments (start with optional whitespace followed by !)
+            for (const line of lines) {
+                if (/^\s*!/.test(line)) {
+                    headerLines.push(line)
+                } else if (line.trim() === '') {
+                    // Allow empty lines at the start
+                    if (headerLines.length > 0) {
+                        headerLines.push(line)
+                    }
+                } else {
+                    // Stop at first non-comment, non-empty line
+                    break
+                }
+            }
+
+            // Remove trailing empty lines
+            while (headerLines.length > 0 && headerLines[headerLines.length - 1].trim() === '') {
+                headerLines.pop()
+            }
+
+            if (headerLines.length === 0) {
+                return undefined
+            }
+
+            return ["```", ...headerLines, "```"].join('\n')
+        } catch (e) {
+            console.error('Error reading script header:', e)
+            return undefined
+        }
     }
 }
