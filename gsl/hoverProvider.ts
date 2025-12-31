@@ -21,6 +21,7 @@ const snippetDescriptionMap = Object.values(snippets).reduce(
 )
 
 type GetScriptProperties = (script: number) => Promise<ScriptProperties | undefined>;
+type GetSyncStatus = (script: number) => Promise<string | undefined>;
 
 export class GSLHoverProvider implements HoverProvider {
     private nodeInfo: any;
@@ -36,9 +37,11 @@ export class GSLHoverProvider implements HoverProvider {
     private callmatchLineRegex: RegExp;
     private callmatchScriptNumberRegex: RegExp;
     private getScriptProperties: GetScriptProperties;
+    private getSyncStatus?: GetSyncStatus;
 
-    constructor(getScriptProperties: GetScriptProperties) {
+    constructor(getScriptProperties: GetScriptProperties, getSyncStatus?: GetSyncStatus) {
         this.getScriptProperties = getScriptProperties
+        this.getSyncStatus = getSyncStatus
         this.nodeInfo = {
             'O': {
                 'A': 'article',
@@ -210,6 +213,7 @@ export class GSLHoverProvider implements HoverProvider {
 
     async callmatchHover(script: number, document: TextDocument): Promise<Hover | undefined> {
         const scriptProperties = await this.getScriptProperties(script)
+        const syncStatus = await this.getSyncStatus?.(script)
         const folder = path.dirname(document.uri.fsPath)
         const scriptHeader = this.getScriptHeader(script, folder)
 
@@ -217,6 +221,12 @@ export class GSLHoverProvider implements HoverProvider {
         if (!scriptProperties && !scriptHeader) return
 
         let hoverContent = ''
+
+        // Show sync warning if newer in dev
+        if (syncStatus && !/All instances in sync/i.test(syncStatus)) {
+            hoverContent += `⚠️ **Newer in Dev** - ${syncStatus.toLowerCase()}\n\n`
+        }
+
         // Add script properties if available
         if (scriptProperties) {
             const {desc, name, owner, modifier, lastModifiedDate} = scriptProperties

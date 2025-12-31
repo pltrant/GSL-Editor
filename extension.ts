@@ -1038,11 +1038,20 @@ export function activate (context: ExtensionContext) {
 
     subscription = languages.registerHoverProvider(
         selector,
-        new GSLHoverProvider(async (script: number) => {
-            const config = workspace.getConfiguration(GSL_LANGUAGE_ID)
-            if (!config.get(GSLX_AUTOMATIC_DOWNLOADS)) return
-            return vsc?.withEditorClient(client => client.modifyScript(script))
-        })
+        new GSLHoverProvider(
+            async (script: number) => {
+                const config = workspace.getConfiguration(GSL_LANGUAGE_ID)
+                if (!config.get(GSLX_AUTOMATIC_DOWNLOADS)) return
+                return vsc?.withEditorClient(client => client.modifyScript(script))
+            },
+            async (script: number) => {
+                const config = workspace.getConfiguration(GSL_LANGUAGE_ID)
+                if (!config.get(GSLX_AUTOMATIC_DOWNLOADS)) return
+                if (!config.get(GSLX_ENABLE_SCRIPT_SYNC_CHECKS)) return
+                if (context.globalState.get(GSLX_DEV_INSTANCE) !== 'GS4D') return
+                return vsc?.withEditorClient(client => client.showScriptCheckStatus(script))
+            }
+        )
     )
     context.subscriptions.push(subscription)
 
