@@ -416,7 +416,8 @@ export class VSCodeIntegration {
 
     private async commandDownloadScript () {
         const prompt = 'Script number(s) or verb name(s) to download?'
-        const input = await window.showInputBox({ prompt })
+        const placeHolder = '29, s07890.gsl, 9800-9805'
+        const input = await window.showInputBox({ prompt, placeHolder })
         if (!input) { return }
         const scriptOptions = input.split(/[\s,;]+/).filter(Boolean)
         const scriptList: Array<number|string> = []
