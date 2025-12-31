@@ -9,6 +9,7 @@ const skippedSnippets = new Set(['if', 'ifnot', 'else', 'loop', 'when'])
 
 const snippetDescriptionMap = Object.values(snippets).reduce(
     (memo, snippet) => {
+        if (!snippet.prefix) return memo
         const firstWord = snippet.prefix.split(/\s+/)[0].toLowerCase()
         if (!firstWord || skippedSnippets.has(firstWord)) return memo
         const tokens = snippet.description.split(/\n+/)
