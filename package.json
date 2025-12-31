@@ -49,7 +49,7 @@
     "vscode:prepublish": "npm run compile && npm run bundle && cd gsl-language-server && npm run compile",
     "postinstall": "cd gsl-language-server && npm ci && cd ..",
     "compile": "tsc -b",
-    "bundle": "esbuild ./extension.ts --bundle --outfile=extension.js --external:vscode --format=cjs --platform=node",
+    "bundle": "esbuild extension.ts --bundle --outfile=extension.js --external:vscode --format=cjs --platform=node",
     "watch": "tsc --watch",
     "test": "node test/runTests.js"
   },
