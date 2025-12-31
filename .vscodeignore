@@ -15,4 +15,5 @@ gsl-language-server/node_modules/
 node_modules/
 out/
 scripts/
+snippets/*.js
 test/
