@@ -416,14 +416,14 @@ export class VSCodeIntegration {
 
     private async commandDownloadScript () {
         const prompt = 'Script number(s) or verb name(s) to download?'
-        const placeHolder = '29, s07890.gsl, 9800-9805'
+        const placeHolder = '29, incant, s07890.gsl, 9800-9805'
         const input = await window.showInputBox({ prompt, placeHolder })
         if (!input) { return }
         const scriptOptions = input.split(/[\s,;]+/).filter(Boolean)
         const scriptList: Array<number|string> = []
         for (let option of scriptOptions) {
-            // Normalize: strip leading 's'/'S' and trailing '.gsl'
-            option = option.replace(/s/ig, '').replace(/\.gsl/ig, '')
+            // Normalize: strip leading 's'/'S' (only if followed by a digit) and trailing '.gsl'
+            option = option.replace(/^s(?=\d)/i, '').replace(/\.gsl$/i, '')
             if (option.indexOf('-') > -1) {
                 let [first, second] = option.split('-')
                 let low = parseInt(first)

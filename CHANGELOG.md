@@ -2,6 +2,12 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.17.1] - 2026-01-03
+
+### Fixed
+
+- Download script no longer strips 's' from verb names (e.g., `sit`, `sigh`, `/esp`).
+
 ## [1.17.0] - 2025-12-31
 
 ### Changed
