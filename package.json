@@ -43,6 +43,7 @@
     "eslint": "^8.46.0",
     "glob": "^11.1.0",
     "mocha": "^10.8.2",
+    "prettier": "^3.8.1",
     "typescript": "^5.1.6"
   },
   "scripts": {
@@ -51,7 +52,8 @@
     "compile": "tsc -b",
     "bundle": "esbuild extension.ts --bundle --outfile=extension.js --external:vscode --format=cjs --platform=node",
     "watch": "tsc --watch",
-    "test": "node test/runTests.js"
+    "test": "node test/runTests.js",
+    "format": "prettier --write \"**/*.ts\""
   },
   "main": "extension",
   "contributes": {
