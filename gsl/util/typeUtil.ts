@@ -21,11 +21,13 @@
  *         assertNever(animal)
  * }
  */
-export const assertNever = <T> (value: never, fallback: T): T => {
-    console.error(`assertNever() called with ${value}`, value)
-    return fallback
-}
+export const assertNever = <T>(value: never, fallback: T): T => {
+    console.error(`assertNever() called with ${value}`, value);
+    return fallback;
+};
 
-export const isNonVoid = <T> (value: T): value is Exclude<T, null | undefined> => {
+export const isNonVoid = <T>(
+    value: T,
+): value is Exclude<T, null | undefined> => {
     return value !== undefined && value !== null;
-}
+};
