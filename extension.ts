@@ -67,8 +67,12 @@ import {
 } from "./gsl/codeActionProvider";
 import { subscribeToDocumentChanges } from "./gsl/diagnostics";
 import { formatIndentation } from "./gsl/util/formattingUtil";
+import { registerCopilotTools } from "./gsl/copilotTools";
+import { runDiffWithPrimeCommand } from "./gsl/commands/diffWithPrime";
+import { runPrimeSetupCommand } from "./gsl/commands/primeSetup";
+import * as primeService from "./gsl/prime/primeService";
 
-const rx_script_number = /^\d{1,5}$/;
+const rx_script_number = /^\d{1,6}$/;
 const rx_script_number_in_filename = /(\d+)\.gsl/;
 
 interface LastSeenScriptModification {
@@ -443,6 +447,8 @@ export class VSCodeIntegration {
                 label: "Format Document Indentation",
                 name: "gsl.formatIndentation",
             },
+            { label: "Prime Server Setup", name: "gsl.primeSetup" },
+            { label: "Diff with Prime Server", name: "gsl.diffWithPrime" },
         ];
 
         this.outputChannel = window.createOutputChannel("GSL Editor (debug)");
@@ -993,6 +999,92 @@ export class VSCodeIntegration {
         }
     }
 
+    private async commandPrimeSetup() {
+        return runPrimeSetupCommand({
+            context: this.context,
+        });
+    }
+
+    private async commandDiffWithPrime() {
+        const { activeTextEditor } = window;
+        if (
+            !activeTextEditor ||
+            activeTextEditor.document.languageId !== GSL_LANGUAGE_ID
+        ) {
+            return void window.showWarningMessage(
+                "Diff with prime requires an active GSL script editor",
+            );
+        }
+
+        const { document } = activeTextEditor;
+        const scriptNumberStr = scriptNumberFromFileName(document.fileName);
+        if (!rx_script_number.test(scriptNumberStr)) {
+            return void window.showErrorMessage(
+                "Could not determine script number from filename",
+            );
+        }
+
+        const script = Number(scriptNumberStr);
+        if (script < 1 || script > 999999) {
+            return void window.showErrorMessage(
+                "Script number must be between 1 and 999999",
+            );
+        }
+
+        const msg = window.setStatusBarMessage(
+            `Downloading script ${script} from prime server...`,
+        );
+
+        try {
+            return await runDiffWithPrimeCommand({
+                script,
+                document,
+                fetchPrimeScriptDiff: (targetScript, targetDocument) =>
+                    this.fetchPrimeScriptDiff(targetScript, targetDocument),
+            });
+        } finally {
+            msg.dispose();
+        }
+    }
+
+    private getPrimeServiceDependencies(): primeService.PrimeServiceDependencies {
+        return {
+            context: this.context,
+            outputChannel: this.outputChannel,
+            downloadLocation: GSLExtension.getDownloadLocation(),
+        };
+    }
+
+    async fetchPrimeScriptDiff(
+        script: number,
+        document: TextDocument,
+    ): Promise<{
+        localContent: string;
+        primeContent: string;
+        isNewOnPrime: boolean;
+    }> {
+        try {
+            await this.withEditorClient(() => {});
+        } catch {
+            // Dev connection failed — that's fine
+        }
+
+        return primeService.fetchPrimeScriptDiff(
+            script,
+            document,
+            this.getPrimeServiceDependencies(),
+        );
+    }
+
+    async fetchPrimeScript(
+        script: number,
+    ): Promise<{ content: string; isNew: boolean }> {
+        return primeService.fetchPrimeScript(
+            script,
+            this.getPrimeServiceDependencies(),
+        );
+    }
+
     private registerCommands() {
         let subscription: Disposable;
         subscription = commands.registerCommand(
@@ -1064,6 +1156,18 @@ export class VSCodeIntegration {
         subscription = commands.registerCommand(
             "gsl.alignComments",
             this.commandAlignComments,
+            this,
+        );
+        this.context.subscriptions.push(subscription);
+        subscription = commands.registerCommand(
+            "gsl.primeSetup",
+            this.commandPrimeSetup,
+            this,
+        );
+        this.context.subscriptions.push(subscription);
+        subscription = commands.registerCommand(
+            "gsl.diffWithPrime",
+            this.commandDiffWithPrime,
             this,
         );
         this.context.subscriptions.push(subscription);
@@ -1226,7 +1330,12 @@ export class VSCodeIntegration {
                 },
                 console: consoleAdapter,
                 downloadLocation: GSLExtension.getDownloadLocation(),
-                loggingEnabled: this.loggingEnabled,
+                ...(this.loggingEnabled
+                    ? {
+                          loggingEnabled: true,
+                          logFileName: "gsl-dev-server.log",
+                      }
+                    : { loggingEnabled: false }),
                 onCreate: (client) => {
                     this.gameTerminal?.bindClient(client);
                 },
@@ -1371,6 +1480,9 @@ export function activate(context: ExtensionContext) {
         languages.createDiagnosticCollection("gsl-line-length");
     context.subscriptions.push(lineLengthDiagnostics);
     subscribeToDocumentChanges(context, lineLengthDiagnostics);
+
+    // Register language model tools for Copilot agent mode
+    registerCopilotTools(context, vsc);
 
     vsc.checkForNewInstall();
     vsc.checkForUpdatedVersion();

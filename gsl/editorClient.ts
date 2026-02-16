@@ -97,7 +97,7 @@ const monthList = [
 const clientTimeout = 15000;
 const ssCheckeditTimeout = 7500;
 
-export interface InitOptions {
+export type InitOptions = {
     login: {
         account: string;
         instance: string;
@@ -106,9 +106,8 @@ export interface InitOptions {
     };
     console: { log: (...args: any[]) => void };
     downloadLocation: string;
-    loggingEnabled: boolean;
     onCreate: (client: EditorClient) => void;
-}
+} & ({ loggingEnabled: true; logFileName: string } | { loggingEnabled: false });
 
 /**
  * An operation requiring an editor client. If a promise is returned
@@ -130,6 +129,18 @@ export const withEditorClient = async <T>(
     task: ClientTask<T>,
 ): Promise<T> => {
     return processorSingleton.enqueueTask(initOptions, task);
+};
+
+/**
+ * Like `withEditorClient`, but connects to the prime (production) server.
+ * Uses its own independent connection and task queue. Intended for
+ * read-only operations such as downloading scripts for diffing.
+ */
+export const withPrimeEditorClient = async <T>(
+    initOptions: InitOptions,
+    task: ClientTask<T>,
+): Promise<T> => {
+    return primeProcessorSingleton.enqueueTask(initOptions, task);
 };
 
 type TaskController<T> = {
@@ -195,13 +206,12 @@ class TaskQueueProcessor {
         }
     }
 
-    async ensureClient({
-        downloadLocation,
-        console,
-        loggingEnabled,
-        login,
-        onCreate,
-    }: InitOptions): Promise<EditorClient> {
+    async ensureClient(options: InitOptions): Promise<EditorClient> {
+        const { downloadLocation, console, loggingEnabled, login, onCreate } =
+            options;
+        const logFileName = options.loggingEnabled
+            ? options.logFileName
+            : undefined;
         // Create a new client if needed
         if (this.client && !this.client.hasServerConnection()) {
             try {
@@ -213,7 +223,9 @@ class TaskQueueProcessor {
         }
         if (!this.client) {
             this.client = new EditorClient({
-                log: path.join(downloadLocation, "gsl-dev-server.log"),
+                ...(logFileName
+                    ? { log: path.join(downloadLocation, logFileName) }
+                    : {}),
                 logging: loggingEnabled,
                 debug: true,
                 echo: true,
@@ -238,6 +250,7 @@ class TaskQueueProcessor {
     }
 }
 const processorSingleton = new TaskQueueProcessor();
+const primeProcessorSingleton = new TaskQueueProcessor();
 
 /**
  * The interface of an `EditorClient` instance. This layer of indirection

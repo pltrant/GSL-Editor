@@ -25,3 +25,5 @@ export const GSLX_SAVED_VERSION = "savedVersion";
 export const GSLX_DISABLE_LOGIN = "disableLoginAttempts";
 export const GSLX_AUTOMATIC_DOWNLOADS = "automaticallyDownloadScripts";
 export const GSLX_ENABLE_SCRIPT_SYNC_CHECKS = "enableScriptSyncChecks";
+export const GSLX_PRIME_INSTANCE = "primeInstance";
+export const GSLX_PRIME_CHARACTER = "primeCharacter";
