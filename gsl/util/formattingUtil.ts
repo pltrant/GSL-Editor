@@ -26,7 +26,7 @@ export interface MessageCommand {
  */
 export const collapseMultiline = (input: string): string => {
     // Regex removes " +\n" (with optional surrounding whitespace) between adjacent string literals.
-    return stripUnnecessaryParans(
+    return stripUnnecessaryParens(
         input.replace(/"\s*\+\s*\\\s*\r?\n\s*"/g, ""),
     );
 };
@@ -54,9 +54,9 @@ export const getMessageCommand = (text: string): MessageCommand | null => {
     return null;
 };
 
-const stripUnnecessaryParans = (text: string): string => {
+const stripUnnecessaryParens = (text: string): string => {
     if (text.indexOf("\n") !== -1) {
-        return text; // Multiline. Parans is necessary.
+        return text; // Multiline. Parentheses are necessary.
     }
     const match = text.match(WRAPPABLE_LINE_REGEX);
     if (!match) return text;
@@ -70,7 +70,7 @@ const stripUnnecessaryParans = (text: string): string => {
  */
 export const fixLineTooLong = (input: string): string => {
     // Return single line if possible
-    const withoutParans = stripUnnecessaryParans(input);
+    const withoutParans = stripUnnecessaryParens(input);
     if (withoutParans.length <= MAX_LINE_LENGTH) return withoutParans;
 
     // Supported commands: msg, msgp, msg NP0/NP1/NP5, msgrxp, set T0 to, etc.
@@ -80,7 +80,7 @@ export const fixLineTooLong = (input: string): string => {
     // Consume buffer
     const [_, indentation, __, ___, comment] = match;
     let result = "";
-    let bufferIn = ensureParantheses(input.trimEnd());
+    let bufferIn = ensureParentheses(input.trimEnd());
 
     while (bufferIn.length) {
         if (result) {
@@ -95,13 +95,13 @@ export const fixLineTooLong = (input: string): string => {
         result += `\n${indentation}${comment.trim()}`;
     }
 
-    const resultWithoutParans = stripUnnecessaryParans(input);
+    const resultWithoutParans = stripUnnecessaryParens(input);
     return resultWithoutParans.length <= MAX_LINE_LENGTH
         ? resultWithoutParans
         : result;
 };
 
-const ensureParantheses = (text: string): string => {
+const ensureParentheses = (text: string): string => {
     const match = text.match(WRAPPABLE_LINE_REGEX);
     if (!match) return text;
     const [_, indentation, command, content] = match;

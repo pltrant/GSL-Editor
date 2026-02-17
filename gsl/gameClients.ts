@@ -1,11 +1,6 @@
-import {
-    ServerConnection,
-    ServerConnectionOptions,
-    ServerConnectionMode,
-} from "./serverConnection";
+import { ServerConnection, ServerConnectionMode } from "./serverConnection";
 import { SAL } from "./sal";
 import { EventEmitter } from "events";
-import { maxHeaderSize } from "http";
 import * as fs from "fs";
 import { WriteStream } from "fs";
 
@@ -17,8 +12,6 @@ export interface GameClientOptions {
     log?: string;
     logging?: boolean;
 }
-
-const defaultConsole = { log: () => {} };
 
 export class BaseGameClient extends EventEmitter {
     protected server?: ServerConnection;

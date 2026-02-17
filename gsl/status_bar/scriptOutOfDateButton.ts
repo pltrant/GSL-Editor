@@ -19,7 +19,7 @@ import { GSLX_DEV_PASSWORD, GSL_LANGUAGE_ID } from "../const";
 import { assertNever } from "../util/typeUtil";
 import { showQuickPick } from "../dialog/QuickPick";
 import { EditorClientInterface } from "../editorClient";
-import { getScriptNumber, scriptNumberFromFileName } from "../util/scriptUtil";
+import { getScriptNumber } from "../util/scriptUtil";
 import { GSLExtension, VSCodeIntegration } from "../../extension";
 
 type OutOfDateButtonState =
