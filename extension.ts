@@ -514,7 +514,11 @@ export class VSCodeIntegration {
     private async commandDownloadScript() {
         const prompt = "Script number(s) or verb name(s) to download?";
         const placeHolder = "29, incant, s07890.gsl, 9800-9805";
-        const input = await window.showInputBox({ prompt, placeHolder });
+        const input = await window.showInputBox({
+            prompt,
+            placeHolder,
+            ignoreFocusOut: true,
+        });
         if (!input) {
             return;
         }
