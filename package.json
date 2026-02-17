@@ -153,6 +153,10 @@
               "minimum": 0,
               "maximum": 100,
               "description": "Number of unchanged context lines to show before and after each change. Defaults to 3 (same as git diff)."
+            },
+            "ignoreWhitespace": {
+              "type": "boolean",
+              "description": "If true, ignore leading/trailing whitespace when comparing lines."
             }
           }
         }

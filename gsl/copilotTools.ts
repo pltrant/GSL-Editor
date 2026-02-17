@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import { createTwoFilesPatch } from "diff";
+import { createTwoFilesPatch, structuredPatch } from "diff";
 
 import { GSL_LANGUAGE_ID } from "./const";
 import { scriptNumberFromFileName } from "./util/scriptUtil";
@@ -18,6 +18,7 @@ const rx_script_number = /^\d{1,6}$/;
 interface IDiffWithPrimeParams {
     scriptNumber?: number;
     context?: number;
+    ignoreWhitespace?: boolean;
 }
 
 interface IFetchPrimeScriptParams {
@@ -246,6 +247,7 @@ class DiffWithPrimeTool implements vscode.LanguageModelTool<IDiffWithPrimeParams
         }
 
         const diffContext = parseDiffContext(options.input.context);
+        const ignoreWhitespace = options.input.ignoreWhitespace ?? false;
 
         try {
             const { localContent, primeContent, isNewOnPrime } =
@@ -259,11 +261,25 @@ class DiffWithPrimeTool implements vscode.LanguageModelTool<IDiffWithPrimeParams
                 ]);
             }
 
-            if (localContent === primeContent) {
+            const patch = structuredPatch(
+                `s${scriptNumber} (Prime)`,
+                `s${scriptNumber} (Dev)`,
+                primeContent,
+                localContent,
+                undefined,
+                undefined,
+                {
+                    context: diffContext,
+                    ignoreWhitespace,
+                },
+            );
+
+            if (patch.hunks.length === 0) {
+                const noDiffMessage = ignoreWhitespace
+                    ? `Script ${scriptNumber}: No differences between Prime and Dev (ignoring leading/trailing whitespace).`
+                    : `Script ${scriptNumber}: No differences between Prime and Dev.`;
                 return new vscode.LanguageModelToolResult([
-                    new vscode.LanguageModelTextPart(
-                        `Script ${scriptNumber}: No differences between Prime and Dev.`,
-                    ),
+                    new vscode.LanguageModelTextPart(noDiffMessage),
                 ]);
             }
 
@@ -274,7 +290,10 @@ class DiffWithPrimeTool implements vscode.LanguageModelTool<IDiffWithPrimeParams
                 localContent,
                 undefined,
                 undefined,
-                { context: diffContext },
+                {
+                    context: diffContext,
+                    ignoreWhitespace,
+                },
             );
 
             return new vscode.LanguageModelToolResult([

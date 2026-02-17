@@ -131,12 +131,15 @@ This avoids leaving stale wrappers behind after incremental refactors.
 ## Commit Messages
 
 - Keep the subject line to 54 characters or fewer.
-- Use tags to indicate whether something is a feature, bugfix, tech debt, etc.
+- Use tags in the title to indicate whether something is a feature, bugfix, tech debt. Example: `[feat] Added command xyz`
 - Include a short body that summarizes:
   - what changed
-  - newly exposed tools/features/etc
+  - newly exposed tools/features/etc (bullet points are preferred)
   - important decisions/tradeoffs (if applicable)
 - Wrap commit message body text at 70 characters.
+- When committing from PowerShell, do not embed literal `\n` in a `-m`
+  string. Use multiple `-m` flags (one per paragraph) so Git stores
+  actual newlines.
 
 ## Updating Changelog
 
