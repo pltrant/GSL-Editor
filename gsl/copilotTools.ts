@@ -1,8 +1,10 @@
 import * as vscode from "vscode";
+import * as path from "path";
 import { createTwoFilesPatch } from "diff";
 
 import { GSL_LANGUAGE_ID } from "./const";
 import { scriptNumberFromFileName } from "./util/scriptUtil";
+import { ScriptCompileResults, ScriptCompileStatus } from "./editorClient";
 import type { VSCodeIntegration } from "../extension";
 
 /** Re-use the module-level reference set by `activate()`. */
@@ -21,6 +23,12 @@ interface IDiffWithPrimeParams {
 interface IFetchPrimeScriptParams {
     scriptNumber?: number;
 }
+
+interface IUploadScriptParams {
+    filename: string;
+}
+
+const AGENT_UPLOAD_SCRIPT_NUMBER = 24661;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -64,6 +72,82 @@ function createPrimeToolConfirmationMessages(
             ),
         },
     };
+}
+
+function formatCompileResults(
+    filename: string,
+    scriptNumber: number,
+    compileResults: ScriptCompileResults,
+): string {
+    const compiledScript = compileResults.script || scriptNumber;
+    if (compileResults.status === ScriptCompileStatus.Failed) {
+        const messages = compileResults.errorList.length
+            ? compileResults.errorList
+                  .map((error) => `line ${error.line}: ${error.message}`)
+                  .join("\n")
+            : "(No line-level compiler errors were captured.)";
+        return [
+            `Compile failed for ${filename} (uploaded as script ${compiledScript}).`,
+            `Errors: ${compileResults.errors}, warnings: ${compileResults.warnings}.`,
+            "",
+            messages,
+        ].join("\n");
+    }
+
+    if (compileResults.status === ScriptCompileStatus.Compiled) {
+        const bytesRemaining = compileResults.maxBytes - compileResults.bytes;
+        return [
+            `Compile OK for ${filename} (uploaded as script ${compiledScript}).`,
+            `Warnings: ${compileResults.warnings}.`,
+            `Size: ${compileResults.bytes.toLocaleString()} bytes (${bytesRemaining.toLocaleString()} bytes remaining).`,
+            compileResults.path ? `Server path: ${compileResults.path}` : "",
+        ]
+            .filter(Boolean)
+            .join("\n");
+    }
+
+    return `Upload finished for ${filename}, but compiler status was inconclusive.`;
+}
+
+async function openUploadDocument(
+    filename: string,
+): Promise<vscode.TextDocument> {
+    if (!filename || !filename.trim()) {
+        throw new Error("Missing filename. Provide a .gsl file path.");
+    }
+
+    const trimmed = filename.trim();
+    const fileUri = path.isAbsolute(trimmed)
+        ? vscode.Uri.file(trimmed)
+        : vscode.workspace.workspaceFolders?.[0]
+          ? vscode.Uri.joinPath(
+                vscode.workspace.workspaceFolders[0].uri,
+                trimmed,
+            )
+          : undefined;
+
+    if (!fileUri) {
+        throw new Error(
+            "No workspace folder is open. Provide an absolute file path.",
+        );
+    }
+
+    try {
+        return await vscode.workspace.openTextDocument(fileUri);
+    } catch {
+        const matches = await vscode.workspace.findFiles(
+            `**/${path.basename(trimmed)}`,
+        );
+        if (matches.length === 0) {
+            throw new Error(`File not found: ${trimmed}`);
+        }
+        if (matches.length > 1) {
+            throw new Error(
+                `Filename is ambiguous: ${trimmed}. Provide a workspace-relative path.`,
+            );
+        }
+        return vscode.workspace.openTextDocument(matches[0]);
+    }
 }
 
 /**
@@ -276,6 +360,78 @@ class FetchPrimeScriptTool implements vscode.LanguageModelTool<IFetchPrimeScript
     }
 }
 
+class CheckCompilerErrorsTool implements vscode.LanguageModelTool<IUploadScriptParams> {
+    async prepareInvocation(
+        options: vscode.LanguageModelToolInvocationPrepareOptions<IUploadScriptParams>,
+        _token: vscode.CancellationToken,
+    ) {
+        const filename = options.input.filename?.trim();
+        return {
+            invocationMessage: "Checking GSL script for compiler errors...",
+            confirmationMessages: {
+                title: "Check Compiler Errors",
+                message: new vscode.MarkdownString(
+                    filename
+                        ? `Check compiler errors for \`${filename}\` on the development server?`
+                        : "Check compiler errors for a GSL file on the development server?",
+                ),
+            },
+        };
+    }
+
+    async invoke(
+        options: vscode.LanguageModelToolInvocationOptions<IUploadScriptParams>,
+        _token: vscode.CancellationToken,
+    ): Promise<vscode.LanguageModelToolResult> {
+        if (!vscRef) {
+            throw new Error(
+                "GSL extension is not active. Open a GSL file to activate it.",
+            );
+        }
+
+        const sourceDocument = await openUploadDocument(options.input.filename);
+        const sourceContent = sourceDocument.getText();
+        if (sourceContent.match(/^\s*$/)) {
+            throw new Error("Cannot upload an empty script file.");
+        }
+
+        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
+        const safetyScriptUri = workspaceRoot
+            ? vscode.Uri.joinPath(workspaceRoot, "S24661.gsl")
+            : vscode.Uri.joinPath(
+                  vscode.Uri.file(path.dirname(sourceDocument.fileName)),
+                  "S24661.gsl",
+              );
+        await vscode.workspace.fs.writeFile(
+            safetyScriptUri,
+            Buffer.from(sourceContent, "utf8"),
+        );
+        const safetyDocument =
+            await vscode.workspace.openTextDocument(safetyScriptUri);
+
+        const compileResults = await vscRef.uploadScriptForAgent(
+            AGENT_UPLOAD_SCRIPT_NUMBER,
+            safetyDocument,
+        );
+
+        if (!compileResults) {
+            throw new Error(
+                "Unable to upload script. Confirm development server login is configured.",
+            );
+        }
+
+        return new vscode.LanguageModelToolResult([
+            new vscode.LanguageModelTextPart(
+                formatCompileResults(
+                    options.input.filename,
+                    AGENT_UPLOAD_SCRIPT_NUMBER,
+                    compileResults,
+                ),
+            ),
+        ]);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Registration
 // ---------------------------------------------------------------------------
@@ -301,6 +457,10 @@ export function registerCopilotTools(
         vscode.lm.registerTool(
             "gsl_fetch_prime_script",
             new FetchPrimeScriptTool(),
+        ),
+        vscode.lm.registerTool(
+            "gsl_compile_check",
+            new CheckCompilerErrorsTool(),
         ),
     );
 }

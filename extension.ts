@@ -206,23 +206,27 @@ export class GSLExtension {
         client: EditorClientInterface,
         script: number,
         document: TextDocument,
+        options?: { skipUploadConfirmation?: boolean },
     ): Promise<ScriptCompileResults | undefined> {
         // Get script properties, keeping editor open
         const scriptProperties = await client.modifyScript(script, true);
         // Confirm upload if needed
-        const requiresConfirmation = GSLExtension.requiresUploadConfirmation(
-            script,
-            scriptProperties,
-        );
-        if (requiresConfirmation) {
-            const confirmation = await window.showWarningMessage(
-                requiresConfirmation.prompt,
-                { modal: true },
-                "Yes",
-            );
-            if (confirmation !== "Yes") {
-                await client.exitModifyScript();
-                return;
+        if (!options?.skipUploadConfirmation) {
+            const requiresConfirmation =
+                GSLExtension.requiresUploadConfirmation(
+                    script,
+                    scriptProperties,
+                );
+            if (requiresConfirmation) {
+                const confirmation = await window.showWarningMessage(
+                    requiresConfirmation.prompt,
+                    { modal: true },
+                    "Yes",
+                );
+                if (confirmation !== "Yes") {
+                    await client.exitModifyScript();
+                    return;
+                }
             }
         }
         // Send script
@@ -1083,6 +1087,39 @@ export class VSCodeIntegration {
             script,
             this.getPrimeServiceDependencies(),
         );
+    }
+
+    async uploadScriptForAgent(
+        script: number,
+        document: TextDocument,
+    ): Promise<ScriptCompileResults | undefined> {
+        if (script !== 24661) {
+            throw new Error(
+                `Agent upload is restricted to script 24661. Refusing script ${script}.`,
+            );
+        }
+        return this.withEditorClient(async (client) => {
+            try {
+                return await GSLExtension.uploadScript(
+                    client,
+                    script,
+                    document,
+                    {
+                        skipUploadConfirmation: true,
+                    },
+                );
+            } catch (error) {
+                try {
+                    await client.exitModifyScript();
+                } catch (cleanupError) {
+                    console.warn(
+                        "Failed to exit modify script during agent upload cleanup",
+                        cleanupError,
+                    );
+                }
+                throw error;
+            }
+        });
     }
 
     private registerCommands() {
