@@ -123,6 +123,11 @@
         "command": "gsl.diffWithPrime",
         "title": "Diff with Prime Server",
         "category": "GSL"
+      },
+      {
+        "command": "gsl.syncAgentPrompts",
+        "title": "Sync Agent Prompts",
+        "category": "GSL"
       }
     ],
     "languageModelTools": [

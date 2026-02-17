@@ -15,6 +15,13 @@
 - After formatting, verify the code compiles by running:
   - `npm run compile`
 
+## Reviewing Code
+
+- Verify the code compiles.
+- Verify there is no prettier diff.
+- Ensure the code adheres to the standards in this file, including the
+  rules under `Writing Code`.
+
 ### Scope Discipline
 
 - Avoid touching code that is unrelated to the current task and
@@ -24,6 +31,9 @@
 - Treat refactors as an explicit decision: do not perform broad or
   opportunistic refactors unless the developer and agent have clearly
   agreed to do so.
+- Keep `extension.ts` thin. New feature logic should live in focused
+  modules (for example under `gsl/commands/`) with `extension.ts`
+  delegating to those modules.
 
 ### Type & Parameter Preferences
 
