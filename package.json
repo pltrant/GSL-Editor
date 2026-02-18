@@ -128,6 +128,11 @@
         "command": "gsl.syncAgentPrompts",
         "title": "Sync Agent Prompts",
         "category": "GSL"
+      },
+      {
+        "command": "gsl.copilotCodeReview",
+        "title": "Copilot Code Review",
+        "category": "GSL"
       }
     ],
     "languageModelTools": [

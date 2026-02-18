@@ -22,10 +22,14 @@ const GSL_AGENT_PROMPTS_SOURCE_SUBDIR = path.join(
     "prompts",
     "gsl-managed",
 );
-const GSL_AGENT_PROMPTS_MANAGED_DIR = path.join(
+export const GSL_AGENT_PROMPTS_MANAGED_DIR = path.join(
     ".github",
     "prompts",
     "gsl-managed",
+);
+export const GSL_AGENT_PROMPTS_VERSION_FILE = path.join(
+    ".github",
+    "version.txt",
 );
 const OVERWRITE_PROMPTS_LABEL = "Overwrite changed prompt files";
 const KEEP_PROMPTS_LABEL = "Keep existing prompt files";
@@ -238,7 +242,10 @@ function writeSyncVersionFile({
 }): string {
     const workspaceGithubDir = path.join(workspaceFolderPath, ".github");
     fs.mkdirSync(workspaceGithubDir, { recursive: true });
-    const versionFilePath = path.join(workspaceGithubDir, "version.txt");
+    const versionFilePath = path.join(
+        workspaceFolderPath,
+        GSL_AGENT_PROMPTS_VERSION_FILE,
+    );
     const versionFileContents = [
         `source_repository_url=${sourceRepositoryUrl}`,
         `source_repository_branch=${sourceRepositoryBranch}`,

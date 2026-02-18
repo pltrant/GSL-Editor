@@ -14,6 +14,9 @@
   - `npm run format`
 - After formatting, verify the code compiles by running:
   - `npm run compile`
+- If shell is PowerShell and `npm` is blocked by execution policy,
+  use `npm.cmd` instead.
+  - Example: `npm.cmd run format` and `npm.cmd run compile`
 
 ## Reviewing Code
 
@@ -140,6 +143,8 @@ This avoids leaving stale wrappers behind after incremental refactors.
 - When committing from PowerShell, do not embed literal `\n` in a `-m`
   string. Use multiple `-m` flags (one per paragraph) so Git stores
   actual newlines.
+- After creating a commit, verify the result before reporting success.
+  - Example: `git show --stat --name-only --oneline HEAD`
 
 ## Updating Changelog
 

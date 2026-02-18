@@ -71,6 +71,7 @@ import { registerCopilotTools } from "./gsl/copilotTools";
 import { runDiffWithPrimeCommand } from "./gsl/commands/diffWithPrime";
 import { runPrimeSetupCommand } from "./gsl/commands/primeSetup";
 import { runSyncAgentPromptsCommand } from "./gsl/commands/syncAgentPrompts";
+import { runCopilotCodeReviewCommand } from "./gsl/commands/copilotCodeReview";
 import * as primeService from "./gsl/prime/primeService";
 
 const rx_script_number = /^\d{1,6}$/;
@@ -455,6 +456,7 @@ export class VSCodeIntegration {
             { label: "Prime Server Setup", name: "gsl.primeSetup" },
             { label: "Diff with Prime Server", name: "gsl.diffWithPrime" },
             { label: "Sync Agent Prompts", name: "gsl.syncAgentPrompts" },
+            { label: "Copilot Code Review", name: "gsl.copilotCodeReview" },
         ];
 
         this.outputChannel = window.createOutputChannel("GSL Editor (debug)");
@@ -700,6 +702,10 @@ export class VSCodeIntegration {
 
     private async commandSyncAgentPrompts() {
         await runSyncAgentPromptsCommand({ context: this.context });
+    }
+
+    private async commandCopilotCodeReview() {
+        await runCopilotCodeReviewCommand({ context: this.context });
     }
 
     private async commandCheckDate() {
@@ -1221,6 +1227,12 @@ export class VSCodeIntegration {
         subscription = commands.registerCommand(
             "gsl.syncAgentPrompts",
             this.commandSyncAgentPrompts,
+            this,
+        );
+        this.context.subscriptions.push(subscription);
+        subscription = commands.registerCommand(
+            "gsl.copilotCodeReview",
+            this.commandCopilotCodeReview,
             this,
         );
         this.context.subscriptions.push(subscription);
