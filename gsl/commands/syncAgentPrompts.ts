@@ -1,5 +1,6 @@
 import { execFile } from "child_process";
 import * as fs from "fs";
+import * as https from "https";
 import * as os from "os";
 import * as path from "path";
 
@@ -65,6 +66,115 @@ function runCommand(
             },
         );
     });
+}
+
+async function fetchGitHubSshHostPublicKeys(): Promise<string[]> {
+    return new Promise((resolve, reject) => {
+        const request = https.get(
+            "https://api.github.com/meta",
+            {
+                headers: {
+                    Accept: "application/vnd.github+json",
+                    "User-Agent": "GSL-Editor",
+                },
+            },
+            (response) => {
+                const chunks = new Array<string>();
+                response.setEncoding("utf8");
+                response.on("data", (chunk) => chunks.push(chunk));
+                response.on("end", () => {
+                    if (response.statusCode !== 200) {
+                        reject(
+                            new Error(
+                                `Failed to fetch GitHub metadata (status ${response.statusCode ?? "unknown"}).`,
+                            ),
+                        );
+                        return;
+                    }
+
+                    let parsedBody: unknown;
+                    try {
+                        parsedBody = JSON.parse(chunks.join(""));
+                    } catch {
+                        reject(new Error("Failed to parse GitHub metadata."));
+                        return;
+                    }
+
+                    if (!parsedBody || typeof parsedBody !== "object") {
+                        reject(
+                            new Error("GitHub metadata has an invalid shape."),
+                        );
+                        return;
+                    }
+
+                    const sshKeys = (parsedBody as { ssh_keys?: unknown })
+                        .ssh_keys;
+                    if (!Array.isArray(sshKeys)) {
+                        reject(
+                            new Error(
+                                "GitHub metadata is missing SSH host keys.",
+                            ),
+                        );
+                        return;
+                    }
+
+                    const normalizedHostKeys = sshKeys.filter(
+                        (value): value is string =>
+                            typeof value === "string" &&
+                            /^\S+\s+\S+/.test(value),
+                    );
+                    if (normalizedHostKeys.length === 0) {
+                        reject(
+                            new Error(
+                                "GitHub metadata did not include usable SSH host keys.",
+                            ),
+                        );
+                        return;
+                    }
+
+                    resolve(normalizedHostKeys);
+                });
+            },
+        );
+
+        request.on("error", (error) => reject(error));
+        request.setTimeout(10000, () => {
+            request.destroy(
+                new Error("Timed out while fetching GitHub host keys."),
+            );
+        });
+    });
+}
+
+async function createGitHubKnownHostsFile(
+    tempRootPath: string,
+): Promise<{ knownHostsPath?: string; warningMessage?: string }> {
+    try {
+        const sshHostPublicKeys = await fetchGitHubSshHostPublicKeys();
+        const knownHostsEntries = sshHostPublicKeys.map(
+            (publicKey) => `github.com ${publicKey}`,
+        );
+        const knownHostsPath = path.join(tempRootPath, "known_hosts");
+        fs.writeFileSync(knownHostsPath, `${knownHostsEntries.join("\n")}\n`, {
+            encoding: "utf8",
+            mode: 0o600,
+        });
+        return { knownHostsPath };
+    } catch (error) {
+        const failureReason =
+            error instanceof Error ? error.message : String(error);
+        const fallbackInstruction =
+            process.platform === "win32"
+                ? "If clone fails with host verification errors, run one of the following:\n" +
+                  "- PowerShell: New-Item -ItemType Directory -Force $HOME/.ssh | Out-Null; ssh-keyscan github.com >> $HOME/.ssh/known_hosts\n" +
+                  "- Command Prompt: if not exist %USERPROFILE%\\.ssh mkdir %USERPROFILE%\\.ssh && ssh-keyscan github.com >> %USERPROFILE%\\.ssh\\known_hosts"
+                : "If clone fails with host verification errors, run: mkdir -p ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts";
+        const warningMessage =
+            "Unable to auto-configure GitHub SSH host verification. " +
+            `Reason: ${failureReason}. ` +
+            fallbackInstruction;
+        return { warningMessage };
+    }
 }
 
 function expandHomePath(value: string): string {
@@ -542,12 +652,26 @@ export async function runSyncAgentPromptsCommand({
 
         const sshKeyPath = keyPath.replace(/\\/g, "/");
         const quotedSshKeyPath = `"${sshKeyPath.replace(/"/g, '\\"')}"`;
+        const { knownHostsPath, warningMessage } =
+            await createGitHubKnownHostsFile(tempRootPath);
+        if (warningMessage) {
+            void window.showWarningMessage(warningMessage);
+        }
+        const sshCommandParts = [
+            `ssh -i ${quotedSshKeyPath}`,
+            "-o IdentitiesOnly=yes",
+            "-o StrictHostKeyChecking=yes",
+        ];
+        if (knownHostsPath) {
+            const normalizedKnownHostsPath = knownHostsPath.replace(/\\/g, "/");
+            const quotedKnownHostsPath = `"${normalizedKnownHostsPath.replace(/"/g, '\\"')}"`;
+            sshCommandParts.push(
+                `-o UserKnownHostsFile=${quotedKnownHostsPath}`,
+            );
+        }
         const env = {
             ...process.env,
-            GIT_SSH_COMMAND:
-                `ssh -i ${quotedSshKeyPath} ` +
-                "-o IdentitiesOnly=yes " +
-                "-o StrictHostKeyChecking=yes",
+            GIT_SSH_COMMAND: sshCommandParts.join(" "),
         };
 
         await runCommand(
