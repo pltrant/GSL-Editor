@@ -131,18 +131,33 @@ This avoids leaving stale wrappers behind after incremental refactors.
   - `npm run test`
 - Use this command as the default test workflow for this repository.
 
+## Test VSIX / Test Package Builds
+
+- Before building a test VSIX/test package, read `README.md` and follow
+  the build steps there.
+- Run `git status --short` before any cleanup/build step that includes
+  `git clean -dxf`.
+- CRITICAL WARNING: if `git status` shows any untracked files (`??`),
+  do not proceed. Stop and alert the developer first.
+- Tracked modified files are acceptable for this warning gate; only
+  untracked files should block proceeding.
+
 ## Commit Messages
 
 - Keep the subject line to 54 characters or fewer.
 - Use tags in the title to indicate whether something is a feature, bugfix, tech debt. Example: `[feat] Added command xyz`
 - Include a short body that summarizes:
-  - what changed
-  - newly exposed tools/features/etc (bullet points are preferred)
-  - important decisions/tradeoffs (if applicable)
+  - Very brief description of what changed
+  - Newly exposed tools/features/etc (short bullet points are preferred)
+- Be concise.
 - Wrap commit message body text at 70 characters.
 - When committing from PowerShell, do not embed literal `\n` in a `-m`
   string. Use multiple `-m` flags (one per paragraph) so Git stores
   actual newlines.
+- Do not use one `-m` flag per bullet line; each `-m` creates a new
+  paragraph (blank line separated). Keep a bullet list together in the
+  same paragraph block, or use a commit message file for exact
+  formatting.
 - After creating a commit, verify the result before reporting success.
   - Example: `git show --stat --name-only --oneline HEAD`
 
