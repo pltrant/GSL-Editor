@@ -57,23 +57,9 @@ function parseDiffContext(value: number | undefined): number {
     return value;
 }
 
-function createPrimeToolConfirmationMessages(
-    invocationMessage: string,
-    title: string,
-    scriptNum: number | undefined,
-    withScriptMessage: (scriptNumber: number) => string,
-    activeScriptMessage: string,
-) {
+function createPrimeToolInvocationMessage(invocationMessage: string) {
     return {
         invocationMessage,
-        confirmationMessages: {
-            title,
-            message: new vscode.MarkdownString(
-                scriptNum !== undefined
-                    ? withScriptMessage(scriptNum)
-                    : activeScriptMessage,
-            ),
-        },
     };
 }
 
@@ -217,14 +203,9 @@ class DiffWithPrimeTool implements vscode.LanguageModelTool<IDiffWithPrimeParams
         options: vscode.LanguageModelToolInvocationPrepareOptions<IDiffWithPrimeParams>,
         _token: vscode.CancellationToken,
     ) {
-        const scriptNum = parseScriptNumber(options.input.scriptNumber);
-        return createPrimeToolConfirmationMessages(
+        parseScriptNumber(options.input.scriptNumber);
+        return createPrimeToolInvocationMessage(
             "Fetching and diffing script from Prime server\u2026",
-            "Diff with Prime Server",
-            scriptNum,
-            (scriptNumber) =>
-                `Fetch and diff script ${scriptNumber} with the Prime server?`,
-            "Fetch and diff the active script with the Prime server?",
         );
     }
 
@@ -326,14 +307,9 @@ class FetchPrimeScriptTool implements vscode.LanguageModelTool<IFetchPrimeScript
         options: vscode.LanguageModelToolInvocationPrepareOptions<IFetchPrimeScriptParams>,
         _token: vscode.CancellationToken,
     ) {
-        const scriptNum = parseScriptNumber(options.input.scriptNumber);
-        return createPrimeToolConfirmationMessages(
+        parseScriptNumber(options.input.scriptNumber);
+        return createPrimeToolInvocationMessage(
             "Fetching script from Prime server\u2026",
-            "Fetch from Prime Server",
-            scriptNum,
-            (scriptNumber) =>
-                `Fetch script ${scriptNumber} from the Prime server?`,
-            "Fetch the active script from the Prime server?",
         );
     }
 
@@ -386,17 +362,8 @@ class CheckCompilerErrorsTool implements vscode.LanguageModelTool<IUploadScriptP
         options: vscode.LanguageModelToolInvocationPrepareOptions<IUploadScriptParams>,
         _token: vscode.CancellationToken,
     ) {
-        const filename = options.input.filename?.trim();
         return {
             invocationMessage: "Checking GSL script for compiler errors...",
-            confirmationMessages: {
-                title: "Check Compiler Errors",
-                message: new vscode.MarkdownString(
-                    filename
-                        ? `Check compiler errors for \`${filename}\` on the development server?`
-                        : "Check compiler errors for a GSL file on the development server?",
-                ),
-            },
         };
     }
 
@@ -460,12 +427,6 @@ class GetCurrentAuthorTool implements vscode.LanguageModelTool<IGetCurrentAuthor
     ) {
         return {
             invocationMessage: "Retrieving configured GSL author...",
-            confirmationMessages: {
-                title: "Get Current GSL Author",
-                message: new vscode.MarkdownString(
-                    "Retrieve the current configured GSL author value?",
-                ),
-            },
         };
     }
 
