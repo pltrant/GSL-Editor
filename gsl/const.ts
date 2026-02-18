@@ -27,3 +27,4 @@ export const GSLX_AUTOMATIC_DOWNLOADS = "automaticallyDownloadScripts";
 export const GSLX_ENABLE_SCRIPT_SYNC_CHECKS = "enableScriptSyncChecks";
 export const GSLX_PRIME_INSTANCE = "primeInstance";
 export const GSLX_PRIME_CHARACTER = "primeCharacter";
+export const GSLX_CURRENT_AUTHOR = "currentAuthor";

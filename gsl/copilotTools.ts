@@ -29,6 +29,8 @@ interface IUploadScriptParams {
     filename: string;
 }
 
+type IGetCurrentAuthorParams = Record<string, never>;
+
 const AGENT_UPLOAD_SCRIPT_NUMBER = 24661;
 
 // ---------------------------------------------------------------------------
@@ -451,6 +453,43 @@ class CheckCompilerErrorsTool implements vscode.LanguageModelTool<IUploadScriptP
     }
 }
 
+class GetCurrentAuthorTool implements vscode.LanguageModelTool<IGetCurrentAuthorParams> {
+    async prepareInvocation(
+        _options: vscode.LanguageModelToolInvocationPrepareOptions<IGetCurrentAuthorParams>,
+        _token: vscode.CancellationToken,
+    ) {
+        return {
+            invocationMessage: "Retrieving configured GSL author...",
+            confirmationMessages: {
+                title: "Get Current GSL Author",
+                message: new vscode.MarkdownString(
+                    "Retrieve the current configured GSL author value?",
+                ),
+            },
+        };
+    }
+
+    async invoke(
+        _options: vscode.LanguageModelToolInvocationOptions<IGetCurrentAuthorParams>,
+        _token: vscode.CancellationToken,
+    ): Promise<vscode.LanguageModelToolResult> {
+        if (!vscRef) {
+            throw new Error(
+                "GSL extension is not active. Open a GSL file to activate it.",
+            );
+        }
+
+        const author = vscRef.getCurrentAuthor()?.trim();
+        if (!author) {
+            throw new Error("Author is not configured. Run 'GSL: User Setup'.");
+        }
+
+        return new vscode.LanguageModelToolResult([
+            new vscode.LanguageModelTextPart(author),
+        ]);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Registration
 // ---------------------------------------------------------------------------
@@ -480,6 +519,10 @@ export function registerCopilotTools(
         vscode.lm.registerTool(
             "gsl_compile_check",
             new CheckCompilerErrorsTool(),
+        ),
+        vscode.lm.registerTool(
+            "gsl-get-current-author",
+            new GetCurrentAuthorTool(),
         ),
     );
 }

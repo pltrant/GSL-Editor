@@ -115,7 +115,7 @@ export async function doPrimeEditorClientTask<T>(
     const password = await context.secrets.get(GSLX_DEV_PASSWORD);
     if (!account || !instance || !character || !password) {
         throw new Error(
-            "Prime server not configured. Run 'GSL: Prime Server Setup' first.",
+            "Prime server not configured. Run 'GSL: User Setup' first.",
         );
     }
 

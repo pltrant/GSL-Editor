@@ -4,6 +4,7 @@ import * as path from "path";
 import { commands, ExtensionContext, window, workspace } from "vscode";
 
 import {
+    GSLX_CURRENT_AUTHOR,
     GSLX_DEV_ACCOUNT,
     GSLX_DEV_PASSWORD,
     GSLX_PRIME_CHARACTER,
@@ -60,18 +61,19 @@ async function verifyPrimeUserSetupPrecondition(
     const primeInstance = context.globalState.get<string>(GSLX_PRIME_INSTANCE);
     const primeCharacter =
         context.globalState.get<string>(GSLX_PRIME_CHARACTER);
-    if (account && password && primeInstance && primeCharacter) {
+    const author = context.globalState.get<string>(GSLX_CURRENT_AUTHOR)?.trim();
+    if (account && password && primeInstance && primeCharacter && author) {
         return true;
     }
 
-    const runSetupAction = "Run Prime Server Setup";
+    const runSetupAction = "Run User Setup";
     const choice = await window.showErrorMessage(
-        "Copilot Code Review requires Prime user setup first. Run 'GSL: Prime Server Setup' and try again.",
+        "Copilot Code Review requires User Setup first. Run 'GSL: User Setup' and try again.",
         { modal: true },
         runSetupAction,
     );
     if (choice === runSetupAction) {
-        void commands.executeCommand("gsl.primeSetup");
+        void commands.executeCommand("gsl.userSetup");
     }
     return false;
 }

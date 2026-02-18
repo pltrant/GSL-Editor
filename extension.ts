@@ -50,6 +50,7 @@ import { OutOfDateButtonManager } from "./gsl/status_bar/scriptOutOfDateButton";
 import { scriptNumberFromFileName } from "./gsl/util/scriptUtil";
 import {
     GSLX_AUTOMATIC_DOWNLOADS,
+    GSLX_CURRENT_AUTHOR,
     GSLX_DEV_ACCOUNT,
     GSLX_DEV_CHARACTER,
     GSLX_DEV_INSTANCE,
@@ -57,6 +58,8 @@ import {
     GSLX_DISABLE_LOGIN,
     GSLX_ENABLE_SCRIPT_SYNC_CHECKS,
     GSLX_NEW_INSTALL_FLAG,
+    GSLX_PRIME_CHARACTER,
+    GSLX_PRIME_INSTANCE,
     GSLX_SAVED_VERSION,
     GSL_LANGUAGE_ID,
 } from "./gsl/const";
@@ -69,7 +72,6 @@ import { subscribeToDocumentChanges } from "./gsl/diagnostics";
 import { formatIndentation } from "./gsl/util/formattingUtil";
 import { registerCopilotTools } from "./gsl/copilotTools";
 import { runDiffWithPrimeCommand } from "./gsl/commands/diffWithPrime";
-import { runPrimeSetupCommand } from "./gsl/commands/primeSetup";
 import { runSyncAgentPromptsCommand } from "./gsl/commands/syncAgentPrompts";
 import { runCopilotCodeReviewCommand } from "./gsl/commands/copilotCodeReview";
 import * as primeService from "./gsl/prime/primeService";
@@ -453,7 +455,6 @@ export class VSCodeIntegration {
                 label: "Format Document Indentation",
                 name: "gsl.formatIndentation",
             },
-            { label: "Prime Server Setup", name: "gsl.primeSetup" },
             { label: "Diff with Prime Server", name: "gsl.diffWithPrime" },
             { label: "Sync Agent Prompts", name: "gsl.syncAgentPrompts" },
             { label: "Copilot Code Review", name: "gsl.copilotCodeReview" },
@@ -755,8 +756,15 @@ export class VSCodeIntegration {
     }
 
     private async commandUserSetup() {
+        const AUTHOR_PATTERN = /^\w+\/\w+$/;
+        const DEV_TO_PRIME: Record<string, string> = { GS4D: "GS3", DRD: "DR" };
+        const sortCharacterNames = (names: string[]) =>
+            [...names].sort((a, b) =>
+                a.localeCompare(b, undefined, { sensitivity: "base" }),
+            );
+
         let account = await window.showInputBox({
-            prompt: "PLAY.NET Account:",
+            prompt: "Step 1 of 3 (Development): PLAY.NET Account:",
             ignoreFocusOut: true,
         });
         if (!account) {
@@ -766,7 +774,7 @@ export class VSCodeIntegration {
         }
 
         let password = await window.showInputBox({
-            prompt: "Password:",
+            prompt: "Step 1 of 3 (Development): Password:",
             ignoreFocusOut: true,
             password: true,
         });
@@ -781,6 +789,10 @@ export class VSCodeIntegration {
         const captureError = (e: Error) => ((error = e), void 0);
 
         /* login */
+        window.setStatusBarMessage(
+            "User Setup: Step 1 of 3 (Development login)...",
+            5000,
+        );
         const gameChoice = await EAccessClient.login(account, password, {
             name: /.*?development.*?/i,
         }).catch(captureError);
@@ -792,7 +804,8 @@ export class VSCodeIntegration {
         /* pick a game */
         const gamePickOptions = {
             ignoreFocusOut: true,
-            placeholder: "Select a game ...",
+            placeholder:
+                "Step 1 of 3 (Development): Select a development game (DR or GS) ...",
         };
         const game = await window.showQuickPick(
             gameChoice.toNameList(),
@@ -816,10 +829,14 @@ export class VSCodeIntegration {
         /* pick a character */
         const characterPickOptions = {
             ignoreFocusOut: true,
-            placeholder: "Select a character ...",
+            placeholder:
+                "Step 1 of 3 (Development): Which Development character should be used?",
         };
-        const character = await window.showQuickPick(
+        const developmentCharacters = sortCharacterNames(
             characterChoice.toNameList(),
+        );
+        const character = await window.showQuickPick(
+            developmentCharacters,
             characterPickOptions,
         );
         if (!character) {
@@ -836,18 +853,126 @@ export class VSCodeIntegration {
             return void window.showErrorMessage(message);
         }
 
-        /* we now have the info we need to log into the same and save the details */
-        const { sal, loginDetails } = result;
+        /* store development credentials */
+        const { loginDetails } = result;
 
-        /* store all the details for automated login */
-        this.context.globalState.update(GSLX_DEV_ACCOUNT, loginDetails.account);
-        this.context.globalState.update(GSLX_DEV_INSTANCE, loginDetails.game);
-        this.context.globalState.update(
-            GSLX_DEV_CHARACTER,
-            loginDetails.character,
+        await Promise.all([
+            this.context.globalState.update(
+                GSLX_DEV_ACCOUNT,
+                loginDetails.account,
+            ),
+            this.context.globalState.update(
+                GSLX_DEV_INSTANCE,
+                loginDetails.game,
+            ),
+            this.context.globalState.update(
+                GSLX_DEV_CHARACTER,
+                loginDetails.character,
+            ),
+            this.context.secrets.store(GSLX_DEV_PASSWORD, password),
+        ]);
+
+        /* map selected development instance to prime instance */
+        const primeGameCode = DEV_TO_PRIME[loginDetails.game];
+        if (!primeGameCode) {
+            return void window.showErrorMessage(
+                `Could not determine prime game from development instance "${loginDetails.game}".`,
+            );
+        }
+
+        /* login and select prime character */
+        window.setStatusBarMessage(
+            "User Setup: Step 2 of 3 (Prime login)...",
+            5000,
         );
-        await this.context.secrets.store(GSLX_DEV_PASSWORD, password);
-        window.showInformationMessage("Credentials stored for login");
+        const primeGameChoice = await EAccessClient.login(
+            account,
+            password,
+        ).catch(captureError);
+        if (!primeGameChoice) {
+            const message = error ? error.message : "Prime login failed?";
+            return void window.showErrorMessage(message);
+        }
+
+        const primeCharacterChoice = await primeGameChoice
+            .select(primeGameCode)
+            .catch(captureError);
+        if (!primeCharacterChoice) {
+            const message = error ? error.message : "Prime game select failed?";
+            primeGameChoice.cancel();
+            return void window.showErrorMessage(message);
+        }
+
+        const primeCharacterPickOptions = {
+            ignoreFocusOut: true,
+            placeholder:
+                "Step 2 of 3 (Prime): Which Prime character should be used?",
+        };
+        const primeCharacters = sortCharacterNames(
+            primeCharacterChoice.toNameList(),
+        );
+        const primeCharacter = await window.showQuickPick(
+            primeCharacters,
+            primeCharacterPickOptions,
+        );
+        if (!primeCharacter) {
+            primeCharacterChoice.cancel();
+            return void window.showErrorMessage(
+                "No Prime character selected; setup incomplete. Development credentials were saved.",
+            );
+        }
+
+        const primeResult = await primeCharacterChoice
+            .select(primeCharacterChoice.pick(primeCharacter))
+            .catch(captureError);
+        if (!primeResult) {
+            const message = error
+                ? error.message
+                : "Prime character select failed?";
+            return void window.showErrorMessage(message);
+        }
+
+        await Promise.all([
+            this.context.globalState.update(
+                GSLX_PRIME_INSTANCE,
+                primeResult.loginDetails.game,
+            ),
+            this.context.globalState.update(
+                GSLX_PRIME_CHARACTER,
+                primeResult.loginDetails.character,
+            ),
+        ]);
+
+        window.setStatusBarMessage(
+            "User Setup: Step 3 of 3 (Changelog Author)...",
+            5000,
+        );
+        while (true) {
+            const authorInput = await window.showInputBox({
+                prompt: "Step 3 of 3 (Changelog Author): AlexB/Nyxus",
+                placeHolder: "AlexB/Nyxus",
+                ignoreFocusOut: true,
+            });
+            if (!authorInput) {
+                return void window.showErrorMessage(
+                    "No author name entered; setup incomplete. Development and Prime credentials were saved.",
+                );
+            }
+            const author = authorInput.trim();
+            if (!AUTHOR_PATTERN.test(author)) {
+                await window.showErrorMessage(
+                    "Invalid changelog author format. Use format like AlexB/Nyxus.",
+                    { modal: true },
+                );
+                continue;
+            }
+            await this.context.globalState.update(GSLX_CURRENT_AUTHOR, author);
+            break;
+        }
+
+        window.showInformationMessage(
+            "User setup complete. Development, Prime, and author settings stored.",
+        );
     }
 
     private async commandOpenConnection() {
@@ -1017,12 +1142,6 @@ export class VSCodeIntegration {
                 `Comment alignment failed: ${e instanceof Error ? e.message : "Unknown error"}`,
             );
         }
-    }
-
-    private async commandPrimeSetup() {
-        return runPrimeSetupCommand({
-            context: this.context,
-        });
     }
 
     private async commandDiffWithPrime() {
@@ -1213,12 +1332,6 @@ export class VSCodeIntegration {
         );
         this.context.subscriptions.push(subscription);
         subscription = commands.registerCommand(
-            "gsl.primeSetup",
-            this.commandPrimeSetup,
-            this,
-        );
-        this.context.subscriptions.push(subscription);
-        subscription = commands.registerCommand(
             "gsl.diffWithPrime",
             this.commandDiffWithPrime,
             this,
@@ -1242,6 +1355,10 @@ export class VSCodeIntegration {
 
     getGameInstance(): string | undefined {
         return this.context.globalState.get(GSLX_DEV_INSTANCE);
+    }
+
+    getCurrentAuthor(): string | undefined {
+        return this.context.globalState.get(GSLX_CURRENT_AUTHOR);
     }
 
     appendLineToGameChannel(text: string) {

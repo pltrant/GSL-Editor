@@ -115,11 +115,6 @@
         "category": "GSL"
       },
       {
-        "command": "gsl.primeSetup",
-        "title": "Prime Server Setup",
-        "category": "GSL"
-      },
-      {
         "command": "gsl.diffWithPrime",
         "title": "Diff with Prime Server",
         "category": "GSL"
@@ -143,7 +138,7 @@
         "toolReferenceName": "diffWithPrime",
         "icon": "$(diff)",
         "userDescription": "Fetch the Prime (production) version of a GSL script and return the diff against the open local script for analysis.",
-        "modelDescription": "Downloads a GSL script from the Prime (production) server and compares it with a local open editor copy. Returns the unified diff text showing exactly what lines differ between Prime and Dev. Use this when the user wants to compare, diff, check differences, or understand what changed between their local script and the production/prime version. The tool returns the diff content directly — it does not open any UI. If scriptNumber is provided, the matching local script must already be open in the editor. Requires the GSL extension to be configured with Prime server credentials via 'GSL: Prime Server Setup'.",
+        "modelDescription": "Downloads a GSL script from the Prime (production) server and compares it with a local open editor copy. Returns the unified diff text showing exactly what lines differ between Prime and Dev. Use this when the user wants to compare, diff, check differences, or understand what changed between their local script and the production/prime version. The tool returns the diff content directly — it does not open any UI. If scriptNumber is provided, the matching local script must already be open in the editor. Requires the GSL extension to be configured with Prime server credentials via 'GSL: User Setup'.",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -173,7 +168,7 @@
         "toolReferenceName": "fetchPrimeScript",
         "icon": "$(cloud-download)",
         "userDescription": "Fetch the Prime (production) version of a GSL script and return its full content.",
-        "modelDescription": "Downloads a GSL script from the Prime (production) server and returns the full script content as text. Use this when the user wants to read, review, or inspect the production version of a script without comparing it to the local copy. The tool returns the raw script content directly — it does not open any UI. Requires the GSL extension to be configured with Prime server credentials via 'GSL: Prime Server Setup'.",
+        "modelDescription": "Downloads a GSL script from the Prime (production) server and returns the full script content as text. Use this when the user wants to read, review, or inspect the production version of a script without comparing it to the local copy. The tool returns the raw script content directly — it does not open any UI. Requires the GSL extension to be configured with Prime server credentials via 'GSL: User Setup'.",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -205,6 +200,19 @@
               "description": "Workspace-relative or absolute path to the .gsl file to upload, such as S24661.gsl."
             }
           }
+        }
+      },
+      {
+        "name": "gsl-get-current-author",
+        "displayName": "Get Current Author",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "getCurrentAuthor",
+        "icon": "$(account)",
+        "userDescription": "Return the current configured GSL author value in <AbbreviatedRealName>/<CharacterName> format.",
+        "modelDescription": "Returns the current GSL author value configured via User Setup. Use this when generating changelog entries or script metadata that needs the canonical author identity.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
         }
       }
     ],
@@ -381,3 +389,4 @@
     ]
   }
 }
+
