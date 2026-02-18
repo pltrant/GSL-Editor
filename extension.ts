@@ -767,7 +767,7 @@ export class VSCodeIntegration {
             );
 
         let account = await window.showInputBox({
-            prompt: "Step 1 of 3 (Development): PLAY.NET Account:",
+            prompt: "Step 1 of 6 (Development): PLAY.NET Account:",
             ignoreFocusOut: true,
         });
         if (!account) {
@@ -777,7 +777,7 @@ export class VSCodeIntegration {
         }
 
         let password = await window.showInputBox({
-            prompt: "Step 1 of 3 (Development): Password:",
+            prompt: "Step 2 of 6 (Development): Password:",
             ignoreFocusOut: true,
             password: true,
         });
@@ -793,7 +793,7 @@ export class VSCodeIntegration {
 
         /* login */
         window.setStatusBarMessage(
-            "User Setup: Step 1 of 3 (Development login)...",
+            "User Setup: Step 2 of 6 (Development login)...",
             5000,
         );
         const gameChoice = await EAccessClient.login(account, password, {
@@ -808,7 +808,7 @@ export class VSCodeIntegration {
         const gamePickOptions = {
             ignoreFocusOut: true,
             placeHolder:
-                "Step 1 of 3 (Development): Select a development game (DR or GS) ...",
+                "Step 3 of 6 (Development): Select a development game (DR or GS) ...",
         };
         const game = await window.showQuickPick(
             gameChoice.toNameList(),
@@ -833,7 +833,7 @@ export class VSCodeIntegration {
         const characterPickOptions = {
             ignoreFocusOut: true,
             placeHolder:
-                "Step 1 of 3 (Development): Which Development character should be used?",
+                "Step 4 of 6 (Development): Which Development character should be used?",
         };
         const developmentCharacters = sortCharacterNames(
             characterChoice.toNameList(),
@@ -885,7 +885,7 @@ export class VSCodeIntegration {
 
         /* login and select prime character */
         window.setStatusBarMessage(
-            "User Setup: Step 2 of 3 (Prime login)...",
+            "User Setup: Step 5 of 6 (Prime login)...",
             5000,
         );
         const primeGameChoice = await EAccessClient.login(
@@ -909,7 +909,7 @@ export class VSCodeIntegration {
         const primeCharacterPickOptions = {
             ignoreFocusOut: true,
             placeHolder:
-                "Step 2 of 3 (Prime): Which Prime character should be used?",
+                "Step 5 of 6 (Prime): Which Prime character should be used?",
         };
         const primeCharacters = sortCharacterNames(
             primeCharacterChoice.toNameList(),
@@ -947,12 +947,12 @@ export class VSCodeIntegration {
         ]);
 
         window.setStatusBarMessage(
-            "User Setup: Step 3 of 3 (Changelog Author)...",
+            "User Setup: Step 6 of 6 (Changelog Author)...",
             5000,
         );
         while (true) {
             const authorInput = await window.showInputBox({
-                prompt: "Step 3 of 3 (Changelog Author): AlexB/Nyxus",
+                prompt: "Step 6 of 6 (Changelog Author): AlexB/Nyxus",
                 placeHolder: "AlexB/Nyxus",
                 ignoreFocusOut: true,
             });
