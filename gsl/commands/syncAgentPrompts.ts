@@ -1,4 +1,5 @@
 import { execFile } from "child_process";
+import * as crypto from "crypto";
 import * as fs from "fs";
 import * as https from "https";
 import * as os from "os";
@@ -31,11 +32,21 @@ export const GSL_AGENT_PROMPTS_VERSION_FILE = path.join(
     ".github",
     "version.txt",
 );
+const GSL_AGENT_PROMPTS_STATE_FILE = path.join(
+    ".github",
+    "gsl-agent-prompts-state.json",
+);
 const OVERWRITE_PROMPTS_LABEL = "Overwrite changed prompt files";
 const KEEP_PROMPTS_LABEL = "Keep existing prompt files";
 const OVERWRITE_INSTRUCTIONS_LABEL =
     "Overwrite workspace .github/copilot-instructions.md";
 const KEEP_INSTRUCTIONS_LABEL = "Keep existing .github/copilot-instructions.md";
+
+interface AgentPromptSyncStateFile {
+    sourceRepositorySha: string;
+    syncedAtUtc: string;
+    sourcePromptHashes: Record<string, string>;
+}
 
 function runCommand(
     command: string,
@@ -264,8 +275,22 @@ function normalizeTextForComparison(text: string): string {
         : normalizedNewlines;
 }
 
+function hashNormalizedText(text: string): string {
+    return crypto
+        .createHash("sha256")
+        .update(normalizeTextForComparison(text), "utf8")
+        .digest("hex");
+}
+
 function readNormalizedFile(filePath: string): string {
     return normalizeTextForComparison(fs.readFileSync(filePath, "utf8"));
+}
+
+function hashNormalizedFile(filePath: string): string {
+    return crypto
+        .createHash("sha256")
+        .update(readNormalizedFile(filePath), "utf8")
+        .digest("hex");
 }
 
 function filesMatchWithNormalization(
@@ -273,6 +298,119 @@ function filesMatchWithNormalization(
     fileBPath: string,
 ): boolean {
     return readNormalizedFile(fileAPath) === readNormalizedFile(fileBPath);
+}
+
+function normalizeRelativePath(filePath: string): string {
+    return filePath.replace(/\\/g, "/");
+}
+
+function buildSourcePromptHashes(
+    sourcePromptDir: string,
+    promptFiles: string[],
+): Record<string, string> {
+    return promptFiles.reduce<Record<string, string>>((acc, promptFile) => {
+        acc[normalizeRelativePath(path.relative(sourcePromptDir, promptFile))] =
+            hashNormalizedFile(promptFile);
+        return acc;
+    }, {});
+}
+
+function readSourceRepositoryShaFromVersionFile(
+    workspaceFolderPath: string,
+): string | undefined {
+    const versionFilePath = path.join(
+        workspaceFolderPath,
+        GSL_AGENT_PROMPTS_VERSION_FILE,
+    );
+    if (!fs.existsSync(versionFilePath)) {
+        return undefined;
+    }
+    const lines = fs.readFileSync(versionFilePath, "utf8").split(/\r?\n/);
+    const shaLine = lines.find((line) =>
+        line.startsWith("source_repository_sha="),
+    );
+    if (!shaLine) {
+        return undefined;
+    }
+    const sha = shaLine.split("=", 2)[1]?.trim();
+    return sha && /^[0-9a-f]{40}$/i.test(sha) ? sha : undefined;
+}
+
+function readAgentPromptSyncStateFile(
+    workspaceFolderPath: string,
+): AgentPromptSyncStateFile | undefined {
+    const stateFilePath = path.join(
+        workspaceFolderPath,
+        GSL_AGENT_PROMPTS_STATE_FILE,
+    );
+    if (!fs.existsSync(stateFilePath)) {
+        return undefined;
+    }
+    try {
+        const parsedState = JSON.parse(fs.readFileSync(stateFilePath, "utf8"));
+        if (!parsedState || typeof parsedState !== "object") {
+            return undefined;
+        }
+        const { sourceRepositorySha, syncedAtUtc, sourcePromptHashes } =
+            parsedState as {
+                sourceRepositorySha?: unknown;
+                syncedAtUtc?: unknown;
+                sourcePromptHashes?: unknown;
+            };
+        if (
+            typeof sourceRepositorySha !== "string" ||
+            !/^[0-9a-f]{40}$/i.test(sourceRepositorySha) ||
+            typeof syncedAtUtc !== "string" ||
+            !sourcePromptHashes ||
+            typeof sourcePromptHashes !== "object"
+        ) {
+            return undefined;
+        }
+        const normalizedHashes = Object.entries(sourcePromptHashes).reduce<
+            Record<string, string>
+        >((acc, [relativePath, hash]) => {
+            if (typeof hash === "string" && /^[0-9a-f]{64}$/i.test(hash)) {
+                acc[relativePath] = hash;
+            }
+            return acc;
+        }, {});
+        return {
+            sourceRepositorySha,
+            syncedAtUtc,
+            sourcePromptHashes: normalizedHashes,
+        };
+    } catch {
+        return undefined;
+    }
+}
+
+function writeAgentPromptSyncStateFile({
+    workspaceFolderPath,
+    sourceRepositorySha,
+    syncedAtUtc,
+    sourcePromptHashes,
+}: {
+    workspaceFolderPath: string;
+    sourceRepositorySha: string;
+    syncedAtUtc: string;
+    sourcePromptHashes: Record<string, string>;
+}): string {
+    const stateFilePath = path.join(
+        workspaceFolderPath,
+        GSL_AGENT_PROMPTS_STATE_FILE,
+    );
+    fs.mkdirSync(path.dirname(stateFilePath), { recursive: true });
+    const statePayload: AgentPromptSyncStateFile = {
+        sourceRepositorySha,
+        syncedAtUtc,
+        sourcePromptHashes,
+    };
+    fs.writeFileSync(
+        stateFilePath,
+        `${JSON.stringify(statePayload, null, 2)}\n`,
+        "utf8",
+    );
+    return stateFilePath;
 }
 
 function findMostRecentBackupPath(filePath: string): string | undefined {
@@ -490,6 +628,109 @@ async function syncManagedPromptFiles({
     };
 }
 
+async function fetchRepositoryCommitBySha({
+    repoPath,
+    sourceRepositorySha,
+}: {
+    repoPath: string;
+    sourceRepositorySha: string;
+}): Promise<boolean> {
+    try {
+        await runCommand(
+            "git",
+            ["fetch", "--depth", "1", "origin", sourceRepositorySha],
+            { cwd: repoPath },
+        );
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+async function resolveSourcePromptHashesAtSha({
+    repoPath,
+    sourceRepositorySha,
+    relativePromptPaths,
+}: {
+    repoPath: string;
+    sourceRepositorySha: string;
+    relativePromptPaths: string[];
+}): Promise<Record<string, string>> {
+    const promptHashes: Record<string, string> = {};
+    const sourceDirPath = normalizeRelativePath(
+        GSL_AGENT_PROMPTS_SOURCE_SUBDIR,
+    );
+    for (const relativePromptPath of relativePromptPaths) {
+        const promptPathAtSha = path.posix.join(
+            sourceDirPath,
+            normalizeRelativePath(relativePromptPath),
+        );
+        try {
+            const { stdout } = await runCommand(
+                "git",
+                ["show", `${sourceRepositorySha}:${promptPathAtSha}`],
+                { cwd: repoPath },
+            );
+            promptHashes[normalizeRelativePath(relativePromptPath)] =
+                hashNormalizedText(stdout);
+        } catch {
+            continue;
+        }
+    }
+    return promptHashes;
+}
+
+function autoUpdateManagedPromptFiles({
+    sourcePromptDir,
+    promptFiles,
+    targetPromptDir,
+    previousSourcePromptHashes,
+}: {
+    sourcePromptDir: string;
+    promptFiles: string[];
+    targetPromptDir: string;
+    previousSourcePromptHashes: Record<string, string>;
+}): { updatedPromptCount: number; skippedPromptCount: number } {
+    fs.mkdirSync(targetPromptDir, { recursive: true });
+
+    let updatedPromptCount = 0;
+    let skippedPromptCount = 0;
+
+    for (const promptFile of promptFiles) {
+        const relativePath = normalizeRelativePath(
+            path.relative(sourcePromptDir, promptFile),
+        );
+        const targetPath = path.join(targetPromptDir, relativePath);
+        const targetExists = fs.existsSync(targetPath);
+        if (!targetExists) {
+            fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+            fs.copyFileSync(promptFile, targetPath);
+            updatedPromptCount++;
+            continue;
+        }
+
+        if (filesMatchWithNormalization(promptFile, targetPath)) {
+            continue;
+        }
+
+        const previousPromptHash = previousSourcePromptHashes[relativePath];
+        if (!previousPromptHash) {
+            skippedPromptCount++;
+            continue;
+        }
+
+        if (hashNormalizedFile(targetPath) !== previousPromptHash) {
+            skippedPromptCount++;
+            continue;
+        }
+
+        fs.copyFileSync(promptFile, targetPath);
+        updatedPromptCount++;
+    }
+
+    return { updatedPromptCount, skippedPromptCount };
+}
+
 async function syncCopilotInstructionsFile({
     sourceInstructionsFilePath,
     workspaceFolderPath,
@@ -620,6 +861,180 @@ async function resolveAgentPromptsDeployKey(
 
 export interface SyncAgentPromptsCommandDependencies {
     context: ExtensionContext;
+}
+
+export async function runStartupAgentPromptAutoUpdate({
+    context,
+}: SyncAgentPromptsCommandDependencies): Promise<void> {
+    const workspaceFolder = workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+        return;
+    }
+
+    const workspaceFolderPath = workspaceFolder.uri.fsPath;
+    const targetPromptDir = path.join(
+        workspaceFolderPath,
+        GSL_AGENT_PROMPTS_MANAGED_DIR,
+    );
+    if (!fs.existsSync(targetPromptDir)) {
+        return;
+    }
+
+    const existingPromptFiles = listPromptFilesRecursive(targetPromptDir);
+    if (existingPromptFiles.length === 0) {
+        return;
+    }
+
+    const hasSyncMarker =
+        fs.existsSync(
+            path.join(workspaceFolderPath, GSL_AGENT_PROMPTS_VERSION_FILE),
+        ) ||
+        fs.existsSync(
+            path.join(workspaceFolderPath, GSL_AGENT_PROMPTS_STATE_FILE),
+        );
+    if (!hasSyncMarker) {
+        return;
+    }
+
+    const deployKey = await context.secrets.get(
+        GSL_AGENT_PROMPTS_DEPLOY_KEY_SECRET,
+    );
+    if (!deployKey) {
+        return;
+    }
+
+    const message = window.setStatusBarMessage(
+        "Checking GSL managed prompts for updates...",
+        30000,
+    );
+    let tempRootPath: string | undefined;
+    try {
+        tempRootPath = fs.mkdtempSync(
+            path.join(os.tmpdir(), "gsl-agent-prompts-"),
+        );
+        const keyPath = path.join(tempRootPath, "deploy_key");
+        const clonePath = path.join(tempRootPath, "repo");
+        fs.writeFileSync(keyPath, `${deployKey}\n`, {
+            encoding: "utf8",
+            mode: 0o600,
+        });
+
+        const sshKeyPath = keyPath.replace(/\\/g, "/");
+        const quotedSshKeyPath = `"${sshKeyPath.replace(/"/g, '\\"')}"`;
+        const { knownHostsPath } =
+            await createGitHubKnownHostsFile(tempRootPath);
+        const sshCommandParts = [
+            `ssh -i ${quotedSshKeyPath}`,
+            "-o IdentitiesOnly=yes",
+            "-o StrictHostKeyChecking=yes",
+        ];
+        if (knownHostsPath) {
+            const normalizedKnownHostsPath = knownHostsPath.replace(/\\/g, "/");
+            const quotedKnownHostsPath = `"${normalizedKnownHostsPath.replace(/"/g, '\\"')}"`;
+            sshCommandParts.push(
+                `-o UserKnownHostsFile=${quotedKnownHostsPath}`,
+            );
+        }
+        const env = {
+            ...process.env,
+            GIT_SSH_COMMAND: sshCommandParts.join(" "),
+        };
+
+        await runCommand(
+            "git",
+            [
+                "clone",
+                "--depth",
+                "1",
+                "--branch",
+                GSL_AGENT_PROMPTS_BRANCH,
+                GSL_AGENT_PROMPTS_REPO_SSH,
+                clonePath,
+            ],
+            { env },
+        );
+        const sourceRepositorySha = await resolveRepositoryHeadSha(clonePath);
+        const sourcePromptDir = path.join(
+            clonePath,
+            GSL_AGENT_PROMPTS_SOURCE_SUBDIR,
+        );
+        if (!fs.existsSync(sourcePromptDir)) {
+            return;
+        }
+
+        const promptFiles = listPromptFilesRecursive(sourcePromptDir);
+        const sourcePromptHashes = buildSourcePromptHashes(
+            sourcePromptDir,
+            promptFiles,
+        );
+        const relativePromptPaths = Object.keys(sourcePromptHashes);
+
+        const storedSyncState =
+            readAgentPromptSyncStateFile(workspaceFolderPath);
+        let previousSourcePromptHashes =
+            storedSyncState?.sourcePromptHashes ?? {};
+        if (Object.keys(previousSourcePromptHashes).length === 0) {
+            const previousSourceRepositorySha =
+                readSourceRepositoryShaFromVersionFile(workspaceFolderPath);
+            if (
+                previousSourceRepositorySha &&
+                previousSourceRepositorySha !== sourceRepositorySha &&
+                (await fetchRepositoryCommitBySha({
+                    repoPath: clonePath,
+                    sourceRepositorySha: previousSourceRepositorySha,
+                }))
+            ) {
+                previousSourcePromptHashes =
+                    await resolveSourcePromptHashesAtSha({
+                        repoPath: clonePath,
+                        sourceRepositorySha: previousSourceRepositorySha,
+                        relativePromptPaths,
+                    });
+            } else if (previousSourceRepositorySha === sourceRepositorySha) {
+                previousSourcePromptHashes = sourcePromptHashes;
+            }
+        }
+
+        const { updatedPromptCount, skippedPromptCount } =
+            autoUpdateManagedPromptFiles({
+                sourcePromptDir,
+                promptFiles,
+                targetPromptDir,
+                previousSourcePromptHashes,
+            });
+
+        const syncedAtUtc = new Date().toISOString();
+        writeSyncVersionFile({
+            workspaceFolderPath,
+            sourceRepositoryUrl: GSL_AGENT_PROMPTS_REPO_SSH,
+            sourceRepositoryBranch: GSL_AGENT_PROMPTS_BRANCH,
+            sourceRepositorySha,
+            syncedAtUtc,
+        });
+        writeAgentPromptSyncStateFile({
+            workspaceFolderPath,
+            sourceRepositorySha,
+            syncedAtUtc,
+            sourcePromptHashes,
+        });
+
+        if (updatedPromptCount > 0 || skippedPromptCount > 0) {
+            const skippedSummary =
+                skippedPromptCount > 0
+                    ? `, ${skippedPromptCount} not updated (local changes)`
+                    : "";
+            void window.showInformationMessage(
+                `GSL prompt auto-update: ${updatedPromptCount} updated${skippedSummary}.`,
+            );
+        }
+    } catch {
+        return;
+    } finally {
+        message.dispose();
+        if (tempRootPath) {
+            fs.rmSync(tempRootPath, { recursive: true, force: true });
+        }
+    }
 }
 
 export async function runSyncAgentPromptsCommand({
@@ -761,12 +1176,22 @@ export async function runSyncAgentPromptsCommand({
             backupPathsCreated,
         });
         const syncedAtUtc = new Date().toISOString();
+        const sourcePromptHashes = buildSourcePromptHashes(
+            sourcePromptDir,
+            promptFiles,
+        );
         const versionFilePath = writeSyncVersionFile({
             workspaceFolderPath: workspaceFolder.uri.fsPath,
             sourceRepositoryUrl: GSL_AGENT_PROMPTS_REPO_SSH,
             sourceRepositoryBranch: GSL_AGENT_PROMPTS_BRANCH,
             sourceRepositorySha,
             syncedAtUtc,
+        });
+        writeAgentPromptSyncStateFile({
+            workspaceFolderPath: workspaceFolder.uri.fsPath,
+            sourceRepositorySha,
+            syncedAtUtc,
+            sourcePromptHashes,
         });
         const versionFilePathForDisplay = path
             .relative(workspaceFolder.uri.fsPath, versionFilePath)

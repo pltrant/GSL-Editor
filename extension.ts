@@ -72,7 +72,10 @@ import { subscribeToDocumentChanges } from "./gsl/diagnostics";
 import { formatIndentation } from "./gsl/util/formattingUtil";
 import { registerCopilotTools } from "./gsl/copilotTools";
 import { runDiffWithPrimeCommand } from "./gsl/commands/diffWithPrime";
-import { runSyncAgentPromptsCommand } from "./gsl/commands/syncAgentPrompts";
+import {
+    runStartupAgentPromptAutoUpdate,
+    runSyncAgentPromptsCommand,
+} from "./gsl/commands/syncAgentPrompts";
 import { runCopilotCodeReviewCommand } from "./gsl/commands/copilotCodeReview";
 import * as primeService from "./gsl/prime/primeService";
 
@@ -804,7 +807,7 @@ export class VSCodeIntegration {
         /* pick a game */
         const gamePickOptions = {
             ignoreFocusOut: true,
-            placeholder:
+            placeHolder:
                 "Step 1 of 3 (Development): Select a development game (DR or GS) ...",
         };
         const game = await window.showQuickPick(
@@ -829,7 +832,7 @@ export class VSCodeIntegration {
         /* pick a character */
         const characterPickOptions = {
             ignoreFocusOut: true,
-            placeholder:
+            placeHolder:
                 "Step 1 of 3 (Development): Which Development character should be used?",
         };
         const developmentCharacters = sortCharacterNames(
@@ -905,7 +908,7 @@ export class VSCodeIntegration {
 
         const primeCharacterPickOptions = {
             ignoreFocusOut: true,
-            placeholder:
+            placeHolder:
                 "Step 2 of 3 (Prime): Which Prime character should be used?",
         };
         const primeCharacters = sortCharacterNames(
@@ -1668,6 +1671,7 @@ export function activate(context: ExtensionContext) {
 
     vsc.checkForNewInstall();
     vsc.checkForUpdatedVersion();
+    void runStartupAgentPromptAutoUpdate({ context });
 }
 
 export function deactivate() {}
