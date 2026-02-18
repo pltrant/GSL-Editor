@@ -18,6 +18,7 @@ const GSL_AGENT_PROMPTS_DEPLOY_KEY_SECRET = "gsl.agentPromptsDeployPrivateKey";
 const GSL_AGENT_PROMPTS_REPO_SSH =
     "git@github.com:pltrant/GSL-Editor-Agents.git";
 const GSL_AGENT_PROMPTS_BRANCH = "main";
+const GSL_AGENTS_FILE = "AGENTS.md";
 const GSL_AGENT_PROMPTS_SOURCE_SUBDIR = path.join(
     "src",
     "prompts",
@@ -36,16 +37,18 @@ const GSL_AGENT_PROMPTS_STATE_FILE = path.join(
     ".github",
     "gsl-agent-prompts-state.json",
 );
-const OVERWRITE_PROMPTS_LABEL = "Overwrite changed prompt files";
+const OVERWRITE_PROMPTS_LABEL =
+    "Overwrite changed prompt files (create backups first)";
 const KEEP_PROMPTS_LABEL = "Keep existing prompt files";
-const OVERWRITE_INSTRUCTIONS_LABEL =
-    "Overwrite workspace .github/copilot-instructions.md";
-const KEEP_INSTRUCTIONS_LABEL = "Keep existing .github/copilot-instructions.md";
+const OVERWRITE_AGENTS_FILE_LABEL =
+    "Overwrite workspace AGENTS.md (create backup first)";
+const KEEP_AGENTS_FILE_LABEL = "Keep existing AGENTS.md";
 
 interface AgentPromptSyncStateFile {
     sourceRepositorySha: string;
     syncedAtUtc: string;
     sourcePromptHashes: Record<string, string>;
+    sourceAgentsFileHash?: string;
 }
 
 function runCommand(
@@ -214,16 +217,10 @@ function listPromptFilesRecursive(rootDir: string): string[] {
     return promptFiles;
 }
 
-function resolveSourceCopilotInstructionsFilePath(
-    clonePath: string,
-): string | undefined {
-    const sourceInstructionsPath = path.join(
-        clonePath,
-        "src",
-        "copilot-instructions.md",
-    );
-    return fs.existsSync(sourceInstructionsPath)
-        ? sourceInstructionsPath
+function resolveSourceAgentsFilePath(clonePath: string): string | undefined {
+    const sourceAgentsFilePath = path.join(clonePath, "src", GSL_AGENTS_FILE);
+    return fs.existsSync(sourceAgentsFilePath)
+        ? sourceAgentsFilePath
         : undefined;
 }
 
@@ -351,12 +348,17 @@ function readAgentPromptSyncStateFile(
         if (!parsedState || typeof parsedState !== "object") {
             return undefined;
         }
-        const { sourceRepositorySha, syncedAtUtc, sourcePromptHashes } =
-            parsedState as {
-                sourceRepositorySha?: unknown;
-                syncedAtUtc?: unknown;
-                sourcePromptHashes?: unknown;
-            };
+        const {
+            sourceRepositorySha,
+            syncedAtUtc,
+            sourcePromptHashes,
+            sourceAgentsFileHash,
+        } = parsedState as {
+            sourceRepositorySha?: unknown;
+            syncedAtUtc?: unknown;
+            sourcePromptHashes?: unknown;
+            sourceAgentsFileHash?: unknown;
+        };
         if (
             typeof sourceRepositorySha !== "string" ||
             !/^[0-9a-f]{40}$/i.test(sourceRepositorySha) ||
@@ -374,10 +376,16 @@ function readAgentPromptSyncStateFile(
             }
             return acc;
         }, {});
+        const normalizedAgentsFileHash =
+            typeof sourceAgentsFileHash === "string" &&
+            /^[0-9a-f]{64}$/i.test(sourceAgentsFileHash)
+                ? sourceAgentsFileHash
+                : undefined;
         return {
             sourceRepositorySha,
             syncedAtUtc,
             sourcePromptHashes: normalizedHashes,
+            sourceAgentsFileHash: normalizedAgentsFileHash,
         };
     } catch {
         return undefined;
@@ -389,11 +397,13 @@ function writeAgentPromptSyncStateFile({
     sourceRepositorySha,
     syncedAtUtc,
     sourcePromptHashes,
+    sourceAgentsFileHash,
 }: {
     workspaceFolderPath: string;
     sourceRepositorySha: string;
     syncedAtUtc: string;
     sourcePromptHashes: Record<string, string>;
+    sourceAgentsFileHash?: string;
 }): string {
     const stateFilePath = path.join(
         workspaceFolderPath,
@@ -405,6 +415,9 @@ function writeAgentPromptSyncStateFile({
         syncedAtUtc,
         sourcePromptHashes,
     };
+    if (sourceAgentsFileHash) {
+        statePayload.sourceAgentsFileHash = sourceAgentsFileHash;
+    }
     fs.writeFileSync(
         stateFilePath,
         `${JSON.stringify(statePayload, null, 2)}\n`,
@@ -537,7 +550,7 @@ async function syncManagedPromptFiles({
             [{ label: OVERWRITE_PROMPTS_LABEL }, { label: KEEP_PROMPTS_LABEL }],
             {
                 placeHolder:
-                    "Overwrite changed managed prompt files and create backups first?",
+                    "Overwrite changed managed prompt files? Changed files will be backed up first.",
                 ignoreFocusOut: true,
             },
         );
@@ -731,77 +744,115 @@ function autoUpdateManagedPromptFiles({
     return { updatedPromptCount, skippedPromptCount };
 }
 
-async function syncCopilotInstructionsFile({
-    sourceInstructionsFilePath,
+async function syncAgentsFile({
+    sourceAgentsFilePath,
     workspaceFolderPath,
     backupPathsCreated,
 }: {
-    sourceInstructionsFilePath: string | undefined;
+    sourceAgentsFilePath: string | undefined;
     workspaceFolderPath: string;
     backupPathsCreated: string[];
 }): Promise<string> {
-    if (!sourceInstructionsFilePath) {
-        return "No source copilot-instructions.md found in synced agent repo.";
+    if (!sourceAgentsFilePath) {
+        return "No source AGENTS.md found in synced agent repo.";
     }
 
-    const workspaceGithubDir = path.join(workspaceFolderPath, ".github");
-    const workspaceInstructionsPath = path.join(
-        workspaceGithubDir,
-        "copilot-instructions.md",
+    const workspaceAgentsFilePath = path.join(
+        workspaceFolderPath,
+        GSL_AGENTS_FILE,
     );
-    if (!fs.existsSync(workspaceInstructionsPath)) {
-        fs.mkdirSync(workspaceGithubDir, { recursive: true });
-        fs.copyFileSync(sourceInstructionsFilePath, workspaceInstructionsPath);
-        return "Created .github/copilot-instructions.md from synced source.";
+    if (!fs.existsSync(workspaceAgentsFilePath)) {
+        fs.copyFileSync(sourceAgentsFilePath, workspaceAgentsFilePath);
+        return "Created AGENTS.md from synced source.";
     }
 
     if (
         !filesMatchWithNormalization(
-            sourceInstructionsFilePath,
-            workspaceInstructionsPath,
+            sourceAgentsFilePath,
+            workspaceAgentsFilePath,
         )
     ) {
-        if (!shouldCreateBackup(workspaceInstructionsPath)) {
-            fs.copyFileSync(
-                sourceInstructionsFilePath,
-                workspaceInstructionsPath,
-            );
-            return "Overwrote .github/copilot-instructions.md with synced source.";
+        if (!shouldCreateBackup(workspaceAgentsFilePath)) {
+            fs.copyFileSync(sourceAgentsFilePath, workspaceAgentsFilePath);
+            return "Overwrote AGENTS.md with synced source.";
         }
         const overwriteChoice = await window.showQuickPick(
             [
                 {
-                    label: OVERWRITE_INSTRUCTIONS_LABEL,
+                    label: OVERWRITE_AGENTS_FILE_LABEL,
                 },
                 {
-                    label: KEEP_INSTRUCTIONS_LABEL,
+                    label: KEEP_AGENTS_FILE_LABEL,
                 },
             ],
             {
                 placeHolder:
-                    "Do you want to overwrite workspace .github/copilot-instructions.md with the synced version?",
+                    "Do you want to overwrite workspace AGENTS.md with the synced version? Existing AGENTS.md will be backed up first.",
                 ignoreFocusOut: true,
             },
         );
         if (!overwriteChoice) {
-            return "Kept existing .github/copilot-instructions.md.";
+            return "Kept existing AGENTS.md.";
         }
-        if (overwriteChoice.label === OVERWRITE_INSTRUCTIONS_LABEL) {
-            const backupPath = nextBackupPath(workspaceInstructionsPath);
-            fs.copyFileSync(workspaceInstructionsPath, backupPath);
+        if (overwriteChoice.label === OVERWRITE_AGENTS_FILE_LABEL) {
+            const backupPath = nextBackupPath(workspaceAgentsFilePath);
+            fs.copyFileSync(workspaceAgentsFilePath, backupPath);
             backupPathsCreated.push(backupPath);
-            fs.copyFileSync(
-                sourceInstructionsFilePath,
-                workspaceInstructionsPath,
-            );
-            return "Overwrote .github/copilot-instructions.md with synced source.";
+            fs.copyFileSync(sourceAgentsFilePath, workspaceAgentsFilePath);
+            return "Overwrote AGENTS.md with synced source.";
         }
-        if (overwriteChoice.label === KEEP_INSTRUCTIONS_LABEL) {
-            return "Kept existing .github/copilot-instructions.md.";
+        if (overwriteChoice.label === KEEP_AGENTS_FILE_LABEL) {
+            return "Kept existing AGENTS.md.";
         }
     }
 
-    return "Kept existing .github/copilot-instructions.md (already up to date).";
+    return "Kept existing AGENTS.md (already up to date).";
+}
+
+function autoUpdateAgentsFile({
+    sourceAgentsFilePath,
+    workspaceFolderPath,
+    previousSourceAgentsFileHash,
+}: {
+    sourceAgentsFilePath: string | undefined;
+    workspaceFolderPath: string;
+    previousSourceAgentsFileHash: string | undefined;
+}): { updatedAgentsFile: boolean; skippedAgentsFile: boolean } {
+    if (!sourceAgentsFilePath) {
+        return { updatedAgentsFile: false, skippedAgentsFile: false };
+    }
+
+    const workspaceAgentsFilePath = path.join(
+        workspaceFolderPath,
+        GSL_AGENTS_FILE,
+    );
+    if (!fs.existsSync(workspaceAgentsFilePath)) {
+        fs.copyFileSync(sourceAgentsFilePath, workspaceAgentsFilePath);
+        return { updatedAgentsFile: true, skippedAgentsFile: false };
+    }
+
+    if (
+        filesMatchWithNormalization(
+            sourceAgentsFilePath,
+            workspaceAgentsFilePath,
+        )
+    ) {
+        return { updatedAgentsFile: false, skippedAgentsFile: false };
+    }
+
+    if (!previousSourceAgentsFileHash) {
+        return { updatedAgentsFile: false, skippedAgentsFile: true };
+    }
+
+    if (
+        hashNormalizedFile(workspaceAgentsFilePath) !==
+        previousSourceAgentsFileHash
+    ) {
+        return { updatedAgentsFile: false, skippedAgentsFile: true };
+    }
+
+    fs.copyFileSync(sourceAgentsFilePath, workspaceAgentsFilePath);
+    return { updatedAgentsFile: true, skippedAgentsFile: false };
 }
 
 async function resolveAgentPromptsDeployKey(
@@ -958,6 +1009,7 @@ export async function runStartupAgentPromptAutoUpdate({
             clonePath,
             GSL_AGENT_PROMPTS_SOURCE_SUBDIR,
         );
+        const sourceAgentsFilePath = resolveSourceAgentsFilePath(clonePath);
         if (!fs.existsSync(sourcePromptDir)) {
             return;
         }
@@ -973,6 +1025,8 @@ export async function runStartupAgentPromptAutoUpdate({
             readAgentPromptSyncStateFile(workspaceFolderPath);
         let previousSourcePromptHashes =
             storedSyncState?.sourcePromptHashes ?? {};
+        const previousSourceAgentsFileHash =
+            storedSyncState?.sourceAgentsFileHash;
         if (Object.keys(previousSourcePromptHashes).length === 0) {
             const previousSourceRepositorySha =
                 readSourceRepositoryShaFromVersionFile(workspaceFolderPath);
@@ -1002,8 +1056,16 @@ export async function runStartupAgentPromptAutoUpdate({
                 targetPromptDir,
                 previousSourcePromptHashes,
             });
+        const { updatedAgentsFile, skippedAgentsFile } = autoUpdateAgentsFile({
+            sourceAgentsFilePath,
+            workspaceFolderPath,
+            previousSourceAgentsFileHash,
+        });
 
         const syncedAtUtc = new Date().toISOString();
+        const sourceAgentsFileHash = sourceAgentsFilePath
+            ? hashNormalizedFile(sourceAgentsFilePath)
+            : undefined;
         writeSyncVersionFile({
             workspaceFolderPath,
             sourceRepositoryUrl: GSL_AGENT_PROMPTS_REPO_SSH,
@@ -1016,15 +1078,29 @@ export async function runStartupAgentPromptAutoUpdate({
             sourceRepositorySha,
             syncedAtUtc,
             sourcePromptHashes,
+            sourceAgentsFileHash,
         });
 
-        if (updatedPromptCount > 0 || skippedPromptCount > 0) {
-            const skippedSummary =
+        if (
+            updatedPromptCount > 0 ||
+            skippedPromptCount > 0 ||
+            updatedAgentsFile ||
+            skippedAgentsFile
+        ) {
+            const promptSummary = `${updatedPromptCount} prompt file(s) updated${
                 skippedPromptCount > 0
-                    ? `, ${skippedPromptCount} not updated (local changes)`
-                    : "";
+                    ? `, ${skippedPromptCount} prompt file(s) not updated (local changes)`
+                    : ""
+            }`;
+            const agentsFileSummary = sourceAgentsFilePath
+                ? updatedAgentsFile
+                    ? ", AGENTS.md updated"
+                    : skippedAgentsFile
+                      ? ", AGENTS.md not updated (local changes)"
+                      : ""
+                : "";
             void window.showInformationMessage(
-                `GSL prompt auto-update: ${updatedPromptCount} updated${skippedSummary}.`,
+                `GSL prompt auto-update: ${promptSummary}${agentsFileSummary}.`,
             );
         }
     } catch {
@@ -1115,8 +1191,7 @@ export async function runSyncAgentPromptsCommand({
             clonePath,
             GSL_AGENT_PROMPTS_SOURCE_SUBDIR,
         );
-        const sourceInstructionsFilePath =
-            resolveSourceCopilotInstructionsFilePath(clonePath);
+        const sourceAgentsFilePath = resolveSourceAgentsFilePath(clonePath);
         if (!fs.existsSync(sourcePromptDir)) {
             throw new Error(
                 `Prompt source directory not found: ${GSL_AGENT_PROMPTS_SOURCE_SUBDIR}`,
@@ -1170,12 +1245,15 @@ export async function runSyncAgentPromptsCommand({
                 );
         }
 
-        const instructionsOutcome = await syncCopilotInstructionsFile({
-            sourceInstructionsFilePath,
+        const agentsFileOutcome = await syncAgentsFile({
+            sourceAgentsFilePath,
             workspaceFolderPath: workspaceFolder.uri.fsPath,
             backupPathsCreated,
         });
         const syncedAtUtc = new Date().toISOString();
+        const sourceAgentsFileHash = sourceAgentsFilePath
+            ? hashNormalizedFile(sourceAgentsFilePath)
+            : undefined;
         const sourcePromptHashes = buildSourcePromptHashes(
             sourcePromptDir,
             promptFiles,
@@ -1192,6 +1270,7 @@ export async function runSyncAgentPromptsCommand({
             sourceRepositorySha,
             syncedAtUtc,
             sourcePromptHashes,
+            sourceAgentsFileHash,
         });
         const versionFilePathForDisplay = path
             .relative(workspaceFolder.uri.fsPath, versionFilePath)
@@ -1246,9 +1325,9 @@ export async function runSyncAgentPromptsCommand({
             ...managedPromptSections,
             "",
             ...backupSections,
-            "### Instructions File",
+            "### AGENTS File",
             "",
-            `- ${instructionsOutcome}`,
+            `- ${agentsFileOutcome}`,
             "",
             "### Sync Metadata",
             "",
