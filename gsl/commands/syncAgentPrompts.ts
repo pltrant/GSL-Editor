@@ -862,23 +862,7 @@ async function resolveAgentPromptsDeployKey(
         GSL_AGENT_PROMPTS_DEPLOY_KEY_SECRET,
     );
     if (existingKey) {
-        const choice = await window.showQuickPick(
-            [
-                { label: "Use saved deploy key" },
-                { label: "Use a different deploy key file" },
-                { label: "Cancel" },
-            ],
-            {
-                placeHolder: "Choose deploy key source for prompt sync.",
-                ignoreFocusOut: true,
-            },
-        );
-        if (!choice || choice.label === "Cancel") {
-            return;
-        }
-        if (choice.label === "Use saved deploy key") {
-            return existingKey;
-        }
+        return existingKey;
     }
 
     const defaultKeyPath = path.join(
