@@ -150,7 +150,11 @@ This avoids leaving stale wrappers behind after incremental refactors.
   - Very brief description of what changed
   - Newly exposed tools/features/etc (short bullet points are preferred)
 - Be concise.
-- Wrap commit message body text at 70 characters.
+- MUST wrap every commit message body line at 70 characters or fewer.
+- Treat the 70-character body wrap as a hard requirement, not a
+  preference.
+- Before reporting success, verify message width (for example with
+  `git log -1 --pretty=%B`).
 - When committing from PowerShell, do not embed literal `\n` in a `-m`
   string. Use multiple `-m` flags (one per paragraph) so Git stores
   actual newlines.

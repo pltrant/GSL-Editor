@@ -11,26 +11,12 @@ import {
     GSLX_PRIME_INSTANCE,
 } from "../const";
 import {
+    GSL_AGENT_COMMANDS_MANAGED_DIR,
     GSL_AGENT_PROMPTS_MANAGED_DIR,
     GSL_AGENT_PROMPTS_VERSION_FILE,
 } from "./syncAgentPrompts";
 
-const COPILOT_CODE_REVIEW_PROMPT = `Task: Run managed code review prompts from \`.github/prompts/gsl-managed\`.
-
-1. Discover prompt files in \`.github/prompts/gsl-managed\`.
-2. Select one prompt intended for technical code review and one intended for copyedit review.
-3. If either required prompt cannot be found or resolved, stop and output exactly:
-   "Something went wrong. Please rerun GSL: Sync Agent Prompts and try again."
-4. If sub-agents are available, use one sub-agent per review prompt and run both reviews in parallel if possible.
-5. Return all findings in a single response with two sections:
-   - Copyedit Review Findings
-   - Technical Review Findings
-
-Output constraints:
-- Findings only.
-- No praise.
-- No internal reasoning or chain-of-thought.
-- No unnecessary commentary.`;
+const COPILOT_CODE_REVIEW_COMMAND_FILE = "copilotCodeReview.command.txt";
 
 function hasManagedPromptFiles(rootPath: string): boolean {
     if (!fs.existsSync(rootPath) || !fs.statSync(rootPath).isDirectory()) {
@@ -78,7 +64,23 @@ async function verifyPrimeUserSetupPrecondition(
     return false;
 }
 
-async function verifyManagedPromptSyncPrecondition(): Promise<boolean> {
+function readManagedCommandPrompt(rootFolderPath: string): string | undefined {
+    const commandPromptFilePath = path.join(
+        rootFolderPath,
+        GSL_AGENT_COMMANDS_MANAGED_DIR,
+        COPILOT_CODE_REVIEW_COMMAND_FILE,
+    );
+    if (!fs.existsSync(commandPromptFilePath)) {
+        return undefined;
+    }
+
+    const prompt = fs.readFileSync(commandPromptFilePath, "utf8").trim();
+    return prompt.length > 0 ? prompt : undefined;
+}
+
+async function verifyManagedPromptSyncPrecondition(): Promise<
+    string | undefined
+> {
     const workspaceFolder = window.activeTextEditor
         ? workspace.getWorkspaceFolder(window.activeTextEditor.document.uri)
         : undefined;
@@ -89,7 +91,7 @@ async function verifyManagedPromptSyncPrecondition(): Promise<boolean> {
             "Copilot Code Review requires an open workspace folder.",
             { modal: true },
         );
-        return false;
+        return undefined;
     }
 
     const managedPromptDirPath = path.join(
@@ -100,12 +102,18 @@ async function verifyManagedPromptSyncPrecondition(): Promise<boolean> {
         rootFolderPath,
         GSL_AGENT_PROMPTS_VERSION_FILE,
     );
+    const commandPromptFilePath = path.join(
+        rootFolderPath,
+        GSL_AGENT_COMMANDS_MANAGED_DIR,
+        COPILOT_CODE_REVIEW_COMMAND_FILE,
+    );
     const promptsAreSynced =
         hasManagedPromptFiles(managedPromptDirPath) &&
-        fs.existsSync(versionFilePath);
+        fs.existsSync(versionFilePath) &&
+        fs.existsSync(commandPromptFilePath);
 
     if (promptsAreSynced) {
-        return true;
+        return rootFolderPath;
     }
 
     const syncPromptsAction = "Run Sync Agent Prompts";
@@ -117,7 +125,7 @@ async function verifyManagedPromptSyncPrecondition(): Promise<boolean> {
     if (choice === syncPromptsAction) {
         void commands.executeCommand("gsl.syncAgentPrompts");
     }
-    return false;
+    return undefined;
 }
 
 async function openCopilotChatWithPrompt(prompt: string): Promise<boolean> {
@@ -162,11 +170,21 @@ export async function runCopilotCodeReviewCommand({
         return;
     }
 
-    if (!(await verifyManagedPromptSyncPrecondition())) {
+    const rootFolderPath = await verifyManagedPromptSyncPrecondition();
+    if (!rootFolderPath) {
         return;
     }
 
-    const opened = await openCopilotChatWithPrompt(COPILOT_CODE_REVIEW_PROMPT);
+    const copilotCodeReviewPrompt = readManagedCommandPrompt(rootFolderPath);
+    if (!copilotCodeReviewPrompt) {
+        await window.showErrorMessage(
+            "Could not load Copilot Code Review command prompt. Run 'GSL: Sync Agent Prompts' and try again.",
+            { modal: true },
+        );
+        return;
+    }
+
+    const opened = await openCopilotChatWithPrompt(copilotCodeReviewPrompt);
     if (opened) {
         return;
     }

@@ -24,11 +24,14 @@ const GSL_AGENT_PROMPTS_SOURCE_SUBDIR = path.join(
     "prompts",
     "gsl-managed",
 );
+const GSL_AGENT_COMMANDS_SOURCE_SUBDIR = path.join("src", "commands");
+const GSL_COPILOT_CODE_REVIEW_COMMAND_FILE = "copilotCodeReview.command.txt";
 export const GSL_AGENT_PROMPTS_MANAGED_DIR = path.join(
     ".github",
     "prompts",
     "gsl-managed",
 );
+export const GSL_AGENT_COMMANDS_MANAGED_DIR = path.join(".github", "commands");
 export const GSL_AGENT_PROMPTS_VERSION_FILE = path.join(
     ".github",
     "version.txt",
@@ -40,15 +43,19 @@ const GSL_AGENT_PROMPTS_STATE_FILE = path.join(
 const OVERWRITE_PROMPTS_LABEL =
     "Overwrite changed prompt files (create backups first)";
 const KEEP_PROMPTS_LABEL = "Keep existing prompt files";
+const OVERWRITE_COMMAND_FILES_LABEL =
+    "Overwrite changed command files (create backups first)";
+const KEEP_COMMAND_FILES_LABEL = "Keep existing command files";
 const OVERWRITE_AGENTS_FILE_LABEL =
     "Overwrite workspace AGENTS.md (create backup first)";
 const KEEP_AGENTS_FILE_LABEL = "Keep existing AGENTS.md";
 
-interface AgentPromptSyncStateFile {
+interface AgentSyncStateFile {
     sourceRepositorySha: string;
     syncedAtUtc: string;
     sourcePromptHashes: Record<string, string>;
     sourceAgentsFileHash?: string;
+    sourceCommandFileHashes?: Record<string, string>;
 }
 
 function runCommand(
@@ -202,19 +209,30 @@ function expandHomePath(value: string): string {
 }
 
 function listPromptFilesRecursive(rootDir: string): string[] {
-    const promptFiles = new Array<string>();
+    return listFilesRecursive(rootDir, { suffix: ".prompt.md" });
+}
+
+function listCommandFilesRecursive(rootDir: string): string[] {
+    return listFilesRecursive(rootDir, { suffix: ".command.txt" });
+}
+
+function listFilesRecursive(
+    rootDir: string,
+    { suffix }: { suffix: ".prompt.md" | ".command.txt" },
+): string[] {
+    const files = new Array<string>();
     const entries = fs.readdirSync(rootDir, { withFileTypes: true });
     for (const entry of entries) {
         const fullPath = path.join(rootDir, entry.name);
         if (entry.isDirectory()) {
-            promptFiles.push(...listPromptFilesRecursive(fullPath));
+            files.push(...listFilesRecursive(fullPath, { suffix }));
             continue;
         }
-        if (entry.isFile() && entry.name.toLowerCase().endsWith(".prompt.md")) {
-            promptFiles.push(fullPath);
+        if (entry.isFile() && entry.name.toLowerCase().endsWith(suffix)) {
+            files.push(fullPath);
         }
     }
-    return promptFiles;
+    return files;
 }
 
 function resolveSourceAgentsFilePath(clonePath: string): string | undefined {
@@ -305,9 +323,23 @@ function buildSourcePromptHashes(
     sourcePromptDir: string,
     promptFiles: string[],
 ): Record<string, string> {
-    return promptFiles.reduce<Record<string, string>>((acc, promptFile) => {
-        acc[normalizeRelativePath(path.relative(sourcePromptDir, promptFile))] =
-            hashNormalizedFile(promptFile);
+    return buildSourceFileHashes(sourcePromptDir, promptFiles);
+}
+
+function buildSourceCommandFileHashes(
+    sourceCommandDir: string,
+    commandFiles: string[],
+): Record<string, string> {
+    return buildSourceFileHashes(sourceCommandDir, commandFiles);
+}
+
+function buildSourceFileHashes(
+    sourceDir: string,
+    files: string[],
+): Record<string, string> {
+    return files.reduce<Record<string, string>>((acc, sourceFile) => {
+        acc[normalizeRelativePath(path.relative(sourceDir, sourceFile))] =
+            hashNormalizedFile(sourceFile);
         return acc;
     }, {});
 }
@@ -333,9 +365,9 @@ function readSourceRepositoryShaFromVersionFile(
     return sha && /^[0-9a-f]{40}$/i.test(sha) ? sha : undefined;
 }
 
-function readAgentPromptSyncStateFile(
+function readAgentSyncStateFile(
     workspaceFolderPath: string,
-): AgentPromptSyncStateFile | undefined {
+): AgentSyncStateFile | undefined {
     const stateFilePath = path.join(
         workspaceFolderPath,
         GSL_AGENT_PROMPTS_STATE_FILE,
@@ -353,11 +385,13 @@ function readAgentPromptSyncStateFile(
             syncedAtUtc,
             sourcePromptHashes,
             sourceAgentsFileHash,
+            sourceCommandFileHashes,
         } = parsedState as {
             sourceRepositorySha?: unknown;
             syncedAtUtc?: unknown;
             sourcePromptHashes?: unknown;
             sourceAgentsFileHash?: unknown;
+            sourceCommandFileHashes?: unknown;
         };
         if (
             typeof sourceRepositorySha !== "string" ||
@@ -381,42 +415,66 @@ function readAgentPromptSyncStateFile(
             /^[0-9a-f]{64}$/i.test(sourceAgentsFileHash)
                 ? sourceAgentsFileHash
                 : undefined;
+        const normalizedCommandFileHashes =
+            sourceCommandFileHashes &&
+            typeof sourceCommandFileHashes === "object"
+                ? Object.entries(sourceCommandFileHashes).reduce<
+                      Record<string, string>
+                  >((acc, [relativePath, hash]) => {
+                      if (
+                          typeof hash === "string" &&
+                          /^[0-9a-f]{64}$/i.test(hash)
+                      ) {
+                          acc[relativePath] = hash;
+                      }
+                      return acc;
+                  }, {})
+                : {};
         return {
             sourceRepositorySha,
             syncedAtUtc,
             sourcePromptHashes: normalizedHashes,
             sourceAgentsFileHash: normalizedAgentsFileHash,
+            sourceCommandFileHashes: normalizedCommandFileHashes,
         };
     } catch {
         return undefined;
     }
 }
 
-function writeAgentPromptSyncStateFile({
+function writeAgentSyncStateFile({
     workspaceFolderPath,
     sourceRepositorySha,
     syncedAtUtc,
     sourcePromptHashes,
     sourceAgentsFileHash,
+    sourceCommandFileHashes,
 }: {
     workspaceFolderPath: string;
     sourceRepositorySha: string;
     syncedAtUtc: string;
     sourcePromptHashes: Record<string, string>;
     sourceAgentsFileHash?: string;
+    sourceCommandFileHashes?: Record<string, string>;
 }): string {
     const stateFilePath = path.join(
         workspaceFolderPath,
         GSL_AGENT_PROMPTS_STATE_FILE,
     );
     fs.mkdirSync(path.dirname(stateFilePath), { recursive: true });
-    const statePayload: AgentPromptSyncStateFile = {
+    const statePayload: AgentSyncStateFile = {
         sourceRepositorySha,
         syncedAtUtc,
         sourcePromptHashes,
     };
     if (sourceAgentsFileHash) {
         statePayload.sourceAgentsFileHash = sourceAgentsFileHash;
+    }
+    if (
+        sourceCommandFileHashes &&
+        Object.keys(sourceCommandFileHashes).length > 0
+    ) {
+        statePayload.sourceCommandFileHashes = sourceCommandFileHashes;
     }
     fs.writeFileSync(
         stateFilePath,
@@ -488,6 +546,48 @@ function formatCountedSection(title: string, items: string[]): string[] {
     ];
 }
 
+interface ManagedFileSyncResult {
+    backupPathsCreated: string[];
+    overwrittenPaths: string[];
+    createdPaths: string[];
+    alreadyUpToDatePaths: string[];
+    keptPaths: string[];
+    deletedPaths: string[];
+}
+
+interface ManagedFileAutoUpdateResult {
+    updatedCount: number;
+    skippedCount: number;
+}
+
+function buildManagedFileSections({
+    overwrittenPaths,
+    createdPaths,
+    alreadyUpToDatePaths,
+    keptPaths,
+    deletedPaths,
+    emptyMessage,
+}: {
+    overwrittenPaths: string[];
+    createdPaths: string[];
+    alreadyUpToDatePaths: string[];
+    keptPaths: string[];
+    deletedPaths: string[];
+    emptyMessage: string;
+}): string[] {
+    const sections = [
+        ...formatCountedSection("Overwritten", overwrittenPaths),
+        ...formatCountedSection("Created", createdPaths),
+        ...formatCountedSection("Already up to date", alreadyUpToDatePaths),
+        ...formatCountedSection("Kept existing", keptPaths),
+        ...formatCountedSection("Removed", deletedPaths),
+    ];
+    if (sections.length === 0) {
+        sections.push(emptyMessage);
+    }
+    return sections;
+}
+
 async function syncManagedPromptFiles({
     sourcePromptDir,
     promptFiles,
@@ -507,137 +607,215 @@ async function syncManagedPromptFiles({
       }
     | undefined
 > {
-    fs.mkdirSync(targetPromptDir, { recursive: true });
+    const result = await syncManagedFiles({
+        sourceDir: sourcePromptDir,
+        sourceFiles: promptFiles,
+        targetDir: targetPromptDir,
+        fileSuffix: ".prompt.md",
+        overwriteLabel: OVERWRITE_PROMPTS_LABEL,
+        keepLabel: KEEP_PROMPTS_LABEL,
+        overwritePromptPlaceholder:
+            "Overwrite changed managed prompt files? Changed files will be backed up first.",
+    });
+    if (!result) {
+        return undefined;
+    }
+
+    return {
+        backupPathsCreated: result.backupPathsCreated,
+        overwrittenManagedPromptPaths: result.overwrittenPaths,
+        createdManagedPromptPaths: result.createdPaths,
+        alreadyUpToDateManagedPromptPaths: result.alreadyUpToDatePaths,
+        keptManagedPromptPaths: result.keptPaths,
+        deletedManagedPromptPaths: result.deletedPaths,
+    };
+}
+
+async function syncManagedCommandFiles({
+    sourceCommandDir,
+    commandFiles,
+    targetCommandDir,
+}: {
+    sourceCommandDir: string;
+    commandFiles: string[];
+    targetCommandDir: string;
+}): Promise<
+    | {
+          backupPathsCreated: string[];
+          overwrittenManagedCommandPaths: string[];
+          createdManagedCommandPaths: string[];
+          alreadyUpToDateManagedCommandPaths: string[];
+          keptManagedCommandPaths: string[];
+          deletedManagedCommandPaths: string[];
+      }
+    | undefined
+> {
+    const result = await syncManagedFiles({
+        sourceDir: sourceCommandDir,
+        sourceFiles: commandFiles,
+        targetDir: targetCommandDir,
+        fileSuffix: ".command.txt",
+        overwriteLabel: OVERWRITE_COMMAND_FILES_LABEL,
+        keepLabel: KEEP_COMMAND_FILES_LABEL,
+        overwritePromptPlaceholder:
+            "Overwrite changed managed command files? Changed files will be backed up first.",
+    });
+    if (!result) {
+        return undefined;
+    }
+
+    return {
+        backupPathsCreated: result.backupPathsCreated,
+        overwrittenManagedCommandPaths: result.overwrittenPaths,
+        createdManagedCommandPaths: result.createdPaths,
+        alreadyUpToDateManagedCommandPaths: result.alreadyUpToDatePaths,
+        keptManagedCommandPaths: result.keptPaths,
+        deletedManagedCommandPaths: result.deletedPaths,
+    };
+}
+
+async function syncManagedFiles({
+    sourceDir,
+    sourceFiles,
+    targetDir,
+    fileSuffix,
+    overwriteLabel,
+    keepLabel,
+    overwritePromptPlaceholder,
+}: {
+    sourceDir: string;
+    sourceFiles: string[];
+    targetDir: string;
+    fileSuffix: ".prompt.md" | ".command.txt";
+    overwriteLabel: string;
+    keepLabel: string;
+    overwritePromptPlaceholder: string;
+}): Promise<ManagedFileSyncResult | undefined> {
+    fs.mkdirSync(targetDir, { recursive: true });
 
     const backupPathsCreated = new Array<string>();
-    const overwrittenManagedPromptPaths = new Array<string>();
-    const createdManagedPromptPaths = new Array<string>();
-    const alreadyUpToDateManagedPromptPaths = new Array<string>();
-    const keptManagedPromptPaths = new Array<string>();
-    const deletedManagedPromptPaths = new Array<string>();
+    const overwrittenPaths = new Array<string>();
+    const createdPaths = new Array<string>();
+    const alreadyUpToDatePaths = new Array<string>();
+    const keptPaths = new Array<string>();
+    const deletedPaths = new Array<string>();
 
-    const sourcePromptPathsByRelativePath = new Map<string, string>();
-    for (const promptFile of promptFiles) {
-        sourcePromptPathsByRelativePath.set(
-            path.relative(sourcePromptDir, promptFile),
-            promptFile,
+    const sourcePathsByRelativePath = new Map<string, string>();
+    for (const sourceFile of sourceFiles) {
+        sourcePathsByRelativePath.set(
+            path.relative(sourceDir, sourceFile),
+            sourceFile,
         );
     }
 
-    const existingPromptFiles = listPromptFilesRecursive(targetPromptDir);
-    const backupRequiredPromptTargets = new Array<string>();
-    let shouldOverwriteManagedPromptFiles = true;
-    for (const targetPromptFile of existingPromptFiles) {
-        const relativePath = path.relative(targetPromptDir, targetPromptFile);
-        const sourcePromptFile =
-            sourcePromptPathsByRelativePath.get(relativePath);
-        if (!sourcePromptFile) {
-            if (shouldCreateBackup(targetPromptFile)) {
-                backupRequiredPromptTargets.push(targetPromptFile);
+    const existingFiles = listFilesRecursive(targetDir, { suffix: fileSuffix });
+    const backupRequiredTargets = new Array<string>();
+    let shouldOverwriteManagedFiles = true;
+    for (const targetFile of existingFiles) {
+        const relativePath = path.relative(targetDir, targetFile);
+        const sourceFile = sourcePathsByRelativePath.get(relativePath);
+        if (!sourceFile) {
+            if (shouldCreateBackup(targetFile)) {
+                backupRequiredTargets.push(targetFile);
             }
             continue;
         }
         if (
-            !filesMatchWithNormalization(sourcePromptFile, targetPromptFile) &&
-            shouldCreateBackup(targetPromptFile)
+            !filesMatchWithNormalization(sourceFile, targetFile) &&
+            shouldCreateBackup(targetFile)
         ) {
-            backupRequiredPromptTargets.push(targetPromptFile);
+            backupRequiredTargets.push(targetFile);
         }
     }
 
-    if (backupRequiredPromptTargets.length > 0) {
-        const overwritePromptChoice = await window.showQuickPick(
-            [{ label: OVERWRITE_PROMPTS_LABEL }, { label: KEEP_PROMPTS_LABEL }],
+    if (backupRequiredTargets.length > 0) {
+        const overwriteChoice = await window.showQuickPick(
+            [{ label: overwriteLabel }, { label: keepLabel }],
             {
-                placeHolder:
-                    "Overwrite changed managed prompt files? Changed files will be backed up first.",
+                placeHolder: overwritePromptPlaceholder,
                 ignoreFocusOut: true,
             },
         );
-        if (!overwritePromptChoice) {
-            return;
+        if (!overwriteChoice) {
+            return undefined;
         }
-        if (overwritePromptChoice.label !== OVERWRITE_PROMPTS_LABEL) {
-            shouldOverwriteManagedPromptFiles = false;
+        if (overwriteChoice.label !== overwriteLabel) {
+            shouldOverwriteManagedFiles = false;
         } else {
-            for (const targetPromptFile of backupRequiredPromptTargets) {
-                const backupPath = nextBackupPath(targetPromptFile);
-                fs.copyFileSync(targetPromptFile, backupPath);
+            for (const targetFile of backupRequiredTargets) {
+                const backupPath = nextBackupPath(targetFile);
+                fs.copyFileSync(targetFile, backupPath);
                 backupPathsCreated.push(backupPath);
             }
         }
     }
 
-    for (const promptFile of promptFiles) {
-        const relativePath = path.relative(sourcePromptDir, promptFile);
-        const targetPath = path.join(targetPromptDir, relativePath);
+    for (const sourceFile of sourceFiles) {
+        const relativePath = path.relative(sourceDir, sourceFile);
+        const targetPath = path.join(targetDir, relativePath);
         const targetAlreadyExists = fs.existsSync(targetPath);
         if (
             targetAlreadyExists &&
-            filesMatchWithNormalization(promptFile, targetPath)
+            filesMatchWithNormalization(sourceFile, targetPath)
         ) {
-            alreadyUpToDateManagedPromptPaths.push(
-                relativePath.replace(/\\/g, "/"),
-            );
+            alreadyUpToDatePaths.push(relativePath.replace(/\\/g, "/"));
             continue;
         }
-        if (targetAlreadyExists && !shouldOverwriteManagedPromptFiles) {
-            keptManagedPromptPaths.push(relativePath.replace(/\\/g, "/"));
+        if (targetAlreadyExists && !shouldOverwriteManagedFiles) {
+            keptPaths.push(relativePath.replace(/\\/g, "/"));
             continue;
         }
         if (
             targetAlreadyExists &&
             shouldCreateBackup(targetPath) &&
-            backupRequiredPromptTargets.length > 0
+            backupRequiredTargets.length > 0
         ) {
             const alreadyBackedUp = backupPathsCreated.some((backupPath) =>
                 backupPath.startsWith(`${targetPath}.backup.`),
             );
             if (!alreadyBackedUp) {
-                keptManagedPromptPaths.push(relativePath.replace(/\\/g, "/"));
+                keptPaths.push(relativePath.replace(/\\/g, "/"));
                 continue;
             }
         }
         fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-        fs.copyFileSync(promptFile, targetPath);
+        fs.copyFileSync(sourceFile, targetPath);
         if (targetAlreadyExists) {
-            overwrittenManagedPromptPaths.push(
-                relativePath.replace(/\\/g, "/"),
-            );
+            overwrittenPaths.push(relativePath.replace(/\\/g, "/"));
         } else {
-            createdManagedPromptPaths.push(relativePath.replace(/\\/g, "/"));
+            createdPaths.push(relativePath.replace(/\\/g, "/"));
         }
     }
 
-    for (const existingPromptFile of existingPromptFiles) {
-        const relativePath = path.relative(targetPromptDir, existingPromptFile);
-        if (sourcePromptPathsByRelativePath.has(relativePath)) {
+    for (const existingFile of existingFiles) {
+        const relativePath = path.relative(targetDir, existingFile);
+        if (sourcePathsByRelativePath.has(relativePath)) {
             continue;
         }
-        if (!shouldOverwriteManagedPromptFiles) {
-            keptManagedPromptPaths.push(relativePath.replace(/\\/g, "/"));
+        if (!shouldOverwriteManagedFiles) {
+            keptPaths.push(relativePath.replace(/\\/g, "/"));
             continue;
         }
-        if (shouldCreateBackup(existingPromptFile)) {
+        if (shouldCreateBackup(existingFile)) {
             const hasBackup = backupPathsCreated.some((backupPath) =>
-                backupPath.startsWith(`${existingPromptFile}.backup.`),
+                backupPath.startsWith(`${existingFile}.backup.`),
             );
             if (!hasBackup) {
-                keptManagedPromptPaths.push(relativePath.replace(/\\/g, "/"));
+                keptPaths.push(relativePath.replace(/\\/g, "/"));
                 continue;
             }
         }
-        fs.rmSync(existingPromptFile, { force: true });
-        deletedManagedPromptPaths.push(relativePath.replace(/\\/g, "/"));
+        fs.rmSync(existingFile, { force: true });
+        deletedPaths.push(relativePath.replace(/\\/g, "/"));
     }
 
     return {
         backupPathsCreated,
-        overwrittenManagedPromptPaths,
-        createdManagedPromptPaths,
-        alreadyUpToDateManagedPromptPaths,
-        keptManagedPromptPaths,
-        deletedManagedPromptPaths,
+        overwrittenPaths,
+        createdPaths,
+        alreadyUpToDatePaths,
+        keptPaths,
+        deletedPaths,
     };
 }
 
@@ -704,44 +882,90 @@ function autoUpdateManagedPromptFiles({
     targetPromptDir: string;
     previousSourcePromptHashes: Record<string, string>;
 }): { updatedPromptCount: number; skippedPromptCount: number } {
-    fs.mkdirSync(targetPromptDir, { recursive: true });
+    const result = autoUpdateManagedFiles({
+        sourceDir: sourcePromptDir,
+        sourceFiles: promptFiles,
+        targetDir: targetPromptDir,
+        previousSourceFileHashes: previousSourcePromptHashes,
+    });
+    return {
+        updatedPromptCount: result.updatedCount,
+        skippedPromptCount: result.skippedCount,
+    };
+}
 
-    let updatedPromptCount = 0;
-    let skippedPromptCount = 0;
+function autoUpdateManagedCommandFiles({
+    sourceCommandDir,
+    commandFiles,
+    targetCommandDir,
+    previousSourceCommandFileHashes,
+}: {
+    sourceCommandDir: string;
+    commandFiles: string[];
+    targetCommandDir: string;
+    previousSourceCommandFileHashes: Record<string, string>;
+}): { updatedCommandCount: number; skippedCommandCount: number } {
+    const result = autoUpdateManagedFiles({
+        sourceDir: sourceCommandDir,
+        sourceFiles: commandFiles,
+        targetDir: targetCommandDir,
+        previousSourceFileHashes: previousSourceCommandFileHashes,
+    });
+    return {
+        updatedCommandCount: result.updatedCount,
+        skippedCommandCount: result.skippedCount,
+    };
+}
 
-    for (const promptFile of promptFiles) {
+function autoUpdateManagedFiles({
+    sourceDir,
+    sourceFiles,
+    targetDir,
+    previousSourceFileHashes,
+}: {
+    sourceDir: string;
+    sourceFiles: string[];
+    targetDir: string;
+    previousSourceFileHashes: Record<string, string>;
+}): ManagedFileAutoUpdateResult {
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    let updatedCount = 0;
+    let skippedCount = 0;
+
+    for (const sourceFile of sourceFiles) {
         const relativePath = normalizeRelativePath(
-            path.relative(sourcePromptDir, promptFile),
+            path.relative(sourceDir, sourceFile),
         );
-        const targetPath = path.join(targetPromptDir, relativePath);
+        const targetPath = path.join(targetDir, relativePath);
         const targetExists = fs.existsSync(targetPath);
         if (!targetExists) {
             fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-            fs.copyFileSync(promptFile, targetPath);
-            updatedPromptCount++;
+            fs.copyFileSync(sourceFile, targetPath);
+            updatedCount++;
             continue;
         }
 
-        if (filesMatchWithNormalization(promptFile, targetPath)) {
+        if (filesMatchWithNormalization(sourceFile, targetPath)) {
             continue;
         }
 
-        const previousPromptHash = previousSourcePromptHashes[relativePath];
-        if (!previousPromptHash) {
-            skippedPromptCount++;
+        const previousSourceHash = previousSourceFileHashes[relativePath];
+        if (!previousSourceHash) {
+            skippedCount++;
             continue;
         }
 
-        if (hashNormalizedFile(targetPath) !== previousPromptHash) {
-            skippedPromptCount++;
+        if (hashNormalizedFile(targetPath) !== previousSourceHash) {
+            skippedCount++;
             continue;
         }
 
-        fs.copyFileSync(promptFile, targetPath);
-        updatedPromptCount++;
+        fs.copyFileSync(sourceFile, targetPath);
+        updatedCount++;
     }
 
-    return { updatedPromptCount, skippedPromptCount };
+    return { updatedCount, skippedCount };
 }
 
 async function syncAgentsFile({
@@ -911,12 +1135,17 @@ export async function runStartupAgentPromptAutoUpdate({
         workspaceFolderPath,
         GSL_AGENT_PROMPTS_MANAGED_DIR,
     );
-    if (!fs.existsSync(targetPromptDir)) {
-        return;
-    }
-
-    const existingPromptFiles = listPromptFilesRecursive(targetPromptDir);
-    if (existingPromptFiles.length === 0) {
+    const targetCommandDir = path.join(
+        workspaceFolderPath,
+        GSL_AGENT_COMMANDS_MANAGED_DIR,
+    );
+    const existingPromptFiles = fs.existsSync(targetPromptDir)
+        ? listPromptFilesRecursive(targetPromptDir)
+        : [];
+    const existingCommandFiles = fs.existsSync(targetCommandDir)
+        ? listCommandFilesRecursive(targetCommandDir)
+        : [];
+    if (existingPromptFiles.length === 0 && existingCommandFiles.length === 0) {
         return;
     }
 
@@ -993,22 +1222,34 @@ export async function runStartupAgentPromptAutoUpdate({
             clonePath,
             GSL_AGENT_PROMPTS_SOURCE_SUBDIR,
         );
+        const sourceCommandDir = path.join(
+            clonePath,
+            GSL_AGENT_COMMANDS_SOURCE_SUBDIR,
+        );
         const sourceAgentsFilePath = resolveSourceAgentsFilePath(clonePath);
         if (!fs.existsSync(sourcePromptDir)) {
             return;
         }
 
         const promptFiles = listPromptFilesRecursive(sourcePromptDir);
+        const commandFiles = fs.existsSync(sourceCommandDir)
+            ? listCommandFilesRecursive(sourceCommandDir)
+            : [];
         const sourcePromptHashes = buildSourcePromptHashes(
             sourcePromptDir,
             promptFiles,
         );
+        const sourceCommandFileHashes = buildSourceCommandFileHashes(
+            sourceCommandDir,
+            commandFiles,
+        );
         const relativePromptPaths = Object.keys(sourcePromptHashes);
 
-        const storedSyncState =
-            readAgentPromptSyncStateFile(workspaceFolderPath);
+        const storedSyncState = readAgentSyncStateFile(workspaceFolderPath);
         let previousSourcePromptHashes =
             storedSyncState?.sourcePromptHashes ?? {};
+        const previousSourceCommandFileHashes =
+            storedSyncState?.sourceCommandFileHashes ?? {};
         const previousSourceAgentsFileHash =
             storedSyncState?.sourceAgentsFileHash;
         if (Object.keys(previousSourcePromptHashes).length === 0) {
@@ -1040,6 +1281,13 @@ export async function runStartupAgentPromptAutoUpdate({
                 targetPromptDir,
                 previousSourcePromptHashes,
             });
+        const { updatedCommandCount, skippedCommandCount } =
+            autoUpdateManagedCommandFiles({
+                sourceCommandDir,
+                commandFiles,
+                targetCommandDir,
+                previousSourceCommandFileHashes,
+            });
         const { updatedAgentsFile, skippedAgentsFile } = autoUpdateAgentsFile({
             sourceAgentsFilePath,
             workspaceFolderPath,
@@ -1057,23 +1305,31 @@ export async function runStartupAgentPromptAutoUpdate({
             sourceRepositorySha,
             syncedAtUtc,
         });
-        writeAgentPromptSyncStateFile({
+        writeAgentSyncStateFile({
             workspaceFolderPath,
             sourceRepositorySha,
             syncedAtUtc,
             sourcePromptHashes,
             sourceAgentsFileHash,
+            sourceCommandFileHashes,
         });
 
         if (
             updatedPromptCount > 0 ||
             skippedPromptCount > 0 ||
+            updatedCommandCount > 0 ||
+            skippedCommandCount > 0 ||
             updatedAgentsFile ||
             skippedAgentsFile
         ) {
             const promptSummary = `${updatedPromptCount} prompt file(s) updated${
                 skippedPromptCount > 0
                     ? `, ${skippedPromptCount} prompt file(s) not updated (local changes)`
+                    : ""
+            }`;
+            const commandSummary = `${updatedCommandCount} command file(s) updated${
+                skippedCommandCount > 0
+                    ? `, ${skippedCommandCount} command file(s) not updated (local changes)`
                     : ""
             }`;
             const agentsFileSummary = sourceAgentsFilePath
@@ -1084,7 +1340,7 @@ export async function runStartupAgentPromptAutoUpdate({
                       : ""
                 : "";
             void window.showInformationMessage(
-                `GSL prompt auto-update: ${promptSummary}${agentsFileSummary}.`,
+                `GSL prompt auto-update: ${promptSummary}, ${commandSummary}${agentsFileSummary}.`,
             );
         }
     } catch {
@@ -1175,10 +1431,28 @@ export async function runSyncAgentPromptsCommand({
             clonePath,
             GSL_AGENT_PROMPTS_SOURCE_SUBDIR,
         );
+        const sourceCommandDir = path.join(
+            clonePath,
+            GSL_AGENT_COMMANDS_SOURCE_SUBDIR,
+        );
         const sourceAgentsFilePath = resolveSourceAgentsFilePath(clonePath);
         if (!fs.existsSync(sourcePromptDir)) {
             throw new Error(
                 `Prompt source directory not found: ${GSL_AGENT_PROMPTS_SOURCE_SUBDIR}`,
+            );
+        }
+        if (!fs.existsSync(sourceCommandDir)) {
+            throw new Error(
+                `Command source directory not found: ${GSL_AGENT_COMMANDS_SOURCE_SUBDIR}`,
+            );
+        }
+        const requiredCommandFilePath = path.join(
+            sourceCommandDir,
+            GSL_COPILOT_CODE_REVIEW_COMMAND_FILE,
+        );
+        if (!fs.existsSync(requiredCommandFilePath)) {
+            throw new Error(
+                `Required command file not found: ${normalizeRelativePath(path.join(GSL_AGENT_COMMANDS_SOURCE_SUBDIR, GSL_COPILOT_CODE_REVIEW_COMMAND_FILE))}`,
             );
         }
 
@@ -1203,6 +1477,28 @@ export async function runSyncAgentPromptsCommand({
             keptManagedPromptPaths,
             deletedManagedPromptPaths,
         } = managedPromptSyncResult;
+
+        const commandFiles = listCommandFilesRecursive(sourceCommandDir);
+        const targetCommandDir = path.join(
+            workspaceFolder.uri.fsPath,
+            GSL_AGENT_COMMANDS_MANAGED_DIR,
+        );
+        const managedCommandSyncResult = await syncManagedCommandFiles({
+            sourceCommandDir,
+            commandFiles,
+            targetCommandDir,
+        });
+        if (!managedCommandSyncResult) {
+            return;
+        }
+        backupPathsCreated.push(...managedCommandSyncResult.backupPathsCreated);
+        const {
+            overwrittenManagedCommandPaths,
+            createdManagedCommandPaths,
+            alreadyUpToDateManagedCommandPaths,
+            keptManagedCommandPaths,
+            deletedManagedCommandPaths,
+        } = managedCommandSyncResult;
 
         const promptLocationsConfig = workspace
             .getConfiguration("chat")
@@ -1242,6 +1538,10 @@ export async function runSyncAgentPromptsCommand({
             sourcePromptDir,
             promptFiles,
         );
+        const sourceCommandFileHashes = buildSourceCommandFileHashes(
+            sourceCommandDir,
+            commandFiles,
+        );
         const versionFilePath = writeSyncVersionFile({
             workspaceFolderPath: workspaceFolder.uri.fsPath,
             sourceRepositoryUrl: GSL_AGENT_PROMPTS_REPO_SSH,
@@ -1249,12 +1549,13 @@ export async function runSyncAgentPromptsCommand({
             sourceRepositorySha,
             syncedAtUtc,
         });
-        writeAgentPromptSyncStateFile({
+        writeAgentSyncStateFile({
             workspaceFolderPath: workspaceFolder.uri.fsPath,
             sourceRepositorySha,
             syncedAtUtc,
             sourcePromptHashes,
             sourceAgentsFileHash,
+            sourceCommandFileHashes,
         });
         const versionFilePathForDisplay = path
             .relative(workspaceFolder.uri.fsPath, versionFilePath)
@@ -1265,24 +1566,22 @@ export async function runSyncAgentPromptsCommand({
                 .relative(workspaceFolder.uri.fsPath, backupPath)
                 .replace(/\\/g, "/"),
         );
-        const managedPromptSections = [
-            ...formatCountedSection(
-                "Overwritten",
-                overwrittenManagedPromptPaths,
-            ),
-            ...formatCountedSection("Created", createdManagedPromptPaths),
-            ...formatCountedSection(
-                "Already up to date",
-                alreadyUpToDateManagedPromptPaths,
-            ),
-            ...formatCountedSection("Kept existing", keptManagedPromptPaths),
-            ...formatCountedSection("Removed", deletedManagedPromptPaths),
-        ];
-        if (managedPromptSections.length === 0) {
-            managedPromptSections.push(
-                "- No managed prompt changes were detected.",
-            );
-        }
+        const managedPromptSections = buildManagedFileSections({
+            overwrittenPaths: overwrittenManagedPromptPaths,
+            createdPaths: createdManagedPromptPaths,
+            alreadyUpToDatePaths: alreadyUpToDateManagedPromptPaths,
+            keptPaths: keptManagedPromptPaths,
+            deletedPaths: deletedManagedPromptPaths,
+            emptyMessage: "- No managed prompt changes were detected.",
+        });
+        const managedCommandSections = buildManagedFileSections({
+            overwrittenPaths: overwrittenManagedCommandPaths,
+            createdPaths: createdManagedCommandPaths,
+            alreadyUpToDatePaths: alreadyUpToDateManagedCommandPaths,
+            keptPaths: keptManagedCommandPaths,
+            deletedPaths: deletedManagedCommandPaths,
+            emptyMessage: "- No managed command file changes were detected.",
+        });
         const backupSections =
             backupPathsForDisplay.length > 0
                 ? [
@@ -1303,10 +1602,15 @@ export async function runSyncAgentPromptsCommand({
             "### Overview",
             "",
             `- Synced **${promptFiles.length}** agent prompt file(s) to \`${GSL_AGENT_PROMPTS_MANAGED_DIR}\`.`,
+            `- Synced **${commandFiles.length}** agent command file(s) to \`${GSL_AGENT_COMMANDS_MANAGED_DIR}\`.`,
             "",
             "### Managed Prompt Results",
             "",
             ...managedPromptSections,
+            "",
+            "### Managed Command Results",
+            "",
+            ...managedCommandSections,
             "",
             ...backupSections,
             "### AGENTS File",
