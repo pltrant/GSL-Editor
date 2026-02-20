@@ -2,7 +2,7 @@
   "name": "gsl",
   "displayName": "GSL",
   "description": "GSL Editor",
-  "version": "1.17.2",
+  "version": "1.18.0",
   "publisher": "patricktrant",
   "author": {
     "name": "Patrick Trant",
@@ -26,23 +26,25 @@
     "onStartupFinished"
   ],
   "engines": {
-    "vscode": "^1.88.0"
+    "vscode": "^1.109.0"
   },
   "dependencies": {
     "csv-parse": "^5.5.5",
+    "diff": "^8.0.3",
     "vscode-languageclient": "^8.1.0",
     "vscode-languageserver": "^8.1.0"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.1",
     "@types/node": "^20.4.5",
-    "@types/vscode": "^1.88.0",
+    "@types/vscode": "^1.109.0",
     "@typescript-eslint/parser": "^6.2.0",
     "@vscode/test-electron": "^2.3.3",
     "esbuild": "^0.27.2",
     "eslint": "^8.46.0",
     "glob": "^11.1.0",
     "mocha": "^10.8.2",
+    "prettier": "^3.8.1",
     "typescript": "^5.1.6"
   },
   "scripts": {
@@ -51,7 +53,8 @@
     "compile": "tsc -b",
     "bundle": "esbuild extension.ts --bundle --outfile=extension.js --external:vscode --format=cjs --platform=node",
     "watch": "tsc --watch",
-    "test": "node test/runTests.js"
+    "test": "node test/runTests.js",
+    "format": "prettier --write \"**/*.ts\""
   },
   "main": "extension",
   "contributes": {
@@ -110,6 +113,107 @@
         "command": "gsl.alignComments",
         "title": "Align Document Comments",
         "category": "GSL"
+      },
+      {
+        "command": "gsl.diffWithPrime",
+        "title": "Diff with Prime Server",
+        "category": "GSL"
+      },
+      {
+        "command": "gsl.syncAgentPrompts",
+        "title": "Sync Agent Prompts",
+        "category": "GSL"
+      },
+      {
+        "command": "gsl.copilotCodeReview",
+        "title": "Copilot Code Review",
+        "category": "GSL"
+      }
+    ],
+    "languageModelTools": [
+      {
+        "name": "gsl_diff_with_prime",
+        "displayName": "Diff with Prime Server",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "diffWithPrime",
+        "icon": "$(diff)",
+        "userDescription": "Fetch the Prime (production) version of a GSL script and return the diff against the open local script for analysis.",
+        "modelDescription": "Downloads a GSL script from the Prime (production) server and compares it with a local open editor copy. Returns the unified diff text showing exactly what lines differ between Prime and Dev. Use this when the user wants to compare, diff, check differences, or understand what changed between their local script and the production/prime version. The tool returns the diff content directly — it does not open any UI. If scriptNumber is provided, the matching local script must already be open in the editor. Requires the GSL extension to be configured with Prime server credentials via 'GSL: User Setup'.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "scriptNumber": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 999999,
+              "description": "Optional GSL script number to diff. If omitted, uses the currently active editor's script. When provided, the matching local script must be open in an editor."
+            },
+            "context": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Number of unchanged context lines to show before and after each change. Defaults to 3 (same as git diff)."
+            },
+            "ignoreWhitespace": {
+              "type": "boolean",
+              "description": "If true, ignore leading/trailing whitespace when comparing lines."
+            }
+          }
+        }
+      },
+      {
+        "name": "gsl_fetch_prime_script",
+        "displayName": "Fetch Script from Prime Server",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "fetchPrimeScript",
+        "icon": "$(cloud-download)",
+        "userDescription": "Fetch the Prime (production) version of a GSL script and return its full content.",
+        "modelDescription": "Downloads a GSL script from the Prime (production) server and returns the full script content as text. Use this when the user wants to read, review, or inspect the production version of a script without comparing it to the local copy. The tool returns the raw script content directly — it does not open any UI. Requires the GSL extension to be configured with Prime server credentials via 'GSL: User Setup'.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "scriptNumber": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 999999,
+              "description": "Optional GSL script number to fetch. If omitted, uses the currently active editor's script."
+            }
+          }
+        }
+      },
+      {
+        "name": "gsl_compile_check",
+        "displayName": "Check Compiler Errors",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "checkGslCompilerErrors",
+        "icon": "$(cloud-upload)",
+        "userDescription": "Check a local GSL script for compiler errors by compiling it in an isolated safety script (S24661) on the development server.",
+        "modelDescription": "Use this tool whenever the task is to check, compile, or validate GSL script compiler errors/warnings. Prefer this tool over generic error tools for GSL compile checks. It compiles a local GSL script file on the development server and returns compiler output, including line-level errors and warnings, so the model can diagnose and fix compilation problems.",
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "filename"
+          ],
+          "properties": {
+            "filename": {
+              "type": "string",
+              "description": "Workspace-relative or absolute path to the .gsl file to upload, such as S24661.gsl."
+            }
+          }
+        }
+      },
+      {
+        "name": "gsl-get-current-author",
+        "displayName": "Get Current Author",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "getCurrentAuthor",
+        "icon": "$(account)",
+        "userDescription": "Return the current configured GSL author value in <AbbreviatedRealName>/<CharacterName> format.",
+        "modelDescription": "Returns the current GSL author value configured via User Setup. Use this when generating changelog entries or script metadata that needs the canonical author identity.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
       }
     ],
     "configuration": {
@@ -285,3 +389,4 @@
     ]
   }
 }
+

@@ -2,6 +2,34 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.18.0] - 2026-02-19
+
+**Important:** To fully benefit from this release, rerun `GSL: User Setup` so your stored Development and Prime configuration is refreshed.
+
+**To effectively use Copilot for reviewing/reading/writing/debugging GSL**, it is recommended to do the following:
+- Receive the private deploy key.
+- Run the `GSL: Sync Agent Prompts` command.
+- Specify the key file location.
+
+### Added
+
+- User Setup now stores both Development and Prime server credentials.
+- New "Diff with Prime Server" command to compare local scripts against Prime.
+- New "Sync Agent Prompts" command to download github copilot instructions/prompts.
+- Added Copilot tools to diff/fetch scripts from Prime and to run compiler checks using safety script `S24661`.
+- Added Copilot tool `gsl-get-current-author` to retrieve the current configured author for changelog/script metadata generation.
+
+### Fixed
+
+- Download script input no longer closes when VSCode loses focus.
+
+### Internal
+
+- Added Prettier and formatted TypeScript sources.
+- Added `.gitattributes` and normalized repository line endings.
+- Added `.AGENTS.md`.
+- Applied Copilot review cleanup for naming and unused imports.
+
 ## [1.17.1] - 2026-01-04
 
 ### Fixed

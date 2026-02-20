@@ -30,7 +30,7 @@ All notable changes will be documented in the [changelog](https://github.com/plt
 Run the following to create a custom build of the extension:
 
 - Update `package.json` version property to indicate pre-release build, e.g. `1.14.1-jul2025beta`
-- `git clean -dxf` (Optional; prevents packaging of unnecessary files. WARNING: WILL DELETE FILES THAT AREN'T CHECKED IN!)
+- `git clean -dxf` (WARNING: WILL DELETE FILES THAT AREN'T CHECKED IN! DO NOT DO THIS IF THERE ARE LOCAL UNTRACKED GIT CHANGES)
 - `npm ci`
 - `vsce package` (will run compile)
 
