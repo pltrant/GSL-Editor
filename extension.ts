@@ -15,6 +15,7 @@ import {
     DiagnosticCollection,
     CodeActionKind,
     Range,
+    CancellationToken,
 } from "vscode";
 
 import { workspace, window, commands, languages, extensions } from "vscode";
@@ -44,6 +45,7 @@ import {
     ScriptCompileResults,
     withEditorClient,
     EditorClientInterface,
+    ClientCancellationToken,
 } from "./gsl/editorClient";
 import { formatDate } from "./gsl/util/dateUtil";
 import { OutOfDateButtonManager } from "./gsl/status_bar/scriptOutOfDateButton";
@@ -1230,6 +1232,7 @@ export class VSCodeIntegration {
     async uploadScriptForAgent(
         script: number,
         document: TextDocument,
+        cancellationToken?: CancellationToken,
     ): Promise<ScriptCompileResults | undefined> {
         if (script !== 24661) {
             throw new Error(
@@ -1257,7 +1260,7 @@ export class VSCodeIntegration {
                 }
                 throw error;
             }
-        });
+        }, cancellationToken);
     }
 
     private registerCommands() {
@@ -1481,6 +1484,7 @@ export class VSCodeIntegration {
      */
     async withEditorClient<T>(
         task: (client: EditorClientInterface) => T,
+        cancellationToken?: ClientCancellationToken,
     ): Promise<T | undefined> {
         if (
             workspace.getConfiguration(GSL_LANGUAGE_ID).get(GSLX_DISABLE_LOGIN)
@@ -1526,6 +1530,7 @@ export class VSCodeIntegration {
                 },
             },
             task,
+            cancellationToken,
         );
     }
 }
