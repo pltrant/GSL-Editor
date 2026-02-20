@@ -96,6 +96,8 @@ const monthList = [
 
 const clientTimeout = 15000;
 const ssCheckeditTimeout = 7500;
+const compileTimeout = 15000;
+const withEditorClientTaskTimeout = 30000;
 
 export type InitOptions = {
     login: {
@@ -116,6 +118,11 @@ export type InitOptions = {
  */
 export type ClientTask<T> = (client: EditorClient) => T;
 
+export type ClientCancellationToken = {
+    readonly isCancellationRequested: boolean;
+    onCancellationRequested(listener: () => unknown): { dispose(): unknown };
+};
+
 /**
  * Provides an `EditorClient` object that is guaranteed to be exclusively owned
  * by the caller, so long as all other callers are using this function. This
@@ -127,8 +134,9 @@ export type ClientTask<T> = (client: EditorClient) => T;
 export const withEditorClient = async <T>(
     initOptions: InitOptions,
     task: ClientTask<T>,
+    cancellationToken?: ClientCancellationToken,
 ): Promise<T> => {
-    return processorSingleton.enqueueTask(initOptions, task);
+    return processorSingleton.enqueueTask(initOptions, task, cancellationToken);
 };
 
 /**
@@ -139,8 +147,13 @@ export const withEditorClient = async <T>(
 export const withPrimeEditorClient = async <T>(
     initOptions: InitOptions,
     task: ClientTask<T>,
+    cancellationToken?: ClientCancellationToken,
 ): Promise<T> => {
-    return primeProcessorSingleton.enqueueTask(initOptions, task);
+    return primeProcessorSingleton.enqueueTask(
+        initOptions,
+        task,
+        cancellationToken,
+    );
 };
 
 type TaskController<T> = {
@@ -148,6 +161,10 @@ type TaskController<T> = {
     initOptions: InitOptions;
     resolve: (result: T | Promise<T>) => void;
     reject: (error: Error) => void;
+    cancellationToken?: ClientCancellationToken;
+    cancellationSubscription?: { dispose(): unknown };
+    canceled: boolean;
+    settled: boolean;
 };
 
 class TaskQueueProcessor {
@@ -158,16 +175,123 @@ class TaskQueueProcessor {
     private taskQueue: TaskController<any>[];
     private isProcessingTask: boolean;
     private nextTick: NodeJS.Timeout | undefined;
+    private activeTask: TaskController<any> | undefined;
+    private activeTaskCancel: ((error: Error) => void) | undefined;
 
     constructor() {
         this.taskQueue = [];
         this.isProcessingTask = false;
         this.nextTick = undefined;
+        this.activeTask = undefined;
+        this.activeTaskCancel = undefined;
     }
 
-    enqueueTask<T>(initOptions: InitOptions, task: ClientTask<T>): Promise<T> {
+    private resetClient(): void {
+        if (!this.client) return;
+        try {
+            this.client.quit();
+        } catch (error) {
+            console.error("Failed to reset editor client", error);
+        }
+        this.client = undefined;
+    }
+
+    private async runTaskWithTimeout<T>(
+        task: ClientTask<T>,
+        client: EditorClient,
+    ): Promise<T> {
+        let timeout: NodeJS.Timeout;
+        const cancellationPromise = new Promise<never>((_, reject) => {
+            this.activeTaskCancel = reject;
+        });
+        const timeoutPromise = new Promise<never>((_, reject) => {
+            timeout = setTimeout(() => {
+                this.resetClient();
+                reject(
+                    new Error(
+                        `Editor client operation exceeded ${withEditorClientTaskTimeout}ms and was aborted.`,
+                    ),
+                );
+            }, withEditorClientTaskTimeout);
+        });
+
+        try {
+            return await Promise.race([
+                Promise.resolve(task(client)),
+                cancellationPromise,
+                timeoutPromise,
+            ]);
+        } finally {
+            clearTimeout(timeout!);
+            this.activeTaskCancel = undefined;
+        }
+    }
+
+    private cancelTask(
+        taskController: TaskController<any>,
+        reason: string,
+    ): void {
+        if (taskController.canceled || taskController.settled) {
+            return;
+        }
+        taskController.canceled = true;
+
+        const index = this.taskQueue.indexOf(taskController);
+        if (index >= 0) {
+            this.taskQueue.splice(index, 1);
+            taskController.reject(new Error(reason));
+            return;
+        }
+
+        if (this.activeTask === taskController) {
+            this.resetClient();
+            this.activeTaskCancel?.(new Error(reason));
+        }
+    }
+
+    enqueueTask<T>(
+        initOptions: InitOptions,
+        task: ClientTask<T>,
+        cancellationToken?: ClientCancellationToken,
+    ): Promise<T> {
         return new Promise<T>((resolve, reject) => {
-            this.taskQueue.push({ initOptions, task, resolve, reject });
+            if (cancellationToken?.isCancellationRequested) {
+                reject(new Error("Operation canceled."));
+                return;
+            }
+
+            let taskController: TaskController<T>;
+            const wrappedResolve = (result: T | Promise<T>) => {
+                if (taskController.settled) return;
+                taskController.settled = true;
+                taskController.cancellationSubscription?.dispose();
+                resolve(result);
+            };
+            const wrappedReject = (error: Error) => {
+                if (taskController.settled) return;
+                taskController.settled = true;
+                taskController.cancellationSubscription?.dispose();
+                reject(error);
+            };
+
+            taskController = {
+                initOptions,
+                task,
+                resolve: wrappedResolve,
+                reject: wrappedReject,
+                cancellationToken,
+                canceled: false,
+                settled: false,
+            };
+
+            if (cancellationToken) {
+                taskController.cancellationSubscription =
+                    cancellationToken.onCancellationRequested(() => {
+                        this.cancelTask(taskController, "Operation canceled.");
+                    });
+            }
+
+            this.taskQueue.push(taskController);
             this.scheduleTick(0);
         });
     }
@@ -186,19 +310,25 @@ class TaskQueueProcessor {
             this.scheduleTick(TaskQueueProcessor.FREQUENCY_MILLIS);
             return;
         }
-        const { initOptions, task, resolve, reject } = this.taskQueue.shift()!;
+        const taskController = this.taskQueue.shift()!;
+        if (taskController.canceled || taskController.settled) {
+            if (this.taskQueue.length > 0) {
+                this.scheduleTick(TaskQueueProcessor.FREQUENCY_MILLIS);
+            }
+            return;
+        }
+        const { initOptions, task, resolve, reject } = taskController;
 
         this.isProcessingTask = true;
+        this.activeTask = taskController;
         try {
             const client = await this.ensureClient(initOptions);
-            let result = await task(client);
-            while (result && result instanceof Promise) {
-                result = await result;
-            }
+            const result = await this.runTaskWithTimeout(task, client);
             resolve(result);
         } catch (e: unknown) {
             reject(e instanceof Error ? e : new Error(String(e)));
         } finally {
+            this.activeTask = undefined;
             this.isProcessingTask = false;
             if (this.taskQueue.length > 0) {
                 this.scheduleTick(TaskQueueProcessor.FREQUENCY_MILLIS);
@@ -214,12 +344,7 @@ class TaskQueueProcessor {
             : undefined;
         // Create a new client if needed
         if (this.client && !this.client.hasServerConnection()) {
-            try {
-                this.client.quit();
-            } catch (e) {
-                console.log(e);
-            }
-            this.client = undefined;
+            this.resetClient();
         }
         if (!this.client) {
             this.client = new EditorClient({
@@ -530,14 +655,30 @@ class EditorClient extends BaseGameClient {
                 errorList: [],
                 status: ScriptCompileStatus.Unknown,
             };
+            let timeout: NodeJS.Timeout;
+            const fail = (reason: string) => {
+                this.off("text", processText);
+                clearTimeout(timeout);
+                reject(new Error(reason));
+            };
+            const resetTimeout = () => {
+                clearTimeout(timeout);
+                timeout = setTimeout(
+                    () => fail("Script upload/compile timed out."),
+                    compileTimeout,
+                );
+            };
             const output = new OutputProcessor((line: string) => {
                 let match: RegExpMatchArray | null;
                 if (rx_aborted.test(line) || rx_compiled.test(line)) {
+                    resetTimeout();
                     this.off("text", processText);
+                    clearTimeout(timeout);
                     resolve(compileResults);
                     return;
                 }
                 if (rx_ready.test(line)) {
+                    resetTimeout();
                     compileResults.status = ScriptCompileStatus.Uploading;
                     lines.forEach((line) => this.send(line));
                     compileResults.status = ScriptCompileStatus.Uploaded;
@@ -545,6 +686,7 @@ class EditorClient extends BaseGameClient {
                 }
                 match = line.match(rx_compiling);
                 if (match && match.groups) {
+                    resetTimeout();
                     compileResults.status = ScriptCompileStatus.Compiling;
                     compileResults.script = Number(match.groups.script);
                     compileResults.path = match.groups.path;
@@ -552,6 +694,7 @@ class EditorClient extends BaseGameClient {
                 }
                 match = line.match(rx_compile_error);
                 if (match && match.groups) {
+                    resetTimeout();
                     const line = Number(match.groups.line);
                     const message = match.groups.message;
                     compileResults.errorList.push({ line, message });
@@ -559,6 +702,7 @@ class EditorClient extends BaseGameClient {
                 }
                 match = line.match(rx_compile_ok);
                 if (match && match.groups) {
+                    resetTimeout();
                     compileResults.status = ScriptCompileStatus.Compiled;
                     compileResults.warnings = Number(match.groups.warnings);
                     compileResults.bytes = Number(
@@ -571,6 +715,7 @@ class EditorClient extends BaseGameClient {
                 }
                 match = line.match(rx_compile_fail);
                 if (match && match.groups) {
+                    resetTimeout();
                     compileResults.status = ScriptCompileStatus.Failed;
                     compileResults.errors = Number(match.groups.errors);
                     compileResults.warnings = Number(match.groups.warnings);
@@ -583,20 +728,24 @@ class EditorClient extends BaseGameClient {
                     if (
                         compileResults.status === ScriptCompileStatus.Uploaded
                     ) {
+                        resetTimeout();
                         this.send("G");
                     } else if (
                         compileResults.status === ScriptCompileStatus.Compiled
                     ) {
+                        resetTimeout();
                         await this.exitModifyScript();
                     } else if (
                         compileResults.status === ScriptCompileStatus.Failed
                     ) {
+                        resetTimeout();
                         await this.exitModifyScript();
                     }
                     output.flush();
                 }
             };
             this.on("text", processText);
+            resetTimeout();
             this.trySend(newScript ? this.newLine + "C" : "Z");
         });
     }

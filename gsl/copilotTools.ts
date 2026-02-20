@@ -218,6 +218,7 @@ class DiffWithPrimeTool implements vscode.LanguageModelTool<IDiffWithPrimeParams
                 "GSL extension is not active. Open a GSL file to activate it.",
             );
         }
+        const vsc = vscRef;
 
         const { scriptNumber, document } = resolveScriptNumber(
             options.input.scriptNumber,
@@ -234,7 +235,7 @@ class DiffWithPrimeTool implements vscode.LanguageModelTool<IDiffWithPrimeParams
 
         try {
             const { localContent, primeContent, isNewOnPrime } =
-                await vscRef.fetchPrimeScriptDiff(scriptNumber, document);
+                await vsc.fetchPrimeScriptDiff(scriptNumber, document);
 
             if (isNewOnPrime) {
                 return new vscode.LanguageModelToolResult([
@@ -369,12 +370,17 @@ class CheckCompilerErrorsTool implements vscode.LanguageModelTool<IUploadScriptP
 
     async invoke(
         options: vscode.LanguageModelToolInvocationOptions<IUploadScriptParams>,
-        _token: vscode.CancellationToken,
+        token: vscode.CancellationToken,
     ): Promise<vscode.LanguageModelToolResult> {
         if (!vscRef) {
             throw new Error(
                 "GSL extension is not active. Open a GSL file to activate it.",
             );
+        }
+        const vsc = vscRef;
+
+        if (token.isCancellationRequested) {
+            throw new Error("Compiler check canceled.");
         }
 
         const sourceDocument = await openUploadDocument(options.input.filename);
@@ -397,9 +403,10 @@ class CheckCompilerErrorsTool implements vscode.LanguageModelTool<IUploadScriptP
         const safetyDocument =
             await vscode.workspace.openTextDocument(safetyScriptUri);
 
-        const compileResults = await vscRef.uploadScriptForAgent(
+        const compileResults = await vsc.uploadScriptForAgent(
             AGENT_UPLOAD_SCRIPT_NUMBER,
             safetyDocument,
+            token,
         );
 
         if (!compileResults) {
