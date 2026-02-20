@@ -2,7 +2,7 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
-## [1.18.0] - 2026-02-19
+## [1.18.0] - 2026-02-20
 
 **Important:** To fully benefit from this release, rerun `GSL: User Setup` so your stored Development and Prime configuration is refreshed.
 
@@ -13,9 +13,9 @@ All notable changes to the GSL Editor extension will be documented in this file.
 
 ### Added
 
-- User Setup now stores both Development and Prime server credentials.
-- New "Diff with Prime Server" command to compare local scripts against Prime.
-- New "Sync Agent Prompts" command to download github copilot instructions/prompts.
+- `User Setup` now stores both Development and Prime server credentials.
+- New `Diff with Prime Server` command to compare local scripts against Prime.
+- New `Sync Agent Prompts` command to download github copilot instructions/prompts.
 - Added Copilot tools to diff/fetch scripts from Prime and to run compiler checks using safety script `S24661`.
 - Added Copilot tool `gsl-get-current-author` to retrieve the current configured author for changelog/script metadata generation.
 
