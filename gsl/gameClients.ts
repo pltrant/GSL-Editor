@@ -138,6 +138,19 @@ export class BaseGameClient extends EventEmitter {
         this.logStream = fs.createWriteStream(this.log, { flags: "a" });
         return true;
     }
+
+    destroy(): void {
+        if (this.logStream) {
+            this.logStream.end();
+            this.logStream = undefined;
+        }
+        try {
+            this.quit();
+        } catch {
+            // Ignore quit errors during forced reset.
+        }
+        this.removeAllListeners();
+    }
 }
 
 class WizardGameClient extends BaseGameClient {
