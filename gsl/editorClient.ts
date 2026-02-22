@@ -146,13 +146,22 @@ export const withPrimeEditorClient = async <T>(
 type TaskController<T> = {
     task: ClientTask<T>;
     initOptions: InitOptions;
-    resolve: (result: T | Promise<T>) => void;
+    resolve: (result: T) => void;
     reject: (error: Error) => void;
 };
+
+class EditorClientTaskTimeoutError extends Error {
+    constructor(timeoutMillis: number) {
+        super(`Editor client task timed out after ${timeoutMillis}ms.`);
+        this.name = "EditorClientTaskTimeoutError";
+    }
+}
 
 class TaskQueueProcessor {
     /** Frequency of queue processing */
     private static FREQUENCY_MILLIS = 250;
+    /** Max time a task may hold the editor client lock */
+    private static TASK_TIMEOUT_MILLIS = clientTimeout;
 
     private client: EditorClient | undefined;
     private taskQueue: TaskController<any>[];
@@ -190,20 +199,51 @@ class TaskQueueProcessor {
 
         this.isProcessingTask = true;
         try {
-            const client = await this.ensureClient(initOptions);
-            let result = await task(client);
-            while (result && result instanceof Promise) {
-                result = await result;
-            }
+            const result = await this.runTaskWithTimeout(async () => {
+                const client = await this.ensureClient(initOptions);
+                return task(client);
+            });
             resolve(result);
         } catch (e: unknown) {
-            reject(e instanceof Error ? e : new Error(String(e)));
+            const error = e instanceof Error ? e : new Error(String(e));
+            if (error instanceof EditorClientTaskTimeoutError) {
+                this.resetClient();
+            }
+            reject(error);
         } finally {
             this.isProcessingTask = false;
             if (this.taskQueue.length > 0) {
                 this.scheduleTick(TaskQueueProcessor.FREQUENCY_MILLIS);
             }
         }
+    }
+
+    private runTaskWithTimeout<T>(task: () => Promise<T> | T): Promise<T> {
+        return new Promise<T>((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                reject(
+                    new EditorClientTaskTimeoutError(
+                        TaskQueueProcessor.TASK_TIMEOUT_MILLIS,
+                    ),
+                );
+            }, TaskQueueProcessor.TASK_TIMEOUT_MILLIS);
+
+            Promise.resolve()
+                .then(() => task())
+                .then(resolve, reject)
+                .finally(() => clearTimeout(timeout));
+        });
+    }
+
+    private resetClient(): void {
+        if (!this.client) return;
+        try {
+            this.client.quit();
+        } catch {
+            // Ignore quit errors during forced reset.
+        }
+        this.client.removeAllListeners();
+        this.client = undefined;
     }
 
     async ensureClient(options: InitOptions): Promise<EditorClient> {
