@@ -19,52 +19,38 @@ const GSL_AGENT_PROMPTS_REPO_SSH =
     "git@github.com:pltrant/GSL-Editor-Agents.git";
 const GSL_AGENT_PROMPTS_BRANCH = "main";
 const GSL_AGENTS_FILE = "AGENTS.md";
-const GSL_PROMPTS_SOURCE_SUBDIR = path.join("src", "prompts");
-const GSL_AGENTS_SOURCE_SUBDIR = path.join("src", "agents");
-const GSL_INSTRUCTIONS_SOURCE_SUBDIR = path.join("src", "instructions");
-const GSL_SKILLS_SOURCE_SUBDIR = path.join("src", "skills");
-const GSL_AGENT_COMMANDS_SOURCE_SUBDIR = path.join(
-    "src",
-    "gsl-extension-builtin-commands",
-);
 const GSL_COPILOT_CODE_REVIEW_COMMAND_FILE = "copilotCodeReview.command.txt";
-const GSL_MANAGED_ROOT_DIR = path.join(".github", "gsl-managed");
 const GSL_SYNC_SUMMARY_FILE = path.join(
-    GSL_MANAGED_ROOT_DIR,
+    ".github",
+    "gsl-managed",
     "sync-summary.md",
-);
-export const GSL_AGENT_PROMPTS_MANAGED_DIR = path.join(
-    GSL_MANAGED_ROOT_DIR,
-    "prompts",
-);
-const GSL_AGENT_MANAGED_AGENTS_DIR = path.join(GSL_MANAGED_ROOT_DIR, "agents");
-const GSL_AGENT_MANAGED_INSTRUCTIONS_DIR = path.join(
-    GSL_MANAGED_ROOT_DIR,
-    "instructions",
-);
-const GSL_AGENT_MANAGED_SKILLS_DIR = path.join(GSL_MANAGED_ROOT_DIR, "skills");
-export const GSL_AGENT_COMMANDS_MANAGED_DIR = path.join(
-    GSL_MANAGED_ROOT_DIR,
-    "gsl-extension-builtin-commands",
 );
 export const GSL_AGENT_PROMPTS_VERSION_FILE = path.join(
     ".github",
+    "gsl-managed",
     "version.txt",
 );
 const GSL_AGENT_PROMPTS_STATE_FILE = path.join(
     ".github",
+    "gsl-managed",
     "gsl-agent-prompts-state.json",
 );
 const OVERWRITE_AGENTS_FILE_LABEL =
     "Overwrite workspace AGENTS.md (create backup first)";
 const KEEP_AGENTS_FILE_LABEL = "Keep existing AGENTS.md";
+const MANAGED_PROMPTS_FILE_SET_ID = "prompts";
+const MANAGED_COMMANDS_FILE_SET_ID = "gsl-extension-builtin-commands";
 
 interface ManagedFileSet {
     id: string;
     displayName: string;
     sourceSubdir: string;
     targetSubdir: string;
-    registerForCopilot: boolean;
+    chatLocationSetting?:
+        | "promptFilesLocations"
+        | "instructionsFilesLocations"
+        | "agentFilesLocations"
+        | "agentSkillsLocations";
 }
 
 interface ManagedFileSetSourceData {
@@ -76,7 +62,6 @@ interface ManagedFileSetSourceData {
 
 interface ManagedFileSetSyncData {
     fileSet: ManagedFileSet;
-    sourceFileCount: number;
     syncResult: ManagedFileSyncResult;
 }
 
@@ -104,45 +89,70 @@ interface ManagedFileAutoUpdateResult {
 interface AgentsFileSyncResult {
     cancelled: boolean;
     summary: string;
+    status:
+        | "no_source"
+        | "created"
+        | "overwritten"
+        | "kept_existing"
+        | "up_to_date";
 }
 
 const MANAGED_FILE_SETS: ManagedFileSet[] = [
     {
-        id: "prompts",
+        id: MANAGED_PROMPTS_FILE_SET_ID,
         displayName: "Prompts",
-        sourceSubdir: GSL_PROMPTS_SOURCE_SUBDIR,
-        targetSubdir: GSL_AGENT_PROMPTS_MANAGED_DIR,
-        registerForCopilot: true,
+        sourceSubdir: path.join("src", "prompts"),
+        targetSubdir: path.join(".github", "gsl-managed", "prompts"),
+        chatLocationSetting: "promptFilesLocations",
     },
     {
         id: "agents",
-        displayName: "Agents",
-        sourceSubdir: GSL_AGENTS_SOURCE_SUBDIR,
-        targetSubdir: GSL_AGENT_MANAGED_AGENTS_DIR,
-        registerForCopilot: true,
+        displayName: "Custom Agents",
+        sourceSubdir: path.join("src", "agents"),
+        targetSubdir: path.join(".github", "gsl-managed", "agents"),
+        chatLocationSetting: "agentFilesLocations",
     },
     {
         id: "instructions",
         displayName: "Instructions",
-        sourceSubdir: GSL_INSTRUCTIONS_SOURCE_SUBDIR,
-        targetSubdir: GSL_AGENT_MANAGED_INSTRUCTIONS_DIR,
-        registerForCopilot: true,
+        sourceSubdir: path.join("src", "instructions"),
+        targetSubdir: path.join(".github", "gsl-managed", "instructions"),
+        chatLocationSetting: "instructionsFilesLocations",
     },
     {
         id: "skills",
         displayName: "Skills",
-        sourceSubdir: GSL_SKILLS_SOURCE_SUBDIR,
-        targetSubdir: GSL_AGENT_MANAGED_SKILLS_DIR,
-        registerForCopilot: true,
+        sourceSubdir: path.join("src", "skills"),
+        targetSubdir: path.join(".github", "gsl-managed", "skills"),
+        chatLocationSetting: "agentSkillsLocations",
     },
     {
-        id: "gsl-extension-builtin-commands",
+        id: MANAGED_COMMANDS_FILE_SET_ID,
         displayName: "Builtin Commands",
-        sourceSubdir: GSL_AGENT_COMMANDS_SOURCE_SUBDIR,
-        targetSubdir: GSL_AGENT_COMMANDS_MANAGED_DIR,
-        registerForCopilot: false,
+        sourceSubdir: path.join("src", "gsl-extension-builtin-commands"),
+        targetSubdir: path.join(
+            ".github",
+            "gsl-managed",
+            "gsl-extension-builtin-commands",
+        ),
     },
 ];
+
+function getManagedFileSetById(fileSetId: string): ManagedFileSet {
+    const fileSet = MANAGED_FILE_SETS.find(({ id }) => id === fileSetId);
+    if (!fileSet) {
+        throw new Error(`Unknown managed file set: ${fileSetId}`);
+    }
+    return fileSet;
+}
+
+export const GSL_AGENT_PROMPTS_MANAGED_DIR = getManagedFileSetById(
+    MANAGED_PROMPTS_FILE_SET_ID,
+).targetSubdir;
+
+export const GSL_AGENT_COMMANDS_MANAGED_DIR = getManagedFileSetById(
+    MANAGED_COMMANDS_FILE_SET_ID,
+).targetSubdir;
 
 function runCommand(
     command: string,
@@ -311,6 +321,9 @@ function listFilesRecursive(rootDir: string): string[] {
             files.push(...listFilesRecursive(fullPath));
             continue;
         }
+        if (entry.name.toLowerCase() === ".gitignore") {
+            continue;
+        }
         if (entry.isFile()) {
             files.push(fullPath);
         }
@@ -349,12 +362,11 @@ function writeSyncVersionFile({
     sourceRepositorySha: string;
     syncedAtUtc: string;
 }): string {
-    const workspaceGithubDir = path.join(workspaceFolderPath, ".github");
-    fs.mkdirSync(workspaceGithubDir, { recursive: true });
     const versionFilePath = path.join(
         workspaceFolderPath,
         GSL_AGENT_PROMPTS_VERSION_FILE,
     );
+    fs.mkdirSync(path.dirname(versionFilePath), { recursive: true });
     const versionFileContents = [
         `source_repository_url=${sourceRepositoryUrl}`,
         `source_repository_branch=${sourceRepositoryBranch}`,
@@ -364,6 +376,28 @@ function writeSyncVersionFile({
     ].join("\n");
     fs.writeFileSync(versionFilePath, versionFileContents, "utf8");
     return versionFilePath;
+}
+
+function readSourceRepositoryShaFromVersionFile(
+    workspaceFolderPath: string,
+): string | undefined {
+    const versionFilePath = path.join(
+        workspaceFolderPath,
+        GSL_AGENT_PROMPTS_VERSION_FILE,
+    );
+    if (!fs.existsSync(versionFilePath)) {
+        return undefined;
+    }
+
+    const lines = fs.readFileSync(versionFilePath, "utf8").split(/\r?\n/);
+    const shaLine = lines.find((line) =>
+        line.startsWith("source_repository_sha="),
+    );
+    if (!shaLine) {
+        return undefined;
+    }
+    const sha = shaLine.split("=", 2)[1]?.trim();
+    return isSha40(sha) ? sha : undefined;
 }
 
 function normalizeTextForComparison(text: string): string {
@@ -752,6 +786,7 @@ async function syncAgentsFile({
         return {
             cancelled: false,
             summary: "No source AGENTS.md found in synced agent repo.",
+            status: "no_source",
         };
     }
 
@@ -764,6 +799,7 @@ async function syncAgentsFile({
         return {
             cancelled: false,
             summary: "Created AGENTS.md from synced source.",
+            status: "created",
         };
     }
 
@@ -776,6 +812,7 @@ async function syncAgentsFile({
         return {
             cancelled: false,
             summary: "Kept existing AGENTS.md (already up to date).",
+            status: "up_to_date",
         };
     }
 
@@ -784,6 +821,7 @@ async function syncAgentsFile({
         return {
             cancelled: false,
             summary: "Overwrote AGENTS.md with synced source.",
+            status: "overwritten",
         };
     }
 
@@ -802,6 +840,7 @@ async function syncAgentsFile({
         return {
             cancelled: true,
             summary: "Kept existing AGENTS.md.",
+            status: "kept_existing",
         };
     }
 
@@ -809,6 +848,7 @@ async function syncAgentsFile({
         return {
             cancelled: false,
             summary: "Kept existing AGENTS.md.",
+            status: "kept_existing",
         };
     }
 
@@ -819,6 +859,7 @@ async function syncAgentsFile({
     return {
         cancelled: false,
         summary: "Overwrote AGENTS.md with synced source.",
+        status: "overwritten",
     };
 }
 
@@ -977,53 +1018,71 @@ function resolveManagedFileSetSourceData(
 }
 
 async function ensureCopilotLocationsRegistered(): Promise<void> {
-    const requiredLocations = MANAGED_FILE_SETS.filter(
-        (fileSet) => fileSet.registerForCopilot,
-    ).map((fileSet) => fileSet.targetSubdir);
-    if (requiredLocations.length === 0) {
+    const requiredLocationsBySetting = MANAGED_FILE_SETS.reduce<
+        Record<string, string[]>
+    >((acc, { chatLocationSetting, targetSubdir }) => {
+        if (!chatLocationSetting) {
+            return acc;
+        }
+
+        acc[chatLocationSetting] ??= [];
+        acc[chatLocationSetting].push(normalizeRelativePath(targetSubdir));
+        return acc;
+    }, {});
+    if (Object.keys(requiredLocationsBySetting).length === 0) {
         return;
     }
 
-    const promptLocationsConfig = workspace
-        .getConfiguration("chat")
-        .get<Record<string, boolean> | string[]>("promptFilesLocations");
-    const promptLocations: Record<string, boolean> = Array.isArray(
-        promptLocationsConfig,
-    )
-        ? promptLocationsConfig.reduce<Record<string, boolean>>(
-              (acc, location) => {
-                  acc[location] = true;
-                  return acc;
-              },
-              {},
-          )
-        : { ...(promptLocationsConfig ?? {}) };
+    for (const [settingKey, requiredLocations] of Object.entries(
+        requiredLocationsBySetting,
+    )) {
+        const locationConfig = workspace
+            .getConfiguration("chat")
+            .get<Record<string, boolean> | string[]>(settingKey);
+        const shouldMigrateLegacyArray = Array.isArray(locationConfig);
+        const existingLocations = shouldMigrateLegacyArray
+            ? locationConfig
+            : Object.entries(locationConfig ?? {})
+                  .filter(([, isEnabled]) => Boolean(isEnabled))
+                  .map(([location]) => location);
+        const locationSet = new Set(
+            existingLocations.map((location) =>
+                normalizeRelativePath(location),
+            ),
+        );
 
-    let shouldWrite = false;
-    for (const requiredLocation of requiredLocations) {
-        if (promptLocations[requiredLocation]) {
+        let shouldWrite = shouldMigrateLegacyArray;
+        for (const requiredLocation of requiredLocations) {
+            if (locationSet.has(requiredLocation)) {
+                continue;
+            }
+            locationSet.add(requiredLocation);
+            shouldWrite = true;
+        }
+
+        if (!shouldWrite) {
             continue;
         }
-        promptLocations[requiredLocation] = true;
-        shouldWrite = true;
-    }
 
-    if (!shouldWrite) {
-        return;
+        const locations = Array.from(locationSet.values())
+            .sort((a, b) => a.localeCompare(b))
+            .reduce<Record<string, boolean>>((acc, location) => {
+                acc[location] = true;
+                return acc;
+            }, {});
+        await workspace
+            .getConfiguration("chat")
+            .update(settingKey, locations, ConfigurationTarget.Workspace);
     }
-    await workspace
-        .getConfiguration("chat")
-        .update(
-            "promptFilesLocations",
-            promptLocations,
-            ConfigurationTarget.Workspace,
-        );
 }
 
 function warnIfCopilotReviewCommandMissing(clonePath: string): void {
+    const commandFileSetSourceSubdir = getManagedFileSetById(
+        MANAGED_COMMANDS_FILE_SET_ID,
+    ).sourceSubdir;
     const requiredCommandFilePath = path.join(
         clonePath,
-        GSL_AGENT_COMMANDS_SOURCE_SUBDIR,
+        commandFileSetSourceSubdir,
         GSL_COPILOT_CODE_REVIEW_COMMAND_FILE,
     );
     if (fs.existsSync(requiredCommandFilePath)) {
@@ -1032,7 +1091,7 @@ function warnIfCopilotReviewCommandMissing(clonePath: string): void {
 
     const sourcePath = normalizeRelativePath(
         path.join(
-            GSL_AGENT_COMMANDS_SOURCE_SUBDIR,
+            commandFileSetSourceSubdir,
             GSL_COPILOT_CODE_REVIEW_COMMAND_FILE,
         ),
     );
@@ -1045,63 +1104,124 @@ function formatMarkdownBulletList(items: string[]): string {
     if (items.length === 0) {
         return "- none";
     }
-    return items.map((item) => `- ${item}`).join("\n");
+    return items.map((item) => `- \`${item}\``).join("\n");
 }
 
-function buildManagedSetSummarySection({
-    fileSet,
-    sourceFileCount,
-    syncResult,
-}: ManagedFileSetSyncData): string[] {
-    return [
-        `### ${fileSet.displayName}`,
-        "",
-        `- Source files: ${sourceFileCount}`,
-        `- Overwritten: ${syncResult.overwrittenPaths.length}`,
-        `- Created: ${syncResult.createdPaths.length}`,
-        `- Already up to date: ${syncResult.alreadyUpToDatePaths.length}`,
-        `- Kept existing: ${syncResult.keptPaths.length}`,
-        `- Removed: ${syncResult.deletedPaths.length}`,
-        `- Backups created: ${syncResult.backupPathsCreated.length}`,
-        "",
-    ];
+function collectChangedManagedFilePaths(
+    managedSetSyncData: ManagedFileSetSyncData[],
+): string[] {
+    const changedPaths = new Array<string>();
+    for (const { fileSet, syncResult } of managedSetSyncData) {
+        for (const relativePath of syncResult.overwrittenPaths) {
+            changedPaths.push(
+                `Updated ${normalizeRelativePath(path.join(fileSet.targetSubdir, relativePath))}`,
+            );
+        }
+        for (const relativePath of syncResult.createdPaths) {
+            changedPaths.push(
+                `Added ${normalizeRelativePath(path.join(fileSet.targetSubdir, relativePath))}`,
+            );
+        }
+        for (const relativePath of syncResult.deletedPaths) {
+            changedPaths.push(
+                `Deleted ${normalizeRelativePath(path.join(fileSet.targetSubdir, relativePath))}`,
+            );
+        }
+    }
+    return changedPaths;
 }
 
 function buildSyncSummaryMarkdown({
+    previousSourceRepositorySha,
     sourceRepositorySha,
-    syncedAtUtc,
     managedSetSyncData,
-    backupPathsForDisplay,
-    agentsFileSummary,
+    agentsFileResult,
+    backupCount,
 }: {
+    previousSourceRepositorySha?: string;
     sourceRepositorySha: string;
-    syncedAtUtc: string;
     managedSetSyncData: ManagedFileSetSyncData[];
-    backupPathsForDisplay: string[];
-    agentsFileSummary: string;
+    agentsFileResult: AgentsFileSyncResult;
+    backupCount: number;
 }): string {
+    const updatedCount = managedSetSyncData.reduce(
+        (count, { syncResult }) => count + syncResult.overwrittenPaths.length,
+        0,
+    );
+    const createdCount = managedSetSyncData.reduce(
+        (count, { syncResult }) => count + syncResult.createdPaths.length,
+        0,
+    );
+    const removedCount = managedSetSyncData.reduce(
+        (count, { syncResult }) => count + syncResult.deletedPaths.length,
+        0,
+    );
+    const keptCount = managedSetSyncData.reduce(
+        (count, { syncResult }) => count + syncResult.keptPaths.length,
+        0,
+    );
+    const changedManagedFilePaths =
+        collectChangedManagedFilePaths(managedSetSyncData);
+
+    const resultParts = new Array<string>();
+    if (updatedCount > 0) {
+        resultParts.push(`Updated ${updatedCount} file(s)`);
+    }
+    if (createdCount > 0) {
+        resultParts.push(`Created ${createdCount} file(s)`);
+    }
+    if (removedCount > 0) {
+        resultParts.push(`Removed ${removedCount} file(s)`);
+    }
+    if (backupCount > 0) {
+        resultParts.push(`Backed up ${backupCount} file(s)`);
+    }
+    if (keptCount > 0) {
+        resultParts.push(`Kept ${keptCount} existing file(s)`);
+    }
+    if (agentsFileResult.status === "created") {
+        resultParts.push("Created AGENTS.md");
+    }
+    if (agentsFileResult.status === "overwritten") {
+        resultParts.push("Updated AGENTS.md");
+    }
+    if (agentsFileResult.status === "kept_existing") {
+        resultParts.push("Kept existing AGENTS.md");
+    }
+
+    const resultLine =
+        resultParts.length > 0
+            ? `- ${resultParts.join(", ")}.`
+            : "- No file changes.";
+    const shouldShowAgentsSection =
+        agentsFileResult.status === "created" ||
+        agentsFileResult.status === "overwritten" ||
+        agentsFileResult.status === "kept_existing";
+
     return [
         "# GSL Sync Results",
         "",
-        "## Overview",
+        "## Result",
+        "",
+        resultLine,
+        "",
+        ...(changedManagedFilePaths.length > 0
+            ? [
+                  "## Changed Files",
+                  "",
+                  formatMarkdownBulletList(changedManagedFilePaths),
+                  "",
+              ]
+            : []),
+        ...(shouldShowAgentsSection
+            ? ["## AGENTS.md", "", `- ${agentsFileResult.summary}`, ""]
+            : []),
+        "## Sync Metadata",
         "",
         `- Source repository: \`${GSL_AGENT_PROMPTS_REPO_SSH}\``,
         `- Source branch: \`${GSL_AGENT_PROMPTS_BRANCH}\``,
-        `- Source SHA: \`${sourceRepositorySha}\``,
-        `- Synced at (UTC): \`${syncedAtUtc}\``,
-        "",
-        "## Managed File Sets",
-        "",
-        ...managedSetSyncData.flatMap((syncData) =>
-            buildManagedSetSummarySection(syncData),
-        ),
-        "## AGENTS.md",
-        "",
-        `- ${agentsFileSummary}`,
-        "",
-        "## Backup Files",
-        "",
-        formatMarkdownBulletList(backupPathsForDisplay),
+        `- Previous source SHA: \`${previousSourceRepositorySha ?? "N/A"}\``,
+        `- New source SHA: \`${sourceRepositorySha}\``,
         "",
     ].join("\n");
 }
@@ -1270,6 +1390,10 @@ export async function runSyncAgentPromptsCommand({
         "Syncing GSL managed customizations...",
         60000,
     );
+    const previousSourceRepositorySha =
+        readAgentSyncStateFile(workspaceFolder.uri.fsPath)
+            ?.sourceRepositorySha ??
+        readSourceRepositoryShaFromVersionFile(workspaceFolder.uri.fsPath);
     let tempRootPath: string | undefined;
     try {
         const deployKey = await resolveAgentPromptsDeployKey(context);
@@ -1323,7 +1447,6 @@ export async function runSyncAgentPromptsCommand({
             backupPathsCreated.push(...syncResult.backupPathsCreated);
             managedSetSyncData.push({
                 fileSet,
-                sourceFileCount: sourceFiles.length,
                 syncResult,
             });
             sourceManagedFileHashes[fileSet.id] = sourceHashes;
@@ -1358,17 +1481,12 @@ export async function runSyncAgentPromptsCommand({
                 : undefined,
         });
 
-        const backupPathsForDisplay = backupPathsCreated.map((backupPath) =>
-            normalizeRelativePath(
-                path.relative(workspaceFolder.uri.fsPath, backupPath),
-            ),
-        );
         const summaryMarkdown = buildSyncSummaryMarkdown({
+            previousSourceRepositorySha,
             sourceRepositorySha,
-            syncedAtUtc,
             managedSetSyncData,
-            backupPathsForDisplay,
-            agentsFileSummary: agentsFileResult.summary,
+            agentsFileResult,
+            backupCount: backupPathsCreated.length,
         });
         const summaryFilePath = path.join(
             workspaceFolder.uri.fsPath,
