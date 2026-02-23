@@ -16,7 +16,7 @@ const rx_script_number = /^\d{1,6}$/;
 // ---------------------------------------------------------------------------
 
 interface IDiffWithPrimeParams {
-    scriptNumber?: number;
+    scriptNumber: number;
     context?: number;
     ignoreWhitespace?: boolean;
 }
@@ -45,6 +45,16 @@ function parseScriptNumber(value: number | undefined): number | undefined {
         );
     }
     return value;
+}
+
+function parseRequiredScriptNumber(value: number | undefined): number {
+    const scriptNumber = parseScriptNumber(value);
+    if (scriptNumber === undefined) {
+        throw new Error(
+            "Missing scriptNumber. Provide an integer between 1 and 999999.",
+        );
+    }
+    return scriptNumber;
 }
 
 function parseDiffContext(value: number | undefined): number {
@@ -186,29 +196,12 @@ async function openUploadDocument(
 }
 
 /**
- * Resolves a script number (and its matching open document) from an
- * optional explicit value or the active editor.
+ * Resolves a script number from an optional explicit value or the
+ * active editor.
  */
-function resolveScriptNumber(scriptNumber?: number): {
-    scriptNumber: number;
-    document?: vscode.TextDocument;
-} {
+function resolveScriptNumber(scriptNumber?: number): number {
     if (scriptNumber !== undefined) {
-        const parsedScriptNumber = parseScriptNumber(scriptNumber);
-        if (parsedScriptNumber === undefined) {
-            throw new Error(
-                "No active GSL script editor and no scriptNumber provided. Open a GSL script or specify a scriptNumber.",
-            );
-        }
-        // Find the open document whose filename matches the given script number
-        const doc = vscode.workspace.textDocuments.find((d) => {
-            if (d.languageId !== GSL_LANGUAGE_ID) return false;
-            const num = scriptNumberFromFileName(d.fileName);
-            return (
-                rx_script_number.test(num) && Number(num) === parsedScriptNumber
-            );
-        });
-        return { scriptNumber: parsedScriptNumber, document: doc };
+        return parseRequiredScriptNumber(scriptNumber);
     }
 
     const editor = vscode.window.activeTextEditor;
@@ -224,10 +217,7 @@ function resolveScriptNumber(scriptNumber?: number): {
             "Could not determine script number from the active editor filename.",
         );
     }
-    return {
-        scriptNumber: parseScriptNumber(Number(scriptNumberStr))!,
-        document: editor.document,
-    };
+    return parseRequiredScriptNumber(Number(scriptNumberStr));
 }
 
 // ---------------------------------------------------------------------------
@@ -237,10 +227,9 @@ function resolveScriptNumber(scriptNumber?: number): {
 /**
  * Language model tool that exposes the "Diff with Prime" functionality
  * to GitHub Copilot agent mode.  When invoked the tool downloads the
- * Prime (production) copy of a GSL script, compares it with the local
- * version, and returns the textual diff so the LLM can analyse it.
- * If `scriptNumber` is provided, the matching local script must already
- * be open in the editor so local content can be read for comparison.
+ * Prime (production) and Dev copies of a GSL script, compares them,
+ * and returns the textual diff so the LLM can analyse it.
+ * `scriptNumber` is required.
  * Does NOT open any UI — the diff content is returned directly to the
  * agent in the tool result.
  */
@@ -249,9 +238,9 @@ class DiffWithPrimeTool implements vscode.LanguageModelTool<IDiffWithPrimeParams
         options: vscode.LanguageModelToolInvocationPrepareOptions<IDiffWithPrimeParams>,
         _token: vscode.CancellationToken,
     ) {
-        parseScriptNumber(options.input.scriptNumber);
+        parseRequiredScriptNumber(options.input.scriptNumber);
         return createPrimeToolInvocationMessage(
-            "Fetching and diffing script from Prime server\u2026",
+            "Fetching and diffing script from Prime and Dev servers\u2026",
         );
     }
 
@@ -267,24 +256,26 @@ class DiffWithPrimeTool implements vscode.LanguageModelTool<IDiffWithPrimeParams
                 );
             }
 
-            const { scriptNumber, document } = resolveScriptNumber(
+            const scriptNumber = parseRequiredScriptNumber(
                 options.input.scriptNumber,
             );
-
-            if (!document) {
-                throw new Error(
-                    `Cannot diff script ${scriptNumber} with local content because it is not open. Open the local script and retry.`,
-                );
-            }
 
             const diffContext = parseDiffContext(options.input.context);
             const ignoreWhitespace = options.input.ignoreWhitespace ?? false;
 
-            const { localContent, primeContent, isNewOnPrime } =
+            const { devContent, primeContent, isNewOnPrime, isNewOnDev } =
                 await withCancellation(
-                    vscRef.fetchPrimeScriptDiff(scriptNumber, document),
+                    vscRef.fetchPrimeAndDevScriptDiff(scriptNumber),
                     token,
                 );
+
+            if (isNewOnPrime && isNewOnDev) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        `Script ${scriptNumber}: Not found on either Prime or Dev server.`,
+                    ),
+                ]);
+            }
 
             if (isNewOnPrime) {
                 return new vscode.LanguageModelToolResult([
@@ -294,11 +285,19 @@ class DiffWithPrimeTool implements vscode.LanguageModelTool<IDiffWithPrimeParams
                 ]);
             }
 
+            if (isNewOnDev) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        `Script ${scriptNumber}: Not found on Dev server.`,
+                    ),
+                ]);
+            }
+
             const patch = structuredPatch(
                 `s${scriptNumber} (Prime)`,
                 `s${scriptNumber} (Dev)`,
                 primeContent,
-                localContent,
+                devContent,
                 undefined,
                 undefined,
                 {
@@ -320,7 +319,7 @@ class DiffWithPrimeTool implements vscode.LanguageModelTool<IDiffWithPrimeParams
                 `s${scriptNumber} (Prime)`,
                 `s${scriptNumber} (Dev)`,
                 primeContent,
-                localContent,
+                devContent,
                 undefined,
                 undefined,
                 {
@@ -345,8 +344,10 @@ class DiffWithPrimeTool implements vscode.LanguageModelTool<IDiffWithPrimeParams
             }
             throw new Error(
                 `Failed to diff script ${
-                    options.input.scriptNumber ?? "active script"
-                } with prime: ${e instanceof Error ? e.message : String(e)}`,
+                    options.input.scriptNumber ?? "(missing scriptNumber)"
+                } with Prime and Dev: ${
+                    e instanceof Error ? e.message : String(e)
+                }`,
             );
         }
     }
@@ -380,7 +381,7 @@ class FetchPrimeScriptTool implements vscode.LanguageModelTool<IFetchPrimeScript
                 );
             }
 
-            const { scriptNumber } = resolveScriptNumber(
+            const scriptNumber = resolveScriptNumber(
                 options.input.scriptNumber,
             );
 
