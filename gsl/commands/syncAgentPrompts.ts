@@ -400,6 +400,52 @@ function readSourceRepositoryShaFromVersionFile(
     return isSha40(sha) ? sha : undefined;
 }
 
+function hasAgentSyncMarker(workspaceFolderPath: string): boolean {
+    return (
+        fs.existsSync(
+            path.join(workspaceFolderPath, GSL_AGENT_PROMPTS_VERSION_FILE),
+        ) ||
+        fs.existsSync(
+            path.join(workspaceFolderPath, GSL_AGENT_PROMPTS_STATE_FILE),
+        )
+    );
+}
+
+function backupGithubDirectoryOnFirstSync({
+    workspaceFolderPath,
+    version,
+}: {
+    workspaceFolderPath: string;
+    version: string;
+}): string | undefined {
+    if (hasAgentSyncMarker(workspaceFolderPath)) {
+        return undefined;
+    }
+
+    const githubDirPath = path.join(workspaceFolderPath, ".github");
+    if (
+        !fs.existsSync(githubDirPath) ||
+        !fs.statSync(githubDirPath).isDirectory()
+    ) {
+        return undefined;
+    }
+
+    const backupDirPath = path.join(
+        workspaceFolderPath,
+        `.github.${version}.backup`,
+    );
+    if (fs.existsSync(backupDirPath)) {
+        return backupDirPath;
+    }
+
+    fs.cpSync(githubDirPath, backupDirPath, {
+        recursive: true,
+        force: false,
+        errorOnExist: true,
+    });
+    return backupDirPath;
+}
+
 function normalizeTextForComparison(text: string): string {
     const normalizedNewlines = text.replace(/\r\n?/g, "\n");
     return normalizedNewlines.endsWith("\n")
@@ -1040,39 +1086,59 @@ async function ensureCopilotLocationsRegistered(): Promise<void> {
             .getConfiguration("chat")
             .get<Record<string, boolean> | string[]>(settingKey);
         const shouldMigrateLegacyArray = Array.isArray(locationConfig);
-        const existingLocations = shouldMigrateLegacyArray
-            ? locationConfig
-            : Object.entries(locationConfig ?? {})
-                  .filter(([, isEnabled]) => Boolean(isEnabled))
-                  .map(([location]) => location);
-        const locationSet = new Set(
-            existingLocations.map((location) =>
-                normalizeRelativePath(location),
-            ),
+        const locations: Record<string, boolean> = shouldMigrateLegacyArray
+            ? {}
+            : { ...(locationConfig ?? {}) };
+        const enabledNormalizedLocations = new Set(
+            Object.entries(locations)
+                .filter(([, isEnabled]) => Boolean(isEnabled))
+                .map(([location]) => normalizeRelativePath(location)),
         );
+        if (shouldMigrateLegacyArray) {
+            for (const location of locationConfig) {
+                const normalizedLocation = normalizeRelativePath(location);
+                locations[normalizedLocation] = true;
+                enabledNormalizedLocations.add(normalizedLocation);
+            }
+        }
 
         let shouldWrite = shouldMigrateLegacyArray;
         for (const requiredLocation of requiredLocations) {
-            if (locationSet.has(requiredLocation)) {
+            if (enabledNormalizedLocations.has(requiredLocation)) {
                 continue;
             }
-            locationSet.add(requiredLocation);
-            shouldWrite = true;
+
+            const matchingKey = Object.keys(locations).find(
+                (existingLocation) =>
+                    normalizeRelativePath(existingLocation) ===
+                    requiredLocation,
+            );
+            if (matchingKey) {
+                if (!locations[matchingKey]) {
+                    locations[matchingKey] = true;
+                    shouldWrite = true;
+                }
+            } else {
+                locations[requiredLocation] = true;
+                shouldWrite = true;
+            }
+
+            enabledNormalizedLocations.add(requiredLocation);
         }
 
         if (!shouldWrite) {
             continue;
         }
 
-        const locations = Array.from(locationSet.values())
-            .sort((a, b) => a.localeCompare(b))
-            .reduce<Record<string, boolean>>((acc, location) => {
-                acc[location] = true;
+        const sortedLocations = Object.entries(locations)
+            .sort(([left], [right]) => left.localeCompare(right))
+            .reduce<Record<string, boolean>>((acc, [location, isEnabled]) => {
+                acc[location] = isEnabled;
                 return acc;
             }, {});
         await workspace
             .getConfiguration("chat")
-            .update(settingKey, locations, ConfigurationTarget.Workspace);
+            .update(settingKey, sortedLocations, ConfigurationTarget.Workspace);
     }
 }
 
@@ -1239,13 +1305,7 @@ export async function runStartupAgentPromptAutoUpdate({
     }
 
     const workspaceFolderPath = workspaceFolder.uri.fsPath;
-    const hasSyncMarker =
-        fs.existsSync(
-            path.join(workspaceFolderPath, GSL_AGENT_PROMPTS_VERSION_FILE),
-        ) ||
-        fs.existsSync(
-            path.join(workspaceFolderPath, GSL_AGENT_PROMPTS_STATE_FILE),
-        );
+    const hasSyncMarker = hasAgentSyncMarker(workspaceFolderPath);
     if (!hasSyncMarker) {
         return;
     }
@@ -1416,6 +1476,10 @@ export async function runSyncAgentPromptsCommand({
         const sourceAgentsFilePath = resolveSourceAgentsFilePath(clonePath);
         const managedFileSetSourceData =
             resolveManagedFileSetSourceData(clonePath);
+        backupGithubDirectoryOnFirstSync({
+            workspaceFolderPath: workspaceFolder.uri.fsPath,
+            version: sourceRepositorySha,
+        });
 
         const backupPathsCreated = new Array<string>();
         const managedSetSyncData = new Array<ManagedFileSetSyncData>();
