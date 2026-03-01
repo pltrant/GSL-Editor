@@ -16,7 +16,7 @@ const rx_script_number = /^\d{1,6}$/;
 // ---------------------------------------------------------------------------
 
 interface IDiffWithPrimeParams {
-    scriptNumber?: number;
+    scriptNumber: number;
     context?: number;
     ignoreWhitespace?: boolean;
 }
@@ -47,6 +47,16 @@ function parseScriptNumber(value: number | undefined): number | undefined {
     return value;
 }
 
+function parseRequiredScriptNumber(value: number | undefined): number {
+    const scriptNumber = parseScriptNumber(value);
+    if (scriptNumber === undefined) {
+        throw new Error(
+            "Missing scriptNumber. Provide an integer between 1 and 999999.",
+        );
+    }
+    return scriptNumber;
+}
+
 function parseDiffContext(value: number | undefined): number {
     if (value === undefined) return 3;
     if (!Number.isInteger(value) || value < 0 || value > 100) {
@@ -61,6 +71,52 @@ function createPrimeToolInvocationMessage(invocationMessage: string) {
     return {
         invocationMessage,
     };
+}
+
+class ToolCancellationError extends Error {
+    constructor() {
+        super("Operation cancelled.");
+        this.name = "ToolCancellationError";
+    }
+}
+
+function throwIfCancelled(token: vscode.CancellationToken): void {
+    if (token.isCancellationRequested) {
+        throw new ToolCancellationError();
+    }
+}
+
+function isToolCancelled(error: unknown): error is ToolCancellationError {
+    return error instanceof ToolCancellationError;
+}
+
+function createCancelledToolResult(
+    message: string,
+): vscode.LanguageModelToolResult {
+    return new vscode.LanguageModelToolResult([
+        new vscode.LanguageModelTextPart(message),
+    ]);
+}
+
+function withCancellation<T>(
+    operation: PromiseLike<T>,
+    token: vscode.CancellationToken,
+): Promise<T> {
+    throwIfCancelled(token);
+    return new Promise<T>((resolve, reject) => {
+        const cancellationListener = token.onCancellationRequested(() => {
+            reject(new ToolCancellationError());
+        });
+        Promise.resolve(operation)
+            .then((value) => {
+                if (token.isCancellationRequested) {
+                    reject(new ToolCancellationError());
+                    return;
+                }
+                resolve(value);
+            }, reject)
+            .finally(() => cancellationListener.dispose());
+    });
 }
 
 function formatCompileResults(
@@ -140,29 +196,12 @@ async function openUploadDocument(
 }
 
 /**
- * Resolves a script number (and its matching open document) from an
- * optional explicit value or the active editor.
+ * Resolves a script number from an optional explicit value or the
+ * active editor.
  */
-function resolveScriptNumber(scriptNumber?: number): {
-    scriptNumber: number;
-    document?: vscode.TextDocument;
-} {
+function resolveScriptNumber(scriptNumber?: number): number {
     if (scriptNumber !== undefined) {
-        const parsedScriptNumber = parseScriptNumber(scriptNumber);
-        if (parsedScriptNumber === undefined) {
-            throw new Error(
-                "No active GSL script editor and no scriptNumber provided. Open a GSL script or specify a scriptNumber.",
-            );
-        }
-        // Find the open document whose filename matches the given script number
-        const doc = vscode.workspace.textDocuments.find((d) => {
-            if (d.languageId !== GSL_LANGUAGE_ID) return false;
-            const num = scriptNumberFromFileName(d.fileName);
-            return (
-                rx_script_number.test(num) && Number(num) === parsedScriptNumber
-            );
-        });
-        return { scriptNumber: parsedScriptNumber, document: doc };
+        return parseRequiredScriptNumber(scriptNumber);
     }
 
     const editor = vscode.window.activeTextEditor;
@@ -178,10 +217,7 @@ function resolveScriptNumber(scriptNumber?: number): {
             "Could not determine script number from the active editor filename.",
         );
     }
-    return {
-        scriptNumber: parseScriptNumber(Number(scriptNumberStr))!,
-        document: editor.document,
-    };
+    return parseRequiredScriptNumber(Number(scriptNumberStr));
 }
 
 // ---------------------------------------------------------------------------
@@ -191,10 +227,9 @@ function resolveScriptNumber(scriptNumber?: number): {
 /**
  * Language model tool that exposes the "Diff with Prime" functionality
  * to GitHub Copilot agent mode.  When invoked the tool downloads the
- * Prime (production) copy of a GSL script, compares it with the local
- * version, and returns the textual diff so the LLM can analyse it.
- * If `scriptNumber` is provided, the matching local script must already
- * be open in the editor so local content can be read for comparison.
+ * Prime (production) and Dev copies of a GSL script, compares them,
+ * and returns the textual diff so the LLM can analyse it.
+ * `scriptNumber` is required.
  * Does NOT open any UI — the diff content is returned directly to the
  * agent in the tool result.
  */
@@ -203,38 +238,44 @@ class DiffWithPrimeTool implements vscode.LanguageModelTool<IDiffWithPrimeParams
         options: vscode.LanguageModelToolInvocationPrepareOptions<IDiffWithPrimeParams>,
         _token: vscode.CancellationToken,
     ) {
-        parseScriptNumber(options.input.scriptNumber);
+        parseRequiredScriptNumber(options.input.scriptNumber);
         return createPrimeToolInvocationMessage(
-            "Fetching and diffing script from Prime server\u2026",
+            "Fetching and diffing script from Prime and Dev servers\u2026",
         );
     }
 
     async invoke(
         options: vscode.LanguageModelToolInvocationOptions<IDiffWithPrimeParams>,
-        _token: vscode.CancellationToken,
+        token: vscode.CancellationToken,
     ): Promise<vscode.LanguageModelToolResult> {
-        if (!vscRef) {
-            throw new Error(
-                "GSL extension is not active. Open a GSL file to activate it.",
-            );
-        }
-
-        const { scriptNumber, document } = resolveScriptNumber(
-            options.input.scriptNumber,
-        );
-
-        if (!document) {
-            throw new Error(
-                `Cannot diff script ${scriptNumber} with local content because it is not open. Open the local script and retry.`,
-            );
-        }
-
-        const diffContext = parseDiffContext(options.input.context);
-        const ignoreWhitespace = options.input.ignoreWhitespace ?? false;
-
         try {
-            const { localContent, primeContent, isNewOnPrime } =
-                await vscRef.fetchPrimeScriptDiff(scriptNumber, document);
+            throwIfCancelled(token);
+            if (!vscRef) {
+                throw new Error(
+                    "GSL extension is not active. Open a GSL file to activate it.",
+                );
+            }
+
+            const scriptNumber = parseRequiredScriptNumber(
+                options.input.scriptNumber,
+            );
+
+            const diffContext = parseDiffContext(options.input.context);
+            const ignoreWhitespace = options.input.ignoreWhitespace ?? false;
+
+            const { devContent, primeContent, isNewOnPrime, isNewOnDev } =
+                await withCancellation(
+                    vscRef.fetchPrimeAndDevScriptDiff(scriptNumber),
+                    token,
+                );
+
+            if (isNewOnPrime && isNewOnDev) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        `Script ${scriptNumber}: Not found on either Prime or Dev server.`,
+                    ),
+                ]);
+            }
 
             if (isNewOnPrime) {
                 return new vscode.LanguageModelToolResult([
@@ -244,11 +285,19 @@ class DiffWithPrimeTool implements vscode.LanguageModelTool<IDiffWithPrimeParams
                 ]);
             }
 
+            if (isNewOnDev) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        `Script ${scriptNumber}: Not found on Dev server.`,
+                    ),
+                ]);
+            }
+
             const patch = structuredPatch(
                 `s${scriptNumber} (Prime)`,
                 `s${scriptNumber} (Dev)`,
                 primeContent,
-                localContent,
+                devContent,
                 undefined,
                 undefined,
                 {
@@ -270,7 +319,7 @@ class DiffWithPrimeTool implements vscode.LanguageModelTool<IDiffWithPrimeParams
                 `s${scriptNumber} (Prime)`,
                 `s${scriptNumber} (Dev)`,
                 primeContent,
-                localContent,
+                devContent,
                 undefined,
                 undefined,
                 {
@@ -288,8 +337,15 @@ class DiffWithPrimeTool implements vscode.LanguageModelTool<IDiffWithPrimeParams
                 ),
             ]);
         } catch (e) {
+            if (isToolCancelled(e)) {
+                return createCancelledToolResult(
+                    "Diff with prime was cancelled before completion.",
+                );
+            }
             throw new Error(
-                `Failed to diff script ${scriptNumber} with prime: ${
+                `Failed to diff script ${
+                    options.input.scriptNumber ?? "(missing scriptNumber)"
+                } with Prime and Dev: ${
                     e instanceof Error ? e.message : String(e)
                 }`,
             );
@@ -315,21 +371,24 @@ class FetchPrimeScriptTool implements vscode.LanguageModelTool<IFetchPrimeScript
 
     async invoke(
         options: vscode.LanguageModelToolInvocationOptions<IFetchPrimeScriptParams>,
-        _token: vscode.CancellationToken,
+        token: vscode.CancellationToken,
     ): Promise<vscode.LanguageModelToolResult> {
-        if (!vscRef) {
-            throw new Error(
-                "GSL extension is not active. Open a GSL file to activate it.",
-            );
-        }
-
-        const { scriptNumber } = resolveScriptNumber(
-            options.input.scriptNumber,
-        );
-
         try {
-            const { content: primeContent, isNew } =
-                await vscRef.fetchPrimeScript(scriptNumber);
+            throwIfCancelled(token);
+            if (!vscRef) {
+                throw new Error(
+                    "GSL extension is not active. Open a GSL file to activate it.",
+                );
+            }
+
+            const scriptNumber = resolveScriptNumber(
+                options.input.scriptNumber,
+            );
+
+            const { content: primeContent, isNew } = await withCancellation(
+                vscRef.fetchPrimeScript(scriptNumber),
+                token,
+            );
 
             if (isNew) {
                 return new vscode.LanguageModelToolResult([
@@ -348,10 +407,15 @@ class FetchPrimeScriptTool implements vscode.LanguageModelTool<IFetchPrimeScript
                 ),
             ]);
         } catch (e) {
+            if (isToolCancelled(e)) {
+                return createCancelledToolResult(
+                    "Fetch prime script was cancelled before completion.",
+                );
+            }
             throw new Error(
-                `Failed to fetch script ${scriptNumber} from prime: ${
-                    e instanceof Error ? e.message : String(e)
-                }`,
+                `Failed to fetch script ${
+                    options.input.scriptNumber ?? "active script"
+                } from prime: ${e instanceof Error ? e.message : String(e)}`,
             );
         }
     }
@@ -369,54 +433,75 @@ class CheckCompilerErrorsTool implements vscode.LanguageModelTool<IUploadScriptP
 
     async invoke(
         options: vscode.LanguageModelToolInvocationOptions<IUploadScriptParams>,
-        _token: vscode.CancellationToken,
+        token: vscode.CancellationToken,
     ): Promise<vscode.LanguageModelToolResult> {
-        if (!vscRef) {
-            throw new Error(
-                "GSL extension is not active. Open a GSL file to activate it.",
+        try {
+            throwIfCancelled(token);
+            if (!vscRef) {
+                throw new Error(
+                    "GSL extension is not active. Open a GSL file to activate it.",
+                );
+            }
+
+            const sourceDocument = await withCancellation(
+                openUploadDocument(options.input.filename),
+                token,
             );
-        }
+            const sourceContent = sourceDocument.getText();
+            if (sourceContent.match(/^\s*$/)) {
+                throw new Error("Cannot upload an empty script file.");
+            }
 
-        const sourceDocument = await openUploadDocument(options.input.filename);
-        const sourceContent = sourceDocument.getText();
-        if (sourceContent.match(/^\s*$/)) {
-            throw new Error("Cannot upload an empty script file.");
-        }
-
-        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
-        const safetyScriptUri = workspaceRoot
-            ? vscode.Uri.joinPath(workspaceRoot, "S24661.gsl")
-            : vscode.Uri.joinPath(
-                  vscode.Uri.file(path.dirname(sourceDocument.fileName)),
-                  "S24661.gsl",
-              );
-        await vscode.workspace.fs.writeFile(
-            safetyScriptUri,
-            Buffer.from(sourceContent, "utf8"),
-        );
-        const safetyDocument =
-            await vscode.workspace.openTextDocument(safetyScriptUri);
-
-        const compileResults = await vscRef.uploadScriptForAgent(
-            AGENT_UPLOAD_SCRIPT_NUMBER,
-            safetyDocument,
-        );
-
-        if (!compileResults) {
-            throw new Error(
-                "Unable to upload script. Confirm development server login is configured.",
-            );
-        }
-
-        return new vscode.LanguageModelToolResult([
-            new vscode.LanguageModelTextPart(
-                formatCompileResults(
-                    options.input.filename,
-                    AGENT_UPLOAD_SCRIPT_NUMBER,
-                    compileResults,
+            const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
+            const safetyScriptUri = workspaceRoot
+                ? vscode.Uri.joinPath(workspaceRoot, "S24661.gsl")
+                : vscode.Uri.joinPath(
+                      vscode.Uri.file(path.dirname(sourceDocument.fileName)),
+                      "S24661.gsl",
+                  );
+            await withCancellation(
+                vscode.workspace.fs.writeFile(
+                    safetyScriptUri,
+                    Buffer.from(sourceContent, "utf8"),
                 ),
-            ),
-        ]);
+                token,
+            );
+            const safetyDocument = await withCancellation(
+                vscode.workspace.openTextDocument(safetyScriptUri),
+                token,
+            );
+
+            const compileResults = await withCancellation(
+                vscRef.uploadScriptForAgent(
+                    AGENT_UPLOAD_SCRIPT_NUMBER,
+                    safetyDocument,
+                ),
+                token,
+            );
+
+            if (!compileResults) {
+                throw new Error(
+                    "Unable to upload script. Confirm development server login is configured.",
+                );
+            }
+
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(
+                    formatCompileResults(
+                        options.input.filename,
+                        AGENT_UPLOAD_SCRIPT_NUMBER,
+                        compileResults,
+                    ),
+                ),
+            ]);
+        } catch (e) {
+            if (isToolCancelled(e)) {
+                return createCancelledToolResult(
+                    "Compile check was cancelled before completion.",
+                );
+            }
+            throw e;
+        }
     }
 }
 
@@ -432,22 +517,34 @@ class GetCurrentAuthorTool implements vscode.LanguageModelTool<IGetCurrentAuthor
 
     async invoke(
         _options: vscode.LanguageModelToolInvocationOptions<IGetCurrentAuthorParams>,
-        _token: vscode.CancellationToken,
+        token: vscode.CancellationToken,
     ): Promise<vscode.LanguageModelToolResult> {
-        if (!vscRef) {
-            throw new Error(
-                "GSL extension is not active. Open a GSL file to activate it.",
-            );
-        }
+        try {
+            throwIfCancelled(token);
+            if (!vscRef) {
+                throw new Error(
+                    "GSL extension is not active. Open a GSL file to activate it.",
+                );
+            }
 
-        const author = vscRef.getCurrentAuthor()?.trim();
-        if (!author) {
-            throw new Error("Author is not configured. Run 'GSL: User Setup'.");
-        }
+            const author = vscRef.getCurrentAuthor()?.trim();
+            if (!author) {
+                throw new Error(
+                    "Author is not configured. Run 'GSL: User Setup'.",
+                );
+            }
 
-        return new vscode.LanguageModelToolResult([
-            new vscode.LanguageModelTextPart(author),
-        ]);
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(author),
+            ]);
+        } catch (e) {
+            if (isToolCancelled(e)) {
+                return createCancelledToolResult(
+                    "Get current author was cancelled.",
+                );
+            }
+            throw e;
+        }
     }
 }
 

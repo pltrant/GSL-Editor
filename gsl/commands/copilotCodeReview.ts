@@ -17,6 +17,11 @@ import {
 } from "./syncAgentPrompts";
 
 const COPILOT_CODE_REVIEW_COMMAND_FILE = "copilotCodeReview.command.txt";
+const NEW_CHAT_COMMAND_CANDIDATES = [
+    "workbench.action.chat.newChat",
+    "workbench.action.chat.new",
+    "vscode.editorChat.start",
+];
 
 function hasManagedPromptFiles(rootPath: string): boolean {
     if (!fs.existsSync(rootPath) || !fs.statSync(rootPath).isDirectory()) {
@@ -134,19 +139,38 @@ async function openCopilotChatWithPrompt(prompt: string): Promise<boolean> {
         return false;
     }
 
+    for (const commandId of NEW_CHAT_COMMAND_CANDIDATES) {
+        if (!availableCommands.has(commandId)) {
+            continue;
+        }
+        try {
+            await commands.executeCommand(commandId);
+            break;
+        } catch {
+            // Try the next command id for compatibility.
+        }
+    }
+
     const candidateArguments = [
         {
             query: prompt,
             mode: "agent",
-            autoSend: true,
-            isPartialQuery: false,
+            autoSend: false,
+            isPartialQuery: true,
         },
         {
             query: prompt,
             mode: "agent",
             isPartialQuery: true,
         },
-        prompt,
+        {
+            query: prompt,
+            isPartialQuery: true,
+        },
+        {
+            query: prompt,
+            autoSend: false,
+        },
     ];
 
     for (const args of candidateArguments) {

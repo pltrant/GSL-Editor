@@ -19,44 +19,140 @@ const GSL_AGENT_PROMPTS_REPO_SSH =
     "git@github.com:pltrant/GSL-Editor-Agents.git";
 const GSL_AGENT_PROMPTS_BRANCH = "main";
 const GSL_AGENTS_FILE = "AGENTS.md";
-const GSL_AGENT_PROMPTS_SOURCE_SUBDIR = path.join(
-    "src",
-    "prompts",
-    "gsl-managed",
-);
-const GSL_AGENT_COMMANDS_SOURCE_SUBDIR = path.join("src", "commands");
 const GSL_COPILOT_CODE_REVIEW_COMMAND_FILE = "copilotCodeReview.command.txt";
-export const GSL_AGENT_PROMPTS_MANAGED_DIR = path.join(
+const GSL_SYNC_SUMMARY_FILE = path.join(
     ".github",
-    "prompts",
     "gsl-managed",
+    "sync-summary.md",
 );
-export const GSL_AGENT_COMMANDS_MANAGED_DIR = path.join(".github", "commands");
 export const GSL_AGENT_PROMPTS_VERSION_FILE = path.join(
     ".github",
+    "gsl-managed",
     "version.txt",
 );
 const GSL_AGENT_PROMPTS_STATE_FILE = path.join(
     ".github",
+    "gsl-managed",
     "gsl-agent-prompts-state.json",
 );
-const OVERWRITE_PROMPTS_LABEL =
-    "Overwrite changed prompt files (create backups first)";
-const KEEP_PROMPTS_LABEL = "Keep existing prompt files";
-const OVERWRITE_COMMAND_FILES_LABEL =
-    "Overwrite changed command files (create backups first)";
-const KEEP_COMMAND_FILES_LABEL = "Keep existing command files";
 const OVERWRITE_AGENTS_FILE_LABEL =
     "Overwrite workspace AGENTS.md (create backup first)";
 const KEEP_AGENTS_FILE_LABEL = "Keep existing AGENTS.md";
+const MANAGED_PROMPTS_FILE_SET_ID = "prompts";
+const MANAGED_COMMANDS_FILE_SET_ID = "gsl-extension-builtin-commands";
+
+interface ManagedFileSet {
+    id: string;
+    displayName: string;
+    sourceSubdir: string;
+    targetSubdir: string;
+    chatLocationSetting?:
+        | "promptFilesLocations"
+        | "instructionsFilesLocations"
+        | "agentFilesLocations"
+        | "agentSkillsLocations";
+}
+
+interface ManagedFileSetSourceData {
+    fileSet: ManagedFileSet;
+    sourceDir: string;
+    sourceFiles: string[];
+    sourceHashes: Record<string, string>;
+}
+
+interface ManagedFileSetSyncData {
+    fileSet: ManagedFileSet;
+    syncResult: ManagedFileSyncResult;
+}
 
 interface AgentSyncStateFile {
     sourceRepositorySha: string;
     syncedAtUtc: string;
-    sourcePromptHashes: Record<string, string>;
+    sourceManagedFileHashes: Record<string, Record<string, string>>;
     sourceAgentsFileHash?: string;
-    sourceCommandFileHashes?: Record<string, string>;
 }
+
+interface ManagedFileSyncResult {
+    backupPathsCreated: string[];
+    overwrittenPaths: string[];
+    createdPaths: string[];
+    alreadyUpToDatePaths: string[];
+    keptPaths: string[];
+    deletedPaths: string[];
+}
+
+interface ManagedFileAutoUpdateResult {
+    updatedCount: number;
+    skippedCount: number;
+}
+
+interface AgentsFileSyncResult {
+    cancelled: boolean;
+    summary: string;
+    status:
+        | "no_source"
+        | "created"
+        | "overwritten"
+        | "kept_existing"
+        | "up_to_date";
+}
+
+const MANAGED_FILE_SETS: ManagedFileSet[] = [
+    {
+        id: MANAGED_PROMPTS_FILE_SET_ID,
+        displayName: "Prompts",
+        sourceSubdir: path.join("src", "prompts"),
+        targetSubdir: path.join(".github", "gsl-managed", "prompts"),
+        chatLocationSetting: "promptFilesLocations",
+    },
+    {
+        id: "agents",
+        displayName: "Custom Agents",
+        sourceSubdir: path.join("src", "agents"),
+        targetSubdir: path.join(".github", "gsl-managed", "agents"),
+        chatLocationSetting: "agentFilesLocations",
+    },
+    {
+        id: "instructions",
+        displayName: "Instructions",
+        sourceSubdir: path.join("src", "instructions"),
+        targetSubdir: path.join(".github", "gsl-managed", "instructions"),
+        chatLocationSetting: "instructionsFilesLocations",
+    },
+    {
+        id: "skills",
+        displayName: "Skills",
+        sourceSubdir: path.join("src", "skills"),
+        targetSubdir: path.join(".github", "gsl-managed", "skills"),
+        chatLocationSetting: "agentSkillsLocations",
+    },
+    {
+        id: MANAGED_COMMANDS_FILE_SET_ID,
+        displayName: "Builtin Commands",
+        sourceSubdir: path.join("src", "gsl-extension-builtin-commands"),
+        targetSubdir: path.join(
+            ".github",
+            "gsl-managed",
+            "gsl-extension-builtin-commands",
+        ),
+    },
+];
+
+function getManagedFileSetById(fileSetId: string): ManagedFileSet {
+    const fileSet = MANAGED_FILE_SETS.find(({ id }) => id === fileSetId);
+    if (!fileSet) {
+        throw new Error(`Unknown managed file set: ${fileSetId}`);
+    }
+    return fileSet;
+}
+
+export const GSL_AGENT_PROMPTS_MANAGED_DIR = getManagedFileSetById(
+    MANAGED_PROMPTS_FILE_SET_ID,
+).targetSubdir;
+
+export const GSL_AGENT_COMMANDS_MANAGED_DIR = getManagedFileSetById(
+    MANAGED_COMMANDS_FILE_SET_ID,
+).targetSubdir;
 
 function runCommand(
     command: string,
@@ -203,32 +299,32 @@ async function createGitHubKnownHostsFile(
 }
 
 function expandHomePath(value: string): string {
-    if (!value.startsWith("~")) return value;
+    if (!value.startsWith("~")) {
+        return value;
+    }
     const suffix = value.slice(1);
     return path.join(os.homedir(), suffix);
 }
 
-function listPromptFilesRecursive(rootDir: string): string[] {
-    return listFilesRecursive(rootDir, { suffix: ".prompt.md" });
-}
+function listFilesRecursive(rootDir: string): string[] {
+    if (!fs.existsSync(rootDir)) {
+        return [];
+    }
 
-function listCommandFilesRecursive(rootDir: string): string[] {
-    return listFilesRecursive(rootDir, { suffix: ".command.txt" });
-}
-
-function listFilesRecursive(
-    rootDir: string,
-    { suffix }: { suffix: ".prompt.md" | ".command.txt" },
-): string[] {
     const files = new Array<string>();
-    const entries = fs.readdirSync(rootDir, { withFileTypes: true });
+    const entries = fs
+        .readdirSync(rootDir, { withFileTypes: true })
+        .sort((a, b) => a.name.localeCompare(b.name));
     for (const entry of entries) {
         const fullPath = path.join(rootDir, entry.name);
         if (entry.isDirectory()) {
-            files.push(...listFilesRecursive(fullPath, { suffix }));
+            files.push(...listFilesRecursive(fullPath));
             continue;
         }
-        if (entry.isFile() && entry.name.toLowerCase().endsWith(suffix)) {
+        if (entry.name.toLowerCase() === ".gitignore") {
+            continue;
+        }
+        if (entry.isFile()) {
             files.push(fullPath);
         }
     }
@@ -266,12 +362,11 @@ function writeSyncVersionFile({
     sourceRepositorySha: string;
     syncedAtUtc: string;
 }): string {
-    const workspaceGithubDir = path.join(workspaceFolderPath, ".github");
-    fs.mkdirSync(workspaceGithubDir, { recursive: true });
     const versionFilePath = path.join(
         workspaceFolderPath,
         GSL_AGENT_PROMPTS_VERSION_FILE,
     );
+    fs.mkdirSync(path.dirname(versionFilePath), { recursive: true });
     const versionFileContents = [
         `source_repository_url=${sourceRepositoryUrl}`,
         `source_repository_branch=${sourceRepositoryBranch}`,
@@ -283,18 +378,79 @@ function writeSyncVersionFile({
     return versionFilePath;
 }
 
+function readSourceRepositoryShaFromVersionFile(
+    workspaceFolderPath: string,
+): string | undefined {
+    const versionFilePath = path.join(
+        workspaceFolderPath,
+        GSL_AGENT_PROMPTS_VERSION_FILE,
+    );
+    if (!fs.existsSync(versionFilePath)) {
+        return undefined;
+    }
+
+    const lines = fs.readFileSync(versionFilePath, "utf8").split(/\r?\n/);
+    const shaLine = lines.find((line) =>
+        line.startsWith("source_repository_sha="),
+    );
+    if (!shaLine) {
+        return undefined;
+    }
+    const sha = shaLine.split("=", 2)[1]?.trim();
+    return isSha40(sha) ? sha : undefined;
+}
+
+function hasAgentSyncMarker(workspaceFolderPath: string): boolean {
+    return (
+        fs.existsSync(
+            path.join(workspaceFolderPath, GSL_AGENT_PROMPTS_VERSION_FILE),
+        ) ||
+        fs.existsSync(
+            path.join(workspaceFolderPath, GSL_AGENT_PROMPTS_STATE_FILE),
+        )
+    );
+}
+
+function backupGithubDirectoryOnFirstSync({
+    workspaceFolderPath,
+    version,
+}: {
+    workspaceFolderPath: string;
+    version: string;
+}): string | undefined {
+    if (hasAgentSyncMarker(workspaceFolderPath)) {
+        return undefined;
+    }
+
+    const githubDirPath = path.join(workspaceFolderPath, ".github");
+    if (
+        !fs.existsSync(githubDirPath) ||
+        !fs.statSync(githubDirPath).isDirectory()
+    ) {
+        return undefined;
+    }
+
+    const backupDirPath = path.join(
+        workspaceFolderPath,
+        `.github.${version}.backup`,
+    );
+    if (fs.existsSync(backupDirPath)) {
+        return backupDirPath;
+    }
+
+    fs.cpSync(githubDirPath, backupDirPath, {
+        recursive: true,
+        force: false,
+        errorOnExist: true,
+    });
+    return backupDirPath;
+}
+
 function normalizeTextForComparison(text: string): string {
     const normalizedNewlines = text.replace(/\r\n?/g, "\n");
     return normalizedNewlines.endsWith("\n")
         ? normalizedNewlines.slice(0, -1)
         : normalizedNewlines;
-}
-
-function hashNormalizedText(text: string): string {
-    return crypto
-        .createHash("sha256")
-        .update(normalizeTextForComparison(text), "utf8")
-        .digest("hex");
 }
 
 function readNormalizedFile(filePath: string): string {
@@ -319,20 +475,6 @@ function normalizeRelativePath(filePath: string): string {
     return filePath.replace(/\\/g, "/");
 }
 
-function buildSourcePromptHashes(
-    sourcePromptDir: string,
-    promptFiles: string[],
-): Record<string, string> {
-    return buildSourceFileHashes(sourcePromptDir, promptFiles);
-}
-
-function buildSourceCommandFileHashes(
-    sourceCommandDir: string,
-    commandFiles: string[],
-): Record<string, string> {
-    return buildSourceFileHashes(sourceCommandDir, commandFiles);
-}
-
 function buildSourceFileHashes(
     sourceDir: string,
     files: string[],
@@ -344,25 +486,12 @@ function buildSourceFileHashes(
     }, {});
 }
 
-function readSourceRepositoryShaFromVersionFile(
-    workspaceFolderPath: string,
-): string | undefined {
-    const versionFilePath = path.join(
-        workspaceFolderPath,
-        GSL_AGENT_PROMPTS_VERSION_FILE,
-    );
-    if (!fs.existsSync(versionFilePath)) {
-        return undefined;
-    }
-    const lines = fs.readFileSync(versionFilePath, "utf8").split(/\r?\n/);
-    const shaLine = lines.find((line) =>
-        line.startsWith("source_repository_sha="),
-    );
-    if (!shaLine) {
-        return undefined;
-    }
-    const sha = shaLine.split("=", 2)[1]?.trim();
-    return sha && /^[0-9a-f]{40}$/i.test(sha) ? sha : undefined;
+function isSha40(value: unknown): value is string {
+    return typeof value === "string" && /^[0-9a-f]{40}$/i.test(value);
+}
+
+function isSha64(value: unknown): value is string {
+    return typeof value === "string" && /^[0-9a-f]{64}$/i.test(value);
 }
 
 function readAgentSyncStateFile(
@@ -375,67 +504,65 @@ function readAgentSyncStateFile(
     if (!fs.existsSync(stateFilePath)) {
         return undefined;
     }
+
     try {
         const parsedState = JSON.parse(fs.readFileSync(stateFilePath, "utf8"));
         if (!parsedState || typeof parsedState !== "object") {
             return undefined;
         }
+
         const {
             sourceRepositorySha,
             syncedAtUtc,
-            sourcePromptHashes,
+            sourceManagedFileHashes,
             sourceAgentsFileHash,
-            sourceCommandFileHashes,
         } = parsedState as {
             sourceRepositorySha?: unknown;
             syncedAtUtc?: unknown;
-            sourcePromptHashes?: unknown;
+            sourceManagedFileHashes?: unknown;
             sourceAgentsFileHash?: unknown;
-            sourceCommandFileHashes?: unknown;
         };
         if (
-            typeof sourceRepositorySha !== "string" ||
-            !/^[0-9a-f]{40}$/i.test(sourceRepositorySha) ||
+            !isSha40(sourceRepositorySha) ||
             typeof syncedAtUtc !== "string" ||
-            !sourcePromptHashes ||
-            typeof sourcePromptHashes !== "object"
+            !sourceManagedFileHashes ||
+            typeof sourceManagedFileHashes !== "object"
         ) {
             return undefined;
         }
-        const normalizedHashes = Object.entries(sourcePromptHashes).reduce<
-            Record<string, string>
-        >((acc, [relativePath, hash]) => {
-            if (typeof hash === "string" && /^[0-9a-f]{64}$/i.test(hash)) {
-                acc[relativePath] = hash;
-            }
-            return acc;
-        }, {});
-        const normalizedAgentsFileHash =
-            typeof sourceAgentsFileHash === "string" &&
-            /^[0-9a-f]{64}$/i.test(sourceAgentsFileHash)
-                ? sourceAgentsFileHash
-                : undefined;
-        const normalizedCommandFileHashes =
-            sourceCommandFileHashes &&
-            typeof sourceCommandFileHashes === "object"
-                ? Object.entries(sourceCommandFileHashes).reduce<
-                      Record<string, string>
-                  >((acc, [relativePath, hash]) => {
-                      if (
-                          typeof hash === "string" &&
-                          /^[0-9a-f]{64}$/i.test(hash)
-                      ) {
-                          acc[relativePath] = hash;
-                      }
-                      return acc;
-                  }, {})
-                : {};
+
+        const normalizedManagedFileHashes = Object.entries(
+            sourceManagedFileHashes,
+        ).reduce<Record<string, Record<string, string>>>(
+            (managedAcc, [setId, hashes]) => {
+                if (!hashes || typeof hashes !== "object") {
+                    return managedAcc;
+                }
+
+                const normalizedHashes = Object.entries(
+                    hashes as Record<string, unknown>,
+                ).reduce<Record<string, string>>(
+                    (hashAcc, [filePath, hash]) => {
+                        if (isSha64(hash)) {
+                            hashAcc[filePath] = hash;
+                        }
+                        return hashAcc;
+                    },
+                    {},
+                );
+                managedAcc[setId] = normalizedHashes;
+                return managedAcc;
+            },
+            {},
+        );
+
         return {
             sourceRepositorySha,
             syncedAtUtc,
-            sourcePromptHashes: normalizedHashes,
-            sourceAgentsFileHash: normalizedAgentsFileHash,
-            sourceCommandFileHashes: normalizedCommandFileHashes,
+            sourceManagedFileHashes: normalizedManagedFileHashes,
+            sourceAgentsFileHash: isSha64(sourceAgentsFileHash)
+                ? sourceAgentsFileHash
+                : undefined,
         };
     } catch {
         return undefined;
@@ -446,36 +573,30 @@ function writeAgentSyncStateFile({
     workspaceFolderPath,
     sourceRepositorySha,
     syncedAtUtc,
-    sourcePromptHashes,
+    sourceManagedFileHashes,
     sourceAgentsFileHash,
-    sourceCommandFileHashes,
 }: {
     workspaceFolderPath: string;
     sourceRepositorySha: string;
     syncedAtUtc: string;
-    sourcePromptHashes: Record<string, string>;
+    sourceManagedFileHashes: Record<string, Record<string, string>>;
     sourceAgentsFileHash?: string;
-    sourceCommandFileHashes?: Record<string, string>;
 }): string {
     const stateFilePath = path.join(
         workspaceFolderPath,
         GSL_AGENT_PROMPTS_STATE_FILE,
     );
     fs.mkdirSync(path.dirname(stateFilePath), { recursive: true });
+
     const statePayload: AgentSyncStateFile = {
         sourceRepositorySha,
         syncedAtUtc,
-        sourcePromptHashes,
+        sourceManagedFileHashes,
     };
     if (sourceAgentsFileHash) {
         statePayload.sourceAgentsFileHash = sourceAgentsFileHash;
     }
-    if (
-        sourceCommandFileHashes &&
-        Object.keys(sourceCommandFileHashes).length > 0
-    ) {
-        statePayload.sourceCommandFileHashes = sourceCommandFileHashes;
-    }
+
     fs.writeFileSync(
         stateFilePath,
         `${JSON.stringify(statePayload, null, 2)}\n`,
@@ -492,10 +613,10 @@ function findMostRecentBackupPath(filePath: string): string | undefined {
     }
 
     let mostRecentIndex = -1;
+    const escapedBaseName = baseName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const backupPattern = new RegExp(`^${escapedBaseName}\\.backup\\.(\\d+)$`);
     for (const entry of fs.readdirSync(directoryPath)) {
-        const match = new RegExp(
-            `^${baseName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\.backup\\.(\\d+)$`,
-        ).exec(entry);
+        const match = backupPattern.exec(entry);
         if (!match) {
             continue;
         }
@@ -529,210 +650,53 @@ function shouldCreateBackup(filePath: string): boolean {
     return readNormalizedFile(mostRecentBackupPath) !== currentFileContent;
 }
 
-function formatMarkdownBulletList(items: string[]): string {
-    if (items.length === 0) {
-        return "  - none";
-    }
-    return items.map((item) => `  - ${item}`).join("\n");
-}
-
-function formatCountedSection(title: string, items: string[]): string[] {
-    if (items.length === 0) {
-        return [];
-    }
-    return [
-        `- **${title} (${items.length})**`,
-        formatMarkdownBulletList(items),
-    ];
-}
-
-interface ManagedFileSyncResult {
-    backupPathsCreated: string[];
-    overwrittenPaths: string[];
-    createdPaths: string[];
-    alreadyUpToDatePaths: string[];
-    keptPaths: string[];
-    deletedPaths: string[];
-}
-
-interface ManagedFileAutoUpdateResult {
-    updatedCount: number;
-    skippedCount: number;
-}
-
-function buildManagedFileSections({
-    overwrittenPaths,
-    createdPaths,
-    alreadyUpToDatePaths,
-    keptPaths,
-    deletedPaths,
-    emptyMessage,
-}: {
-    overwrittenPaths: string[];
-    createdPaths: string[];
-    alreadyUpToDatePaths: string[];
-    keptPaths: string[];
-    deletedPaths: string[];
-    emptyMessage: string;
-}): string[] {
-    const sections = [
-        ...formatCountedSection("Overwritten", overwrittenPaths),
-        ...formatCountedSection("Created", createdPaths),
-        ...formatCountedSection("Already up to date", alreadyUpToDatePaths),
-        ...formatCountedSection("Kept existing", keptPaths),
-        ...formatCountedSection("Removed", deletedPaths),
-    ];
-    if (sections.length === 0) {
-        sections.push(emptyMessage);
-    }
-    return sections;
-}
-
-async function syncManagedPromptFiles({
-    sourcePromptDir,
-    promptFiles,
-    targetPromptDir,
-}: {
-    sourcePromptDir: string;
-    promptFiles: string[];
-    targetPromptDir: string;
-}): Promise<
-    | {
-          backupPathsCreated: string[];
-          overwrittenManagedPromptPaths: string[];
-          createdManagedPromptPaths: string[];
-          alreadyUpToDateManagedPromptPaths: string[];
-          keptManagedPromptPaths: string[];
-          deletedManagedPromptPaths: string[];
-      }
-    | undefined
-> {
-    const result = await syncManagedFiles({
-        sourceDir: sourcePromptDir,
-        sourceFiles: promptFiles,
-        targetDir: targetPromptDir,
-        fileSuffix: ".prompt.md",
-        overwriteLabel: OVERWRITE_PROMPTS_LABEL,
-        keepLabel: KEEP_PROMPTS_LABEL,
-        overwritePromptPlaceholder:
-            "Overwrite changed managed prompt files? Changed files will be backed up first.",
-    });
-    if (!result) {
-        return undefined;
-    }
-
-    return {
-        backupPathsCreated: result.backupPathsCreated,
-        overwrittenManagedPromptPaths: result.overwrittenPaths,
-        createdManagedPromptPaths: result.createdPaths,
-        alreadyUpToDateManagedPromptPaths: result.alreadyUpToDatePaths,
-        keptManagedPromptPaths: result.keptPaths,
-        deletedManagedPromptPaths: result.deletedPaths,
-    };
-}
-
-async function syncManagedCommandFiles({
-    sourceCommandDir,
-    commandFiles,
-    targetCommandDir,
-}: {
-    sourceCommandDir: string;
-    commandFiles: string[];
-    targetCommandDir: string;
-}): Promise<
-    | {
-          backupPathsCreated: string[];
-          overwrittenManagedCommandPaths: string[];
-          createdManagedCommandPaths: string[];
-          alreadyUpToDateManagedCommandPaths: string[];
-          keptManagedCommandPaths: string[];
-          deletedManagedCommandPaths: string[];
-      }
-    | undefined
-> {
-    const result = await syncManagedFiles({
-        sourceDir: sourceCommandDir,
-        sourceFiles: commandFiles,
-        targetDir: targetCommandDir,
-        fileSuffix: ".command.txt",
-        overwriteLabel: OVERWRITE_COMMAND_FILES_LABEL,
-        keepLabel: KEEP_COMMAND_FILES_LABEL,
-        overwritePromptPlaceholder:
-            "Overwrite changed managed command files? Changed files will be backed up first.",
-    });
-    if (!result) {
-        return undefined;
-    }
-
-    return {
-        backupPathsCreated: result.backupPathsCreated,
-        overwrittenManagedCommandPaths: result.overwrittenPaths,
-        createdManagedCommandPaths: result.createdPaths,
-        alreadyUpToDateManagedCommandPaths: result.alreadyUpToDatePaths,
-        keptManagedCommandPaths: result.keptPaths,
-        deletedManagedCommandPaths: result.deletedPaths,
-    };
-}
-
 async function syncManagedFiles({
     sourceDir,
     sourceFiles,
     targetDir,
-    fileSuffix,
-    overwriteLabel,
-    keepLabel,
-    overwritePromptPlaceholder,
+    displayName,
 }: {
     sourceDir: string;
     sourceFiles: string[];
     targetDir: string;
-    fileSuffix: ".prompt.md" | ".command.txt";
-    overwriteLabel: string;
-    keepLabel: string;
-    overwritePromptPlaceholder: string;
+    displayName: string;
 }): Promise<ManagedFileSyncResult | undefined> {
     fs.mkdirSync(targetDir, { recursive: true });
-
-    const backupPathsCreated = new Array<string>();
-    const overwrittenPaths = new Array<string>();
-    const createdPaths = new Array<string>();
-    const alreadyUpToDatePaths = new Array<string>();
-    const keptPaths = new Array<string>();
-    const deletedPaths = new Array<string>();
 
     const sourcePathsByRelativePath = new Map<string, string>();
     for (const sourceFile of sourceFiles) {
         sourcePathsByRelativePath.set(
-            path.relative(sourceDir, sourceFile),
+            normalizeRelativePath(path.relative(sourceDir, sourceFile)),
             sourceFile,
         );
     }
 
-    const existingFiles = listFilesRecursive(targetDir, { suffix: fileSuffix });
+    const existingFiles = listFilesRecursive(targetDir);
     const backupRequiredTargets = new Array<string>();
-    let shouldOverwriteManagedFiles = true;
     for (const targetFile of existingFiles) {
-        const relativePath = path.relative(targetDir, targetFile);
+        const relativePath = normalizeRelativePath(
+            path.relative(targetDir, targetFile),
+        );
         const sourceFile = sourcePathsByRelativePath.get(relativePath);
-        if (!sourceFile) {
+        if (
+            !sourceFile ||
+            !filesMatchWithNormalization(sourceFile, targetFile)
+        ) {
             if (shouldCreateBackup(targetFile)) {
                 backupRequiredTargets.push(targetFile);
             }
-            continue;
-        }
-        if (
-            !filesMatchWithNormalization(sourceFile, targetFile) &&
-            shouldCreateBackup(targetFile)
-        ) {
-            backupRequiredTargets.push(targetFile);
         }
     }
 
+    let shouldOverwriteManagedFiles = true;
+    const backupPathsCreated = new Array<string>();
     if (backupRequiredTargets.length > 0) {
+        const overwriteLabel = `Overwrite changed ${displayName.toLowerCase()} files (create backups first)`;
+        const keepLabel = `Keep existing ${displayName.toLowerCase()} files`;
         const overwriteChoice = await window.showQuickPick(
             [{ label: overwriteLabel }, { label: keepLabel }],
             {
-                placeHolder: overwritePromptPlaceholder,
+                placeHolder: `Overwrite changed ${displayName.toLowerCase()} files? Changed files will be backed up first.`,
                 ignoreFocusOut: true,
             },
         );
@@ -750,63 +714,48 @@ async function syncManagedFiles({
         }
     }
 
-    for (const sourceFile of sourceFiles) {
-        const relativePath = path.relative(sourceDir, sourceFile);
+    const overwrittenPaths = new Array<string>();
+    const createdPaths = new Array<string>();
+    const alreadyUpToDatePaths = new Array<string>();
+    const keptPaths = new Array<string>();
+    const deletedPaths = new Array<string>();
+
+    for (const [relativePath, sourceFile] of sourcePathsByRelativePath) {
         const targetPath = path.join(targetDir, relativePath);
         const targetAlreadyExists = fs.existsSync(targetPath);
         if (
             targetAlreadyExists &&
             filesMatchWithNormalization(sourceFile, targetPath)
         ) {
-            alreadyUpToDatePaths.push(relativePath.replace(/\\/g, "/"));
+            alreadyUpToDatePaths.push(relativePath);
             continue;
         }
         if (targetAlreadyExists && !shouldOverwriteManagedFiles) {
-            keptPaths.push(relativePath.replace(/\\/g, "/"));
+            keptPaths.push(relativePath);
             continue;
-        }
-        if (
-            targetAlreadyExists &&
-            shouldCreateBackup(targetPath) &&
-            backupRequiredTargets.length > 0
-        ) {
-            const alreadyBackedUp = backupPathsCreated.some((backupPath) =>
-                backupPath.startsWith(`${targetPath}.backup.`),
-            );
-            if (!alreadyBackedUp) {
-                keptPaths.push(relativePath.replace(/\\/g, "/"));
-                continue;
-            }
         }
         fs.mkdirSync(path.dirname(targetPath), { recursive: true });
         fs.copyFileSync(sourceFile, targetPath);
         if (targetAlreadyExists) {
-            overwrittenPaths.push(relativePath.replace(/\\/g, "/"));
+            overwrittenPaths.push(relativePath);
         } else {
-            createdPaths.push(relativePath.replace(/\\/g, "/"));
+            createdPaths.push(relativePath);
         }
     }
 
     for (const existingFile of existingFiles) {
-        const relativePath = path.relative(targetDir, existingFile);
+        const relativePath = normalizeRelativePath(
+            path.relative(targetDir, existingFile),
+        );
         if (sourcePathsByRelativePath.has(relativePath)) {
             continue;
         }
         if (!shouldOverwriteManagedFiles) {
-            keptPaths.push(relativePath.replace(/\\/g, "/"));
+            keptPaths.push(relativePath);
             continue;
         }
-        if (shouldCreateBackup(existingFile)) {
-            const hasBackup = backupPathsCreated.some((backupPath) =>
-                backupPath.startsWith(`${existingFile}.backup.`),
-            );
-            if (!hasBackup) {
-                keptPaths.push(relativePath.replace(/\\/g, "/"));
-                continue;
-            }
-        }
         fs.rmSync(existingFile, { force: true });
-        deletedPaths.push(relativePath.replace(/\\/g, "/"));
+        deletedPaths.push(relativePath);
     }
 
     return {
@@ -816,104 +765,6 @@ async function syncManagedFiles({
         alreadyUpToDatePaths,
         keptPaths,
         deletedPaths,
-    };
-}
-
-async function fetchRepositoryCommitBySha({
-    repoPath,
-    sourceRepositorySha,
-}: {
-    repoPath: string;
-    sourceRepositorySha: string;
-}): Promise<boolean> {
-    try {
-        await runCommand(
-            "git",
-            ["fetch", "--depth", "1", "origin", sourceRepositorySha],
-            { cwd: repoPath },
-        );
-        return true;
-    } catch {
-        return false;
-    }
-}
-
-async function resolveSourcePromptHashesAtSha({
-    repoPath,
-    sourceRepositorySha,
-    relativePromptPaths,
-}: {
-    repoPath: string;
-    sourceRepositorySha: string;
-    relativePromptPaths: string[];
-}): Promise<Record<string, string>> {
-    const promptHashes: Record<string, string> = {};
-    const sourceDirPath = normalizeRelativePath(
-        GSL_AGENT_PROMPTS_SOURCE_SUBDIR,
-    );
-    for (const relativePromptPath of relativePromptPaths) {
-        const promptPathAtSha = path.posix.join(
-            sourceDirPath,
-            normalizeRelativePath(relativePromptPath),
-        );
-        try {
-            const { stdout } = await runCommand(
-                "git",
-                ["show", `${sourceRepositorySha}:${promptPathAtSha}`],
-                { cwd: repoPath },
-            );
-            promptHashes[normalizeRelativePath(relativePromptPath)] =
-                hashNormalizedText(stdout);
-        } catch {
-            continue;
-        }
-    }
-    return promptHashes;
-}
-
-function autoUpdateManagedPromptFiles({
-    sourcePromptDir,
-    promptFiles,
-    targetPromptDir,
-    previousSourcePromptHashes,
-}: {
-    sourcePromptDir: string;
-    promptFiles: string[];
-    targetPromptDir: string;
-    previousSourcePromptHashes: Record<string, string>;
-}): { updatedPromptCount: number; skippedPromptCount: number } {
-    const result = autoUpdateManagedFiles({
-        sourceDir: sourcePromptDir,
-        sourceFiles: promptFiles,
-        targetDir: targetPromptDir,
-        previousSourceFileHashes: previousSourcePromptHashes,
-    });
-    return {
-        updatedPromptCount: result.updatedCount,
-        skippedPromptCount: result.skippedCount,
-    };
-}
-
-function autoUpdateManagedCommandFiles({
-    sourceCommandDir,
-    commandFiles,
-    targetCommandDir,
-    previousSourceCommandFileHashes,
-}: {
-    sourceCommandDir: string;
-    commandFiles: string[];
-    targetCommandDir: string;
-    previousSourceCommandFileHashes: Record<string, string>;
-}): { updatedCommandCount: number; skippedCommandCount: number } {
-    const result = autoUpdateManagedFiles({
-        sourceDir: sourceCommandDir,
-        sourceFiles: commandFiles,
-        targetDir: targetCommandDir,
-        previousSourceFileHashes: previousSourceCommandFileHashes,
-    });
-    return {
-        updatedCommandCount: result.updatedCount,
-        skippedCommandCount: result.skippedCount,
     };
 }
 
@@ -976,9 +827,13 @@ async function syncAgentsFile({
     sourceAgentsFilePath: string | undefined;
     workspaceFolderPath: string;
     backupPathsCreated: string[];
-}): Promise<string> {
+}): Promise<AgentsFileSyncResult> {
     if (!sourceAgentsFilePath) {
-        return "No source AGENTS.md found in synced agent repo.";
+        return {
+            cancelled: false,
+            summary: "No source AGENTS.md found in synced agent repo.",
+            status: "no_source",
+        };
     }
 
     const workspaceAgentsFilePath = path.join(
@@ -987,50 +842,71 @@ async function syncAgentsFile({
     );
     if (!fs.existsSync(workspaceAgentsFilePath)) {
         fs.copyFileSync(sourceAgentsFilePath, workspaceAgentsFilePath);
-        return "Created AGENTS.md from synced source.";
+        return {
+            cancelled: false,
+            summary: "Created AGENTS.md from synced source.",
+            status: "created",
+        };
     }
 
     if (
-        !filesMatchWithNormalization(
+        filesMatchWithNormalization(
             sourceAgentsFilePath,
             workspaceAgentsFilePath,
         )
     ) {
-        if (!shouldCreateBackup(workspaceAgentsFilePath)) {
-            fs.copyFileSync(sourceAgentsFilePath, workspaceAgentsFilePath);
-            return "Overwrote AGENTS.md with synced source.";
-        }
-        const overwriteChoice = await window.showQuickPick(
-            [
-                {
-                    label: OVERWRITE_AGENTS_FILE_LABEL,
-                },
-                {
-                    label: KEEP_AGENTS_FILE_LABEL,
-                },
-            ],
-            {
-                placeHolder:
-                    "Do you want to overwrite workspace AGENTS.md with the synced version? Existing AGENTS.md will be backed up first.",
-                ignoreFocusOut: true,
-            },
-        );
-        if (!overwriteChoice) {
-            return "Kept existing AGENTS.md.";
-        }
-        if (overwriteChoice.label === OVERWRITE_AGENTS_FILE_LABEL) {
-            const backupPath = nextBackupPath(workspaceAgentsFilePath);
-            fs.copyFileSync(workspaceAgentsFilePath, backupPath);
-            backupPathsCreated.push(backupPath);
-            fs.copyFileSync(sourceAgentsFilePath, workspaceAgentsFilePath);
-            return "Overwrote AGENTS.md with synced source.";
-        }
-        if (overwriteChoice.label === KEEP_AGENTS_FILE_LABEL) {
-            return "Kept existing AGENTS.md.";
-        }
+        return {
+            cancelled: false,
+            summary: "Kept existing AGENTS.md (already up to date).",
+            status: "up_to_date",
+        };
     }
 
-    return "Kept existing AGENTS.md (already up to date).";
+    if (!shouldCreateBackup(workspaceAgentsFilePath)) {
+        fs.copyFileSync(sourceAgentsFilePath, workspaceAgentsFilePath);
+        return {
+            cancelled: false,
+            summary: "Overwrote AGENTS.md with synced source.",
+            status: "overwritten",
+        };
+    }
+
+    const overwriteChoice = await window.showQuickPick(
+        [
+            { label: OVERWRITE_AGENTS_FILE_LABEL },
+            { label: KEEP_AGENTS_FILE_LABEL },
+        ],
+        {
+            placeHolder:
+                "Do you want to overwrite workspace AGENTS.md with the synced version? Existing AGENTS.md will be backed up first.",
+            ignoreFocusOut: true,
+        },
+    );
+    if (!overwriteChoice) {
+        return {
+            cancelled: true,
+            summary: "Kept existing AGENTS.md.",
+            status: "kept_existing",
+        };
+    }
+
+    if (overwriteChoice.label !== OVERWRITE_AGENTS_FILE_LABEL) {
+        return {
+            cancelled: false,
+            summary: "Kept existing AGENTS.md.",
+            status: "kept_existing",
+        };
+    }
+
+    const backupPath = nextBackupPath(workspaceAgentsFilePath);
+    fs.copyFileSync(workspaceAgentsFilePath, backupPath);
+    backupPathsCreated.push(backupPath);
+    fs.copyFileSync(sourceAgentsFilePath, workspaceAgentsFilePath);
+    return {
+        cancelled: false,
+        summary: "Overwrote AGENTS.md with synced source.",
+        status: "overwritten",
+    };
 }
 
 function autoUpdateAgentsFile({
@@ -1117,6 +993,304 @@ async function resolveAgentPromptsDeployKey(
     await context.secrets.store(GSL_AGENT_PROMPTS_DEPLOY_KEY_SECRET, deployKey);
     return deployKey;
 }
+async function cloneAgentPromptsRepo({
+    tempRootPath,
+    deployKey,
+    showKnownHostsWarning,
+}: {
+    tempRootPath: string;
+    deployKey: string;
+    showKnownHostsWarning: boolean;
+}): Promise<string> {
+    const keyPath = path.join(tempRootPath, "deploy_key");
+    const clonePath = path.join(tempRootPath, "repo");
+    fs.writeFileSync(keyPath, `${deployKey}\n`, {
+        encoding: "utf8",
+        mode: 0o600,
+    });
+
+    const sshKeyPath = keyPath.replace(/\\/g, "/");
+    const quotedSshKeyPath = `"${sshKeyPath.replace(/"/g, '\\"')}"`;
+    const { knownHostsPath, warningMessage } =
+        await createGitHubKnownHostsFile(tempRootPath);
+    if (showKnownHostsWarning && warningMessage) {
+        void window.showWarningMessage(warningMessage);
+    }
+
+    const sshCommandParts = [
+        `ssh -i ${quotedSshKeyPath}`,
+        "-o IdentitiesOnly=yes",
+        "-o StrictHostKeyChecking=yes",
+    ];
+    if (knownHostsPath) {
+        const normalizedKnownHostsPath = knownHostsPath.replace(/\\/g, "/");
+        const quotedKnownHostsPath = `"${normalizedKnownHostsPath.replace(/"/g, '\\"')}"`;
+        sshCommandParts.push(`-o UserKnownHostsFile=${quotedKnownHostsPath}`);
+    }
+    const env = {
+        ...process.env,
+        GIT_SSH_COMMAND: sshCommandParts.join(" "),
+    };
+
+    await runCommand(
+        "git",
+        [
+            "clone",
+            "--depth",
+            "1",
+            "--branch",
+            GSL_AGENT_PROMPTS_BRANCH,
+            GSL_AGENT_PROMPTS_REPO_SSH,
+            clonePath,
+        ],
+        { env },
+    );
+    return clonePath;
+}
+
+function resolveManagedFileSetSourceData(
+    clonePath: string,
+): ManagedFileSetSourceData[] {
+    return MANAGED_FILE_SETS.map((fileSet) => {
+        const sourceDir = path.join(clonePath, fileSet.sourceSubdir);
+        const sourceFiles = listFilesRecursive(sourceDir);
+        return {
+            fileSet,
+            sourceDir,
+            sourceFiles,
+            sourceHashes: buildSourceFileHashes(sourceDir, sourceFiles),
+        };
+    });
+}
+
+async function ensureCopilotLocationsRegistered(): Promise<void> {
+    const requiredLocationsBySetting = MANAGED_FILE_SETS.reduce<
+        Record<string, string[]>
+    >((acc, { chatLocationSetting, targetSubdir }) => {
+        if (!chatLocationSetting) {
+            return acc;
+        }
+
+        acc[chatLocationSetting] ??= [];
+        acc[chatLocationSetting].push(normalizeRelativePath(targetSubdir));
+        return acc;
+    }, {});
+    if (Object.keys(requiredLocationsBySetting).length === 0) {
+        return;
+    }
+
+    for (const [settingKey, requiredLocations] of Object.entries(
+        requiredLocationsBySetting,
+    )) {
+        const locationConfig = workspace
+            .getConfiguration("chat")
+            .get<Record<string, boolean> | string[]>(settingKey);
+        const shouldMigrateLegacyArray = Array.isArray(locationConfig);
+        const locations: Record<string, boolean> = shouldMigrateLegacyArray
+            ? {}
+            : { ...(locationConfig ?? {}) };
+        const enabledNormalizedLocations = new Set(
+            Object.entries(locations)
+                .filter(([, isEnabled]) => Boolean(isEnabled))
+                .map(([location]) => normalizeRelativePath(location)),
+        );
+        if (shouldMigrateLegacyArray) {
+            for (const location of locationConfig) {
+                const normalizedLocation = normalizeRelativePath(location);
+                locations[normalizedLocation] = true;
+                enabledNormalizedLocations.add(normalizedLocation);
+            }
+        }
+
+        let shouldWrite = shouldMigrateLegacyArray;
+        for (const requiredLocation of requiredLocations) {
+            if (enabledNormalizedLocations.has(requiredLocation)) {
+                continue;
+            }
+
+            const matchingKey = Object.keys(locations).find(
+                (existingLocation) =>
+                    normalizeRelativePath(existingLocation) ===
+                    requiredLocation,
+            );
+            if (matchingKey) {
+                if (!locations[matchingKey]) {
+                    locations[matchingKey] = true;
+                    shouldWrite = true;
+                }
+            } else {
+                locations[requiredLocation] = true;
+                shouldWrite = true;
+            }
+
+            enabledNormalizedLocations.add(requiredLocation);
+        }
+
+        if (!shouldWrite) {
+            continue;
+        }
+
+        const sortedLocations = Object.entries(locations)
+            .sort(([left], [right]) => left.localeCompare(right))
+            .reduce<Record<string, boolean>>((acc, [location, isEnabled]) => {
+                acc[location] = isEnabled;
+                return acc;
+            }, {});
+        await workspace
+            .getConfiguration("chat")
+            .update(settingKey, sortedLocations, ConfigurationTarget.Workspace);
+    }
+}
+
+function warnIfCopilotReviewCommandMissing(clonePath: string): void {
+    const commandFileSetSourceSubdir = getManagedFileSetById(
+        MANAGED_COMMANDS_FILE_SET_ID,
+    ).sourceSubdir;
+    const requiredCommandFilePath = path.join(
+        clonePath,
+        commandFileSetSourceSubdir,
+        GSL_COPILOT_CODE_REVIEW_COMMAND_FILE,
+    );
+    if (fs.existsSync(requiredCommandFilePath)) {
+        return;
+    }
+
+    const sourcePath = normalizeRelativePath(
+        path.join(
+            commandFileSetSourceSubdir,
+            GSL_COPILOT_CODE_REVIEW_COMMAND_FILE,
+        ),
+    );
+    void window.showWarningMessage(
+        `Required builtin command file is missing in source repository: ${sourcePath}`,
+    );
+}
+
+function formatMarkdownBulletList(items: string[]): string {
+    if (items.length === 0) {
+        return "- none";
+    }
+    return items.map((item) => `- \`${item}\``).join("\n");
+}
+
+function collectChangedManagedFilePaths(
+    managedSetSyncData: ManagedFileSetSyncData[],
+): string[] {
+    const changedPaths = new Array<string>();
+    for (const { fileSet, syncResult } of managedSetSyncData) {
+        for (const relativePath of syncResult.overwrittenPaths) {
+            changedPaths.push(
+                `Updated ${normalizeRelativePath(path.join(fileSet.targetSubdir, relativePath))}`,
+            );
+        }
+        for (const relativePath of syncResult.createdPaths) {
+            changedPaths.push(
+                `Added ${normalizeRelativePath(path.join(fileSet.targetSubdir, relativePath))}`,
+            );
+        }
+        for (const relativePath of syncResult.deletedPaths) {
+            changedPaths.push(
+                `Deleted ${normalizeRelativePath(path.join(fileSet.targetSubdir, relativePath))}`,
+            );
+        }
+    }
+    return changedPaths;
+}
+
+function buildSyncSummaryMarkdown({
+    previousSourceRepositorySha,
+    sourceRepositorySha,
+    managedSetSyncData,
+    agentsFileResult,
+    backupCount,
+}: {
+    previousSourceRepositorySha?: string;
+    sourceRepositorySha: string;
+    managedSetSyncData: ManagedFileSetSyncData[];
+    agentsFileResult: AgentsFileSyncResult;
+    backupCount: number;
+}): string {
+    const updatedCount = managedSetSyncData.reduce(
+        (count, { syncResult }) => count + syncResult.overwrittenPaths.length,
+        0,
+    );
+    const createdCount = managedSetSyncData.reduce(
+        (count, { syncResult }) => count + syncResult.createdPaths.length,
+        0,
+    );
+    const removedCount = managedSetSyncData.reduce(
+        (count, { syncResult }) => count + syncResult.deletedPaths.length,
+        0,
+    );
+    const keptCount = managedSetSyncData.reduce(
+        (count, { syncResult }) => count + syncResult.keptPaths.length,
+        0,
+    );
+    const changedManagedFilePaths =
+        collectChangedManagedFilePaths(managedSetSyncData);
+
+    const resultParts = new Array<string>();
+    if (updatedCount > 0) {
+        resultParts.push(`Updated ${updatedCount} file(s)`);
+    }
+    if (createdCount > 0) {
+        resultParts.push(`Created ${createdCount} file(s)`);
+    }
+    if (removedCount > 0) {
+        resultParts.push(`Removed ${removedCount} file(s)`);
+    }
+    if (backupCount > 0) {
+        resultParts.push(`Backed up ${backupCount} file(s)`);
+    }
+    if (keptCount > 0) {
+        resultParts.push(`Kept ${keptCount} existing file(s)`);
+    }
+    if (agentsFileResult.status === "created") {
+        resultParts.push("Created AGENTS.md");
+    }
+    if (agentsFileResult.status === "overwritten") {
+        resultParts.push("Updated AGENTS.md");
+    }
+    if (agentsFileResult.status === "kept_existing") {
+        resultParts.push("Kept existing AGENTS.md");
+    }
+
+    const resultLine =
+        resultParts.length > 0
+            ? `- ${resultParts.join(", ")}.`
+            : "- No file changes.";
+    const shouldShowAgentsSection =
+        agentsFileResult.status === "created" ||
+        agentsFileResult.status === "overwritten" ||
+        agentsFileResult.status === "kept_existing";
+
+    return [
+        "# GSL Sync Results",
+        "",
+        "## Result",
+        "",
+        resultLine,
+        "",
+        ...(changedManagedFilePaths.length > 0
+            ? [
+                  "## Changed Files",
+                  "",
+                  formatMarkdownBulletList(changedManagedFilePaths),
+                  "",
+              ]
+            : []),
+        ...(shouldShowAgentsSection
+            ? ["## AGENTS.md", "", `- ${agentsFileResult.summary}`, ""]
+            : []),
+        "## Sync Metadata",
+        "",
+        `- Source repository: \`${GSL_AGENT_PROMPTS_REPO_SSH}\``,
+        `- Source branch: \`${GSL_AGENT_PROMPTS_BRANCH}\``,
+        `- Previous source SHA: \`${previousSourceRepositorySha ?? "N/A"}\``,
+        `- New source SHA: \`${sourceRepositorySha}\``,
+        "",
+    ].join("\n");
+}
 
 export interface SyncAgentPromptsCommandDependencies {
     context: ExtensionContext;
@@ -1131,32 +1305,20 @@ export async function runStartupAgentPromptAutoUpdate({
     }
 
     const workspaceFolderPath = workspaceFolder.uri.fsPath;
-    const targetPromptDir = path.join(
-        workspaceFolderPath,
-        GSL_AGENT_PROMPTS_MANAGED_DIR,
-    );
-    const targetCommandDir = path.join(
-        workspaceFolderPath,
-        GSL_AGENT_COMMANDS_MANAGED_DIR,
-    );
-    const existingPromptFiles = fs.existsSync(targetPromptDir)
-        ? listPromptFilesRecursive(targetPromptDir)
-        : [];
-    const existingCommandFiles = fs.existsSync(targetCommandDir)
-        ? listCommandFilesRecursive(targetCommandDir)
-        : [];
-    if (existingPromptFiles.length === 0 && existingCommandFiles.length === 0) {
+    const hasSyncMarker = hasAgentSyncMarker(workspaceFolderPath);
+    if (!hasSyncMarker) {
         return;
     }
 
-    const hasSyncMarker =
-        fs.existsSync(
-            path.join(workspaceFolderPath, GSL_AGENT_PROMPTS_VERSION_FILE),
-        ) ||
-        fs.existsSync(
-            path.join(workspaceFolderPath, GSL_AGENT_PROMPTS_STATE_FILE),
-        );
-    if (!hasSyncMarker) {
+    const hasManagedFiles = MANAGED_FILE_SETS.some(
+        ({ targetSubdir }) =>
+            listFilesRecursive(path.join(workspaceFolderPath, targetSubdir))
+                .length > 0,
+    );
+    if (
+        !hasManagedFiles &&
+        !fs.existsSync(path.join(workspaceFolderPath, GSL_AGENTS_FILE))
+    ) {
         return;
     }
 
@@ -1168,7 +1330,7 @@ export async function runStartupAgentPromptAutoUpdate({
     }
 
     const message = window.setStatusBarMessage(
-        "Checking GSL managed prompts for updates...",
+        "Checking GSL managed customizations for updates...",
         30000,
     );
     let tempRootPath: string | undefined;
@@ -1176,128 +1338,55 @@ export async function runStartupAgentPromptAutoUpdate({
         tempRootPath = fs.mkdtempSync(
             path.join(os.tmpdir(), "gsl-agent-prompts-"),
         );
-        const keyPath = path.join(tempRootPath, "deploy_key");
-        const clonePath = path.join(tempRootPath, "repo");
-        fs.writeFileSync(keyPath, `${deployKey}\n`, {
-            encoding: "utf8",
-            mode: 0o600,
+        const clonePath = await cloneAgentPromptsRepo({
+            tempRootPath,
+            deployKey,
+            showKnownHostsWarning: false,
         });
 
-        const sshKeyPath = keyPath.replace(/\\/g, "/");
-        const quotedSshKeyPath = `"${sshKeyPath.replace(/"/g, '\\"')}"`;
-        const { knownHostsPath } =
-            await createGitHubKnownHostsFile(tempRootPath);
-        const sshCommandParts = [
-            `ssh -i ${quotedSshKeyPath}`,
-            "-o IdentitiesOnly=yes",
-            "-o StrictHostKeyChecking=yes",
-        ];
-        if (knownHostsPath) {
-            const normalizedKnownHostsPath = knownHostsPath.replace(/\\/g, "/");
-            const quotedKnownHostsPath = `"${normalizedKnownHostsPath.replace(/"/g, '\\"')}"`;
-            sshCommandParts.push(
-                `-o UserKnownHostsFile=${quotedKnownHostsPath}`,
-            );
-        }
-        const env = {
-            ...process.env,
-            GIT_SSH_COMMAND: sshCommandParts.join(" "),
-        };
-
-        await runCommand(
-            "git",
-            [
-                "clone",
-                "--depth",
-                "1",
-                "--branch",
-                GSL_AGENT_PROMPTS_BRANCH,
-                GSL_AGENT_PROMPTS_REPO_SSH,
-                clonePath,
-            ],
-            { env },
-        );
         const sourceRepositorySha = await resolveRepositoryHeadSha(clonePath);
-        const sourcePromptDir = path.join(
-            clonePath,
-            GSL_AGENT_PROMPTS_SOURCE_SUBDIR,
-        );
-        const sourceCommandDir = path.join(
-            clonePath,
-            GSL_AGENT_COMMANDS_SOURCE_SUBDIR,
-        );
         const sourceAgentsFilePath = resolveSourceAgentsFilePath(clonePath);
-        if (!fs.existsSync(sourcePromptDir)) {
-            return;
-        }
+        const managedFileSetSourceData =
+            resolveManagedFileSetSourceData(clonePath);
 
-        const promptFiles = listPromptFilesRecursive(sourcePromptDir);
-        const commandFiles = fs.existsSync(sourceCommandDir)
-            ? listCommandFilesRecursive(sourceCommandDir)
-            : [];
-        const sourcePromptHashes = buildSourcePromptHashes(
-            sourcePromptDir,
-            promptFiles,
-        );
-        const sourceCommandFileHashes = buildSourceCommandFileHashes(
-            sourceCommandDir,
-            commandFiles,
-        );
-        const relativePromptPaths = Object.keys(sourcePromptHashes);
-
+        const sourceManagedFileHashes: Record<
+            string,
+            Record<string, string>
+        > = {};
         const storedSyncState = readAgentSyncStateFile(workspaceFolderPath);
-        let previousSourcePromptHashes =
-            storedSyncState?.sourcePromptHashes ?? {};
-        const previousSourceCommandFileHashes =
-            storedSyncState?.sourceCommandFileHashes ?? {};
-        const previousSourceAgentsFileHash =
-            storedSyncState?.sourceAgentsFileHash;
-        if (Object.keys(previousSourcePromptHashes).length === 0) {
-            const previousSourceRepositorySha =
-                readSourceRepositoryShaFromVersionFile(workspaceFolderPath);
-            if (
-                previousSourceRepositorySha &&
-                previousSourceRepositorySha !== sourceRepositorySha &&
-                (await fetchRepositoryCommitBySha({
-                    repoPath: clonePath,
-                    sourceRepositorySha: previousSourceRepositorySha,
-                }))
-            ) {
-                previousSourcePromptHashes =
-                    await resolveSourcePromptHashesAtSha({
-                        repoPath: clonePath,
-                        sourceRepositorySha: previousSourceRepositorySha,
-                        relativePromptPaths,
-                    });
-            } else if (previousSourceRepositorySha === sourceRepositorySha) {
-                previousSourcePromptHashes = sourcePromptHashes;
-            }
+
+        let updatedFileCount = 0;
+        let skippedFileCount = 0;
+        for (const {
+            fileSet,
+            sourceDir,
+            sourceFiles,
+            sourceHashes,
+        } of managedFileSetSourceData) {
+            sourceManagedFileHashes[fileSet.id] = sourceHashes;
+            const previousSourceFileHashes =
+                storedSyncState?.sourceManagedFileHashes[fileSet.id] ?? {};
+            const targetDir = path.join(
+                workspaceFolderPath,
+                fileSet.targetSubdir,
+            );
+            const { updatedCount, skippedCount } = autoUpdateManagedFiles({
+                sourceDir,
+                sourceFiles,
+                targetDir,
+                previousSourceFileHashes,
+            });
+            updatedFileCount += updatedCount;
+            skippedFileCount += skippedCount;
         }
 
-        const { updatedPromptCount, skippedPromptCount } =
-            autoUpdateManagedPromptFiles({
-                sourcePromptDir,
-                promptFiles,
-                targetPromptDir,
-                previousSourcePromptHashes,
-            });
-        const { updatedCommandCount, skippedCommandCount } =
-            autoUpdateManagedCommandFiles({
-                sourceCommandDir,
-                commandFiles,
-                targetCommandDir,
-                previousSourceCommandFileHashes,
-            });
         const { updatedAgentsFile, skippedAgentsFile } = autoUpdateAgentsFile({
             sourceAgentsFilePath,
             workspaceFolderPath,
-            previousSourceAgentsFileHash,
+            previousSourceAgentsFileHash: storedSyncState?.sourceAgentsFileHash,
         });
 
         const syncedAtUtc = new Date().toISOString();
-        const sourceAgentsFileHash = sourceAgentsFilePath
-            ? hashNormalizedFile(sourceAgentsFilePath)
-            : undefined;
         writeSyncVersionFile({
             workspaceFolderPath,
             sourceRepositoryUrl: GSL_AGENT_PROMPTS_REPO_SSH,
@@ -1309,38 +1398,29 @@ export async function runStartupAgentPromptAutoUpdate({
             workspaceFolderPath,
             sourceRepositorySha,
             syncedAtUtc,
-            sourcePromptHashes,
-            sourceAgentsFileHash,
-            sourceCommandFileHashes,
+            sourceManagedFileHashes,
+            sourceAgentsFileHash: sourceAgentsFilePath
+                ? hashNormalizedFile(sourceAgentsFilePath)
+                : undefined,
         });
 
         if (
-            updatedPromptCount > 0 ||
-            skippedPromptCount > 0 ||
-            updatedCommandCount > 0 ||
-            skippedCommandCount > 0 ||
+            updatedFileCount > 0 ||
+            skippedFileCount > 0 ||
             updatedAgentsFile ||
             skippedAgentsFile
         ) {
-            const promptSummary = `${updatedPromptCount} prompt file(s) updated${
-                skippedPromptCount > 0
-                    ? `, ${skippedPromptCount} prompt file(s) not updated (local changes)`
-                    : ""
-            }`;
-            const commandSummary = `${updatedCommandCount} command file(s) updated${
-                skippedCommandCount > 0
-                    ? `, ${skippedCommandCount} command file(s) not updated (local changes)`
-                    : ""
-            }`;
-            const agentsFileSummary = sourceAgentsFilePath
-                ? updatedAgentsFile
-                    ? ", AGENTS.md updated"
-                    : skippedAgentsFile
-                      ? ", AGENTS.md not updated (local changes)"
-                      : ""
-                : "";
+            const skippedSummary =
+                skippedFileCount > 0
+                    ? `, ${skippedFileCount} file(s) not updated (local changes)`
+                    : "";
+            const agentsSummary = updatedAgentsFile
+                ? ", AGENTS.md updated"
+                : skippedAgentsFile
+                  ? ", AGENTS.md not updated (local changes)"
+                  : "";
             void window.showInformationMessage(
-                `GSL prompt auto-update: ${promptSummary}, ${commandSummary}${agentsFileSummary}.`,
+                `GSL customization auto-update: ${updatedFileCount} file(s) updated${skippedSummary}${agentsSummary}.`,
             );
         }
     } catch {
@@ -1352,7 +1432,6 @@ export async function runStartupAgentPromptAutoUpdate({
         }
     }
 }
-
 export async function runSyncAgentPromptsCommand({
     context,
 }: SyncAgentPromptsCommandDependencies): Promise<void> {
@@ -1368,9 +1447,13 @@ export async function runSyncAgentPromptsCommand({
     }
 
     const message = window.setStatusBarMessage(
-        "Syncing GSL agent prompts...",
+        "Syncing GSL managed customizations...",
         60000,
     );
+    const previousSourceRepositorySha =
+        readAgentSyncStateFile(workspaceFolder.uri.fsPath)
+            ?.sourceRepositorySha ??
+        readSourceRepositoryShaFromVersionFile(workspaceFolder.uri.fsPath);
     let tempRootPath: string | undefined;
     try {
         const deployKey = await resolveAgentPromptsDeployKey(context);
@@ -1381,168 +1464,71 @@ export async function runSyncAgentPromptsCommand({
         tempRootPath = fs.mkdtempSync(
             path.join(os.tmpdir(), "gsl-agent-prompts-"),
         );
-        const keyPath = path.join(tempRootPath, "deploy_key");
-        const clonePath = path.join(tempRootPath, "repo");
-        fs.writeFileSync(keyPath, `${deployKey}\n`, {
-            encoding: "utf8",
-            mode: 0o600,
+        const clonePath = await cloneAgentPromptsRepo({
+            tempRootPath,
+            deployKey,
+            showKnownHostsWarning: true,
         });
 
-        const sshKeyPath = keyPath.replace(/\\/g, "/");
-        const quotedSshKeyPath = `"${sshKeyPath.replace(/"/g, '\\"')}"`;
-        const { knownHostsPath, warningMessage } =
-            await createGitHubKnownHostsFile(tempRootPath);
-        if (warningMessage) {
-            void window.showWarningMessage(warningMessage);
-        }
-        const sshCommandParts = [
-            `ssh -i ${quotedSshKeyPath}`,
-            "-o IdentitiesOnly=yes",
-            "-o StrictHostKeyChecking=yes",
-        ];
-        if (knownHostsPath) {
-            const normalizedKnownHostsPath = knownHostsPath.replace(/\\/g, "/");
-            const quotedKnownHostsPath = `"${normalizedKnownHostsPath.replace(/"/g, '\\"')}"`;
-            sshCommandParts.push(
-                `-o UserKnownHostsFile=${quotedKnownHostsPath}`,
-            );
-        }
-        const env = {
-            ...process.env,
-            GIT_SSH_COMMAND: sshCommandParts.join(" "),
-        };
+        warnIfCopilotReviewCommandMissing(clonePath);
 
-        await runCommand(
-            "git",
-            [
-                "clone",
-                "--depth",
-                "1",
-                "--branch",
-                GSL_AGENT_PROMPTS_BRANCH,
-                GSL_AGENT_PROMPTS_REPO_SSH,
-                clonePath,
-            ],
-            { env },
-        );
         const sourceRepositorySha = await resolveRepositoryHeadSha(clonePath);
-
-        const sourcePromptDir = path.join(
-            clonePath,
-            GSL_AGENT_PROMPTS_SOURCE_SUBDIR,
-        );
-        const sourceCommandDir = path.join(
-            clonePath,
-            GSL_AGENT_COMMANDS_SOURCE_SUBDIR,
-        );
         const sourceAgentsFilePath = resolveSourceAgentsFilePath(clonePath);
-        if (!fs.existsSync(sourcePromptDir)) {
-            throw new Error(
-                `Prompt source directory not found: ${GSL_AGENT_PROMPTS_SOURCE_SUBDIR}`,
-            );
-        }
-        if (!fs.existsSync(sourceCommandDir)) {
-            throw new Error(
-                `Command source directory not found: ${GSL_AGENT_COMMANDS_SOURCE_SUBDIR}`,
-            );
-        }
-        const requiredCommandFilePath = path.join(
-            sourceCommandDir,
-            GSL_COPILOT_CODE_REVIEW_COMMAND_FILE,
-        );
-        if (!fs.existsSync(requiredCommandFilePath)) {
-            throw new Error(
-                `Required command file not found: ${normalizeRelativePath(path.join(GSL_AGENT_COMMANDS_SOURCE_SUBDIR, GSL_COPILOT_CODE_REVIEW_COMMAND_FILE))}`,
-            );
-        }
-
-        const promptFiles = listPromptFilesRecursive(sourcePromptDir);
-        const targetPromptDir = path.join(
-            workspaceFolder.uri.fsPath,
-            GSL_AGENT_PROMPTS_MANAGED_DIR,
-        );
-        const managedPromptSyncResult = await syncManagedPromptFiles({
-            sourcePromptDir,
-            promptFiles,
-            targetPromptDir,
+        const managedFileSetSourceData =
+            resolveManagedFileSetSourceData(clonePath);
+        backupGithubDirectoryOnFirstSync({
+            workspaceFolderPath: workspaceFolder.uri.fsPath,
+            version: sourceRepositorySha,
         });
-        if (!managedPromptSyncResult) {
-            return;
-        }
-        const {
-            backupPathsCreated,
-            overwrittenManagedPromptPaths,
-            createdManagedPromptPaths,
-            alreadyUpToDateManagedPromptPaths,
-            keptManagedPromptPaths,
-            deletedManagedPromptPaths,
-        } = managedPromptSyncResult;
 
-        const commandFiles = listCommandFilesRecursive(sourceCommandDir);
-        const targetCommandDir = path.join(
-            workspaceFolder.uri.fsPath,
-            GSL_AGENT_COMMANDS_MANAGED_DIR,
-        );
-        const managedCommandSyncResult = await syncManagedCommandFiles({
-            sourceCommandDir,
-            commandFiles,
-            targetCommandDir,
-        });
-        if (!managedCommandSyncResult) {
-            return;
-        }
-        backupPathsCreated.push(...managedCommandSyncResult.backupPathsCreated);
-        const {
-            overwrittenManagedCommandPaths,
-            createdManagedCommandPaths,
-            alreadyUpToDateManagedCommandPaths,
-            keptManagedCommandPaths,
-            deletedManagedCommandPaths,
-        } = managedCommandSyncResult;
+        const backupPathsCreated = new Array<string>();
+        const managedSetSyncData = new Array<ManagedFileSetSyncData>();
+        const sourceManagedFileHashes: Record<
+            string,
+            Record<string, string>
+        > = {};
 
-        const promptLocationsConfig = workspace
-            .getConfiguration("chat")
-            .get<Record<string, boolean> | string[]>("promptFilesLocations");
-        const promptLocations: Record<string, boolean> = Array.isArray(
-            promptLocationsConfig,
-        )
-            ? promptLocationsConfig.reduce<Record<string, boolean>>(
-                  (acc, location) => {
-                      acc[location] = true;
-                      return acc;
-                  },
-                  {},
-              )
-            : { ...(promptLocationsConfig ?? {}) };
-        if (!promptLocations[GSL_AGENT_PROMPTS_MANAGED_DIR]) {
-            promptLocations[GSL_AGENT_PROMPTS_MANAGED_DIR] = true;
-            await workspace
-                .getConfiguration("chat")
-                .update(
-                    "promptFilesLocations",
-                    promptLocations,
-                    ConfigurationTarget.Workspace,
-                );
+        for (const {
+            fileSet,
+            sourceDir,
+            sourceFiles,
+            sourceHashes,
+        } of managedFileSetSourceData) {
+            const targetDir = path.join(
+                workspaceFolder.uri.fsPath,
+                fileSet.targetSubdir,
+            );
+            const syncResult = await syncManagedFiles({
+                sourceDir,
+                sourceFiles,
+                targetDir,
+                displayName: fileSet.displayName,
+            });
+            if (!syncResult) {
+                return;
+            }
+
+            backupPathsCreated.push(...syncResult.backupPathsCreated);
+            managedSetSyncData.push({
+                fileSet,
+                syncResult,
+            });
+            sourceManagedFileHashes[fileSet.id] = sourceHashes;
         }
 
-        const agentsFileOutcome = await syncAgentsFile({
+        await ensureCopilotLocationsRegistered();
+
+        const agentsFileResult = await syncAgentsFile({
             sourceAgentsFilePath,
             workspaceFolderPath: workspaceFolder.uri.fsPath,
             backupPathsCreated,
         });
+        if (agentsFileResult.cancelled) {
+            return;
+        }
+
         const syncedAtUtc = new Date().toISOString();
-        const sourceAgentsFileHash = sourceAgentsFilePath
-            ? hashNormalizedFile(sourceAgentsFilePath)
-            : undefined;
-        const sourcePromptHashes = buildSourcePromptHashes(
-            sourcePromptDir,
-            promptFiles,
-        );
-        const sourceCommandFileHashes = buildSourceCommandFileHashes(
-            sourceCommandDir,
-            commandFiles,
-        );
-        const versionFilePath = writeSyncVersionFile({
+        writeSyncVersionFile({
             workspaceFolderPath: workspaceFolder.uri.fsPath,
             sourceRepositoryUrl: GSL_AGENT_PROMPTS_REPO_SSH,
             sourceRepositoryBranch: GSL_AGENT_PROMPTS_BRANCH,
@@ -1553,81 +1539,24 @@ export async function runSyncAgentPromptsCommand({
             workspaceFolderPath: workspaceFolder.uri.fsPath,
             sourceRepositorySha,
             syncedAtUtc,
-            sourcePromptHashes,
-            sourceAgentsFileHash,
-            sourceCommandFileHashes,
+            sourceManagedFileHashes,
+            sourceAgentsFileHash: sourceAgentsFilePath
+                ? hashNormalizedFile(sourceAgentsFilePath)
+                : undefined,
         });
-        const versionFilePathForDisplay = path
-            .relative(workspaceFolder.uri.fsPath, versionFilePath)
-            .replace(/\\/g, "/");
 
-        const backupPathsForDisplay = backupPathsCreated.map((backupPath) =>
-            path
-                .relative(workspaceFolder.uri.fsPath, backupPath)
-                .replace(/\\/g, "/"),
+        const summaryMarkdown = buildSyncSummaryMarkdown({
+            previousSourceRepositorySha,
+            sourceRepositorySha,
+            managedSetSyncData,
+            agentsFileResult,
+            backupCount: backupPathsCreated.length,
+        });
+        const summaryFilePath = path.join(
+            workspaceFolder.uri.fsPath,
+            GSL_SYNC_SUMMARY_FILE,
         );
-        const managedPromptSections = buildManagedFileSections({
-            overwrittenPaths: overwrittenManagedPromptPaths,
-            createdPaths: createdManagedPromptPaths,
-            alreadyUpToDatePaths: alreadyUpToDateManagedPromptPaths,
-            keptPaths: keptManagedPromptPaths,
-            deletedPaths: deletedManagedPromptPaths,
-            emptyMessage: "- No managed prompt changes were detected.",
-        });
-        const managedCommandSections = buildManagedFileSections({
-            overwrittenPaths: overwrittenManagedCommandPaths,
-            createdPaths: createdManagedCommandPaths,
-            alreadyUpToDatePaths: alreadyUpToDateManagedCommandPaths,
-            keptPaths: keptManagedCommandPaths,
-            deletedPaths: deletedManagedCommandPaths,
-            emptyMessage: "- No managed command file changes were detected.",
-        });
-        const backupSections =
-            backupPathsForDisplay.length > 0
-                ? [
-                      "### Backup Files Created",
-                      "",
-                      `- **Total backups (${backupPathsForDisplay.length})**`,
-                      formatMarkdownBulletList(backupPathsForDisplay),
-                      "",
-                  ]
-                : [];
-        const summaryMarkdown = [
-            "# TLDR",
-            "",
-            "Prompts have been updated — open Copilot Chat, type `/`, and start using them by prompt name.",
-            "",
-            "# The Nitty Gritty Details",
-            "",
-            "### Overview",
-            "",
-            `- Synced **${promptFiles.length}** agent prompt file(s) to \`${GSL_AGENT_PROMPTS_MANAGED_DIR}\`.`,
-            `- Synced **${commandFiles.length}** agent command file(s) to \`${GSL_AGENT_COMMANDS_MANAGED_DIR}\`.`,
-            "",
-            "### Managed Prompt Results",
-            "",
-            ...managedPromptSections,
-            "",
-            "### Managed Command Results",
-            "",
-            ...managedCommandSections,
-            "",
-            ...backupSections,
-            "### AGENTS File",
-            "",
-            `- ${agentsFileOutcome}`,
-            "",
-            "### Sync Metadata",
-            "",
-            `- Wrote sync metadata to \`${versionFilePathForDisplay}\`.`,
-            `- Source repository URL: \`${GSL_AGENT_PROMPTS_REPO_SSH}\``,
-            `- Source repository branch: \`${GSL_AGENT_PROMPTS_BRANCH}\``,
-            `- Source repository SHA: \`${sourceRepositorySha}\``,
-            `- Synced at (UTC): \`${syncedAtUtc}\``,
-            "",
-        ].join("\n");
-
-        const summaryFilePath = path.join(targetPromptDir, "sync-summary.md");
+        fs.mkdirSync(path.dirname(summaryFilePath), { recursive: true });
         fs.writeFileSync(summaryFilePath, summaryMarkdown, "utf8");
         await commands.executeCommand(
             "markdown.showPreview",

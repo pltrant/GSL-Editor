@@ -137,16 +137,19 @@
         "canBeReferencedInPrompt": true,
         "toolReferenceName": "diffWithPrime",
         "icon": "$(diff)",
-        "userDescription": "Fetch the Prime (production) version of a GSL script and return the diff against the open local script for analysis.",
-        "modelDescription": "Downloads a GSL script from the Prime (production) server and compares it with a local open editor copy. Returns the unified diff text showing exactly what lines differ between Prime and Dev. Use this when the user wants to compare, diff, check differences, or understand what changed between their local script and the production/prime version. The tool returns the diff content directly — it does not open any UI. If scriptNumber is provided, the matching local script must already be open in the editor. Requires the GSL extension to be configured with Prime server credentials via 'GSL: User Setup'.",
+        "userDescription": "Fetch the Prime (production) and Dev versions of a GSL script and return their diff for analysis.",
+        "modelDescription": "Downloads a GSL script from both the Prime (production) and Dev servers, then returns a unified diff showing exactly what lines differ. Use this when the user wants to compare, diff, check differences, or understand what changed between Prime and Dev versions of a script. The tool returns diff content directly and does not write local files or open UI. scriptNumber is required. Requires the GSL extension to be configured via 'GSL: User Setup'.",
         "inputSchema": {
           "type": "object",
+          "required": [
+            "scriptNumber"
+          ],
           "properties": {
             "scriptNumber": {
               "type": "integer",
               "minimum": 1,
               "maximum": 999999,
-              "description": "Optional GSL script number to diff. If omitted, uses the currently active editor's script. When provided, the matching local script must be open in an editor."
+              "description": "Required GSL script number to diff between Prime and Dev servers."
             },
             "context": {
               "type": "integer",
@@ -389,4 +392,3 @@
     ]
   }
 }
-

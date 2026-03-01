@@ -1227,6 +1227,18 @@ export class VSCodeIntegration {
         );
     }
 
+    async fetchPrimeAndDevScriptDiff(script: number): Promise<{
+        devContent: string;
+        primeContent: string;
+        isNewOnPrime: boolean;
+        isNewOnDev: boolean;
+    }> {
+        return primeService.fetchPrimeAndDevScriptDiff(
+            script,
+            this.getPrimeServiceDependencies(),
+        );
+    }
+
     async uploadScriptForAgent(
         script: number,
         document: TextDocument,
