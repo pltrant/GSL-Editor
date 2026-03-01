@@ -95,6 +95,7 @@ const monthList = [
 ];
 
 const clientTimeout = 15000;
+const taskQueueTimeout = 30000;
 const ssCheckeditTimeout = 7500;
 
 export type InitOptions = {
@@ -146,22 +147,100 @@ export const withPrimeEditorClient = async <T>(
 type TaskController<T> = {
     task: ClientTask<T>;
     initOptions: InitOptions;
-    resolve: (result: T | Promise<T>) => void;
+    resolve: (result: T) => void;
     reject: (error: Error) => void;
 };
+
+type TaskExecution = {
+    leaseId: number;
+    abortController: AbortController;
+};
+
+class EditorClientTaskTimeoutError extends Error {
+    constructor(timeoutMillis: number) {
+        super(`Editor client task timed out after ${timeoutMillis}ms.`);
+        this.name = "EditorClientTaskTimeoutError";
+    }
+}
+
+class EditorClientLoginTimeoutError extends Error {
+    constructor(timeoutMillis: number) {
+        super(`Editor client login prompt timed out after ${timeoutMillis}ms.`);
+        this.name = "EditorClientLoginTimeoutError";
+    }
+}
+
+class StaleEditorClientTaskError extends Error {
+    constructor() {
+        super("Stale editor client task was ignored.");
+        this.name = "StaleEditorClientTaskError";
+    }
+}
+
+const NON_RESETTABLE_ERROR_NAMES = new Set([
+    "AbortError",
+    "StaleEditorClientTaskError",
+    "QuickLoginCancelledError",
+    "EditorClientMissingVerbError",
+    "EditorClientMissingScriptError",
+]);
+
+function getErrorCode(error: Error): string | undefined {
+    const code = (error as Error & { code?: unknown }).code;
+    return typeof code === "string" ? code : undefined;
+}
+
+function shouldResetClient(error: Error): boolean {
+    if (NON_RESETTABLE_ERROR_NAMES.has(error.name)) {
+        return false;
+    }
+    // Known expected quick-login failures (auth/config) should not reset.
+    if (error.name === "QuickLoginError") {
+        const errorCode = getErrorCode(error);
+        if (errorCode === "NORECORD" || errorCode === "PASSWORD") {
+            return false;
+        }
+    }
+    // Reset for network and unexpected errors by default.
+    return true;
+}
+
+function createNamedError(name: string, message: string): Error {
+    const error = new Error(message);
+    error.name = name;
+    return error;
+}
+
+function createAbortError(message: string): Error {
+    return createNamedError("AbortError", message);
+}
+
+function throwIfAborted(signal?: AbortSignal, message?: string): void {
+    if (signal?.aborted) {
+        throw createAbortError(message ?? "Operation cancelled.");
+    }
+}
 
 class TaskQueueProcessor {
     /** Frequency of queue processing */
     private static FREQUENCY_MILLIS = 250;
+    /** Max time a task may hold the editor client lock */
+    private static TASK_TIMEOUT_MILLIS = taskQueueTimeout;
 
     private client: EditorClient | undefined;
+    private pendingClient: EditorClient | undefined;
     private taskQueue: TaskController<any>[];
     private isProcessingTask: boolean;
+    private nextTaskLeaseId: number;
+    private activeTaskLeaseId: number | undefined;
     private nextTick: NodeJS.Timeout | undefined;
 
     constructor() {
         this.taskQueue = [];
+        this.pendingClient = undefined;
         this.isProcessingTask = false;
+        this.nextTaskLeaseId = 0;
+        this.activeTaskLeaseId = undefined;
         this.nextTick = undefined;
     }
 
@@ -187,18 +266,34 @@ class TaskQueueProcessor {
             return;
         }
         const { initOptions, task, resolve, reject } = this.taskQueue.shift()!;
+        const taskExecution = this.createTaskExecution();
 
         this.isProcessingTask = true;
         try {
-            const client = await this.ensureClient(initOptions);
-            let result = await task(client);
-            while (result && result instanceof Promise) {
-                result = await result;
+            const result = await this.runTaskWithTimeout(
+                async () => {
+                    const client = await this.ensureClient(
+                        initOptions,
+                        taskExecution,
+                    );
+                    this.assertTaskActive(taskExecution);
+                    return task(client);
+                },
+                () => taskExecution.abortController.abort(),
+            );
+            if (!this.isTaskLeaseActive(taskExecution.leaseId)) {
+                reject(new StaleEditorClientTaskError());
+                return;
             }
             resolve(result);
         } catch (e: unknown) {
-            reject(e instanceof Error ? e : new Error(String(e)));
+            const error = e instanceof Error ? e : new Error(String(e));
+            if (shouldResetClient(error)) {
+                this.resetClients();
+            }
+            reject(error);
         } finally {
+            this.endTaskLease(taskExecution.leaseId);
             this.isProcessingTask = false;
             if (this.taskQueue.length > 0) {
                 this.scheduleTick(TaskQueueProcessor.FREQUENCY_MILLIS);
@@ -206,47 +301,140 @@ class TaskQueueProcessor {
         }
     }
 
-    async ensureClient(options: InitOptions): Promise<EditorClient> {
-        const { downloadLocation, console, loggingEnabled, login, onCreate } =
-            options;
+    private runTaskWithTimeout<T>(
+        task: () => Promise<T> | T,
+        onTimeout: () => void,
+    ): Promise<T> {
+        return new Promise<T>((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                onTimeout();
+                reject(
+                    new EditorClientTaskTimeoutError(
+                        TaskQueueProcessor.TASK_TIMEOUT_MILLIS,
+                    ),
+                );
+            }, TaskQueueProcessor.TASK_TIMEOUT_MILLIS);
+
+            Promise.resolve()
+                .then(() => task())
+                .then(resolve, reject)
+                .finally(() => clearTimeout(timeout));
+        });
+    }
+
+    private createTaskExecution(): TaskExecution {
+        return {
+            leaseId: this.startTaskLease(),
+            abortController: new AbortController(),
+        };
+    }
+
+    private assertTaskActive(taskExecution: TaskExecution): void {
+        if (!this.isTaskLeaseActive(taskExecution.leaseId)) {
+            throw new StaleEditorClientTaskError();
+        }
+        throwIfAborted(
+            taskExecution.abortController.signal,
+            "Editor client task cancelled.",
+        );
+    }
+
+    private clearClientRefs(client: EditorClient): void {
+        if (this.pendingClient === client) {
+            this.pendingClient = undefined;
+        }
+        if (this.client === client) {
+            this.client = undefined;
+        }
+    }
+
+    private disposeClient(client: EditorClient): void {
+        client.destroy();
+        this.clearClientRefs(client);
+    }
+
+    private resetClients(): void {
+        if (this.pendingClient && this.pendingClient !== this.client) {
+            this.disposeClient(this.pendingClient);
+        }
+        if (this.client) {
+            this.disposeClient(this.client);
+        }
+    }
+
+    private pruneDisconnectedClient(): void {
+        if (this.client && !this.client.hasServerConnection()) {
+            this.resetClients();
+        }
+    }
+
+    private createEditorClient(options: InitOptions): EditorClient {
+        const { downloadLocation, console, loggingEnabled } = options;
         const logFileName = options.loggingEnabled
             ? options.logFileName
             : undefined;
-        // Create a new client if needed
-        if (this.client && !this.client.hasServerConnection()) {
-            try {
-                this.client.quit();
-            } catch (e) {
-                console.log(e);
-            }
-            this.client = undefined;
+        return new EditorClient({
+            ...(logFileName
+                ? { log: path.join(downloadLocation, logFileName) }
+                : {}),
+            logging: loggingEnabled,
+            debug: true,
+            echo: true,
+            console,
+        });
+    }
+
+    private attachClientInvalidationHandlers(client: EditorClient): void {
+        const clearCreatedClientRefs = () => this.clearClientRefs(client);
+        client.on("error", clearCreatedClientRefs);
+        client.on("quit", clearCreatedClientRefs);
+    }
+
+    private startTaskLease(): number {
+        const taskLeaseId = ++this.nextTaskLeaseId;
+        this.activeTaskLeaseId = taskLeaseId;
+        return taskLeaseId;
+    }
+
+    private isTaskLeaseActive(taskLeaseId: number): boolean {
+        return this.activeTaskLeaseId === taskLeaseId;
+    }
+
+    private endTaskLease(taskLeaseId: number): void {
+        if (this.activeTaskLeaseId === taskLeaseId) {
+            this.activeTaskLeaseId = undefined;
         }
-        if (!this.client) {
-            this.client = new EditorClient({
-                ...(logFileName
-                    ? { log: path.join(downloadLocation, logFileName) }
-                    : {}),
-                logging: loggingEnabled,
-                debug: true,
-                echo: true,
-                console,
-            });
-            onCreate(this.client);
-            this.client.on("error", () => {
-                this.client = undefined;
-            });
-            this.client.on("quit", () => {
-                this.client = undefined;
-            });
-            try {
-                await this.client.login(login);
-            } catch (e) {
-                // Clear the client so subsequent calls can create a fresh one
-                this.client = undefined;
-                throw e;
-            }
+    }
+
+    async ensureClient(
+        options: InitOptions,
+        taskExecution: TaskExecution,
+    ): Promise<EditorClient> {
+        this.assertTaskActive(taskExecution);
+        this.pruneDisconnectedClient();
+        this.assertTaskActive(taskExecution);
+        if (this.client) {
+            return this.client;
         }
-        return this.client;
+
+        const { login, onCreate } = options;
+        const createdClient = this.createEditorClient(options);
+        this.pendingClient = createdClient;
+        this.attachClientInvalidationHandlers(createdClient);
+        try {
+            await createdClient.login(
+                login,
+                taskExecution.abortController.signal,
+            );
+            this.assertTaskActive(taskExecution);
+        } catch (e) {
+            this.disposeClient(createdClient);
+            throw e;
+        }
+        this.clearClientRefs(createdClient);
+        this.client = createdClient;
+        onCreate(createdClient);
+        return createdClient;
     }
 }
 const processorSingleton = new TaskQueueProcessor();
@@ -271,7 +459,7 @@ class EditorClient extends BaseGameClient {
         this.retryCommand = "";
     }
 
-    private isInteractive(): Promise<void> {
+    private isInteractive(abortSignal?: AbortSignal): Promise<void> {
         if (this.interactive === true) {
             return Promise.resolve();
         }
@@ -282,20 +470,42 @@ class EditorClient extends BaseGameClient {
                     // character name, account name, index
                 }
             });
-            const timeout = setTimeout(() => {
+            let settled = false;
+            const cleanup = () => {
                 this.off("text", waitForPrompt);
-                reject();
+                clearTimeout(timeout);
+                abortSignal?.removeEventListener("abort", onAbort);
+            };
+            const settle = (handler: () => void) => {
+                if (settled) return;
+                settled = true;
+                cleanup();
+                handler();
+            };
+            function onAbort() {
+                settle(() =>
+                    reject(createAbortError("Editor client login cancelled.")),
+                );
+            }
+            const timeout = setTimeout(() => {
+                settle(() =>
+                    reject(new EditorClientLoginTimeoutError(clientTimeout)),
+                );
             }, clientTimeout);
             const waitForPrompt = (text: string) => {
                 output.accumulate(text);
                 if (output.peek(1) === ">") {
                     this.interactive = true;
-                    this.off("text", waitForPrompt);
-                    clearTimeout(timeout);
-                    resolve();
+                    settle(() => resolve());
                 }
             };
             this.on("text", waitForPrompt);
+            if (abortSignal) {
+                abortSignal.addEventListener("abort", onAbort, { once: true });
+                if (abortSignal.aborted) {
+                    onAbort();
+                }
+            }
         });
     }
 
@@ -387,19 +597,27 @@ class EditorClient extends BaseGameClient {
     ): Promise<ScriptProperties> {
         const scriptProperties: Partial<ScriptProperties> = { new: false };
         return new Promise((resolve, reject) => {
-            const modifyFailed = (reason: string) => {
+            const modifyFailed = (reason: string, errorName?: string) => {
                 clearTimeout(timeout);
                 this.off("text", processText);
-                reject(new Error(reason));
+                reject(
+                    errorName
+                        ? createNamedError(errorName, reason)
+                        : new Error(reason),
+                );
             };
             const output = new OutputProcessor((line: string) => {
                 let match: RegExpMatchArray | null;
                 if (rx_noverb.test(line)) {
-                    return modifyFailed(`Verb '${script}' does not exist.`);
+                    return modifyFailed(
+                        `Verb '${script}' does not exist.`,
+                        "EditorClientMissingVerbError",
+                    );
                 }
                 if (rx_noscript.test(line)) {
                     return modifyFailed(
                         `Script ${script} has not yet been created.`,
+                        "EditorClientMissingScriptError",
                     );
                 }
                 match = line.match(rx_getverb);
@@ -601,7 +819,8 @@ class EditorClient extends BaseGameClient {
         });
     }
 
-    async reconnect() {
+    async reconnect(abortSignal?: AbortSignal) {
+        throwIfAborted(abortSignal, "Editor client login cancelled.");
         const error: any = (e: Error) => {
             error.caught = e;
         };
@@ -612,18 +831,20 @@ class EditorClient extends BaseGameClient {
             instance,
             character,
             "storm",
+            abortSignal,
         ).catch(error);
         if (error.caught) {
             return Promise.reject(error.caught);
         }
+        throwIfAborted(abortSignal, "Editor client login cancelled.");
         this.interactive = false;
         this.connect(sal);
-        return await this.isInteractive();
+        return await this.isInteractive(abortSignal);
     }
 
-    async login(loginDetails: any) {
+    async login(loginDetails: any, abortSignal?: AbortSignal) {
         this.loginDetails = loginDetails;
-        return await this.reconnect();
+        return await this.reconnect(abortSignal);
     }
 
     /**

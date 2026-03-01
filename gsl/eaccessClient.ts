@@ -129,10 +129,18 @@ export class EAccessClient extends EventEmitter {
     }
 
     close() {
-        if (this.status !== STATUS_CLOSED) {
+        if (this.status === STATUS_CLOSED) return;
+        this.status = STATUS_CLOSED;
+
+        try {
             this.socket.end();
+        } catch {
+            // Ignore close races during forced cancellation/teardown.
+        }
+        try {
             this.socket.destroy();
-            this.status = STATUS_CLOSED;
+        } catch {
+            // Ignore close races during forced cancellation/teardown.
         }
     }
 
@@ -461,20 +469,69 @@ export class EAccessClient extends EventEmitter {
         game: string,
         character: string,
         mode: string,
+        abortSignal?: AbortSignal,
     ): Promise<SAL> {
         const options = { debug: true, console: this.console };
         return new Promise((resolve, reject) => {
+            const createQuickLoginError = (
+                name: "QuickLoginError" | "QuickLoginCancelledError",
+                message: string,
+                code?: string,
+            ): Error => {
+                const error = new Error(message) as Error & {
+                    code?: string;
+                };
+                error.name = name;
+                if (code) {
+                    error.code = code;
+                }
+                return error;
+            };
             const client = new this(options);
-            client.once(EVENT_PROBLEM, (code: string) =>
-                reject(new Error(`Quick login failed due to ${code}`)),
-            );
-            client.once(EVENT_ERROR, (error: Error) => reject(error));
+            let settled = false;
+            const settle = (next: () => void) => {
+                if (settled) return;
+                settled = true;
+                abortSignal?.removeEventListener("abort", onAbort);
+                next();
+            };
+            const rejectOnce = (error: Error) => settle(() => reject(error));
+            const resolveOnce = (sal: SAL) => settle(() => resolve(sal));
+            const onAbort = () => {
+                try {
+                    client.close();
+                } catch {
+                    // Ignore teardown errors and preserve cancel signal.
+                }
+                rejectOnce(
+                    createQuickLoginError(
+                        "QuickLoginCancelledError",
+                        "Quick login cancelled.",
+                    ),
+                );
+            };
+            if (abortSignal?.aborted) {
+                onAbort();
+                return;
+            }
+            abortSignal?.addEventListener("abort", onAbort, { once: true });
+
+            client.once(EVENT_PROBLEM, (code: string) => {
+                rejectOnce(
+                    createQuickLoginError(
+                        "QuickLoginError",
+                        `Quick login failed due to ${code}`,
+                        code,
+                    ),
+                );
+            });
+            client.once(EVENT_ERROR, (error: Error) => rejectOnce(error));
             client.once(EVENT_READY, () => client.authorize(account, password));
             client.once(EVENT_GAMES, () => client.selectGame(game));
             client.once(EVENT_CHARS, () =>
                 client.selectCharacter(character, mode),
             );
-            client.once(EVENT_LAUNCH, (sal: SAL) => resolve(sal));
+            client.once(EVENT_LAUNCH, (sal: SAL) => resolveOnce(sal));
             client.connect();
         });
     }

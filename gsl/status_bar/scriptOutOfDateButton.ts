@@ -340,56 +340,52 @@ export class OutOfDateButtonManager {
         const localIteration = this.iteration;
         const document = window.activeTextEditor?.document;
         if (!document) return;
+        const scriptNum = getScriptNumber(document);
+        if (!scriptNum) throw new Error("Failed to get script number");
+        const { SHOW_COMPARISON, OVERWRITE_LOCAL_COPY, STOP_MONITORING } =
+            OutOfDateChoice;
 
-        await this.withEditorClient(async (client) => {
-            if (this.isExecutionStale(document, localIteration)) return;
-            const scriptNum = getScriptNumber(document);
-            if (!scriptNum) throw new Error("Failed to get script number");
-            const { SHOW_COMPARISON, OVERWRITE_LOCAL_COPY, STOP_MONITORING } =
-                OutOfDateChoice;
+        // Ask user for action
+        const userChoice = await showQuickPick({
+            title: `Script ${scriptNum} Differs`,
+            items: [
+                {
+                    id: SHOW_COMPARISON,
+                    label: "Show Comparison",
+                    iconPath: new ThemeIcon("diff"),
+                    description: "Compare local script with server script.",
+                },
+                QuickPickItemKind.Separator,
+                {
+                    id: OVERWRITE_LOCAL_COPY,
+                    label: "Overwrite Local Copy",
+                    iconPath: new ThemeIcon("cloud-download"),
+                    description: `Download s${scriptNum} from server.`,
+                },
+                QuickPickItemKind.Separator,
+                {
+                    id: STOP_MONITORING,
+                    label: "Stop Monitoring",
+                    iconPath: new ThemeIcon("sync-ignored"),
+                    description: "Stop monitoring script until next version.",
+                },
+            ],
+        });
+        if (!userChoice || this.isExecutionStale(document, localIteration)) {
+            return;
+        }
 
-            // Ask user for action
-            const userChoice = await showQuickPick({
-                title: `Script ${scriptNum} Differs`,
-                items: [
-                    {
-                        id: SHOW_COMPARISON,
-                        label: "Show Comparison",
-                        iconPath: new ThemeIcon("diff"),
-                        description: "Compare local script with server script.",
-                    },
-                    QuickPickItemKind.Separator,
-                    {
-                        id: OVERWRITE_LOCAL_COPY,
-                        label: "Overwrite Local Copy",
-                        iconPath: new ThemeIcon("cloud-download"),
-                        description: `Download s${scriptNum} from server.`,
-                    },
-                    QuickPickItemKind.Separator,
-                    {
-                        id: STOP_MONITORING,
-                        label: "Stop Monitoring",
-                        iconPath: new ThemeIcon("sync-ignored"),
-                        description:
-                            "Stop monitoring script until next version.",
-                    },
-                ],
-            });
-            if (
-                this.isExecutionStale(document, localIteration) ||
-                !userChoice
-            ) {
-                return;
-            }
-
-            // Take action
-            switch (userChoice) {
-                case SHOW_COMPARISON: {
-                    this.button.hide();
+        // Take action
+        switch (userChoice) {
+            case SHOW_COMPARISON: {
+                this.button.hide();
+                return this.withEditorClient(async (client) => {
                     return this.showDiff(client, scriptNum, document);
-                }
-                case OVERWRITE_LOCAL_COPY: {
-                    this.button.hide();
+                });
+            }
+            case OVERWRITE_LOCAL_COPY: {
+                this.button.hide();
+                return this.withEditorClient(async (client) => {
                     const result = await GSLExtension.downloadScript(
                         client,
                         scriptNum,
@@ -408,17 +404,19 @@ export class OutOfDateButtonManager {
                         );
                     }
                     return void this.showDownloadedScript(result);
-                }
-                case STOP_MONITORING: {
-                    this.renderButton({ state: "ignored", scriptNum });
-                    return this.stopCheckingScript(client, scriptNum);
-                }
-                default: {
-                    console.error("Unexpected user choice", userChoice);
-                    assertNever(userChoice, undefined);
-                }
+                });
             }
-        });
+            case STOP_MONITORING: {
+                this.renderButton({ state: "ignored", scriptNum });
+                return this.withEditorClient(async (client) => {
+                    return this.stopCheckingScript(client, scriptNum);
+                });
+            }
+            default: {
+                console.error("Unexpected user choice", userChoice);
+                assertNever(userChoice, undefined);
+            }
+        }
     }
 
     /**
