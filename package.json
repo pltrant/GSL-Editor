@@ -38,14 +38,19 @@
     "@types/mocha": "^10.0.1",
     "@types/node": "^20.4.5",
     "@types/vscode": "^1.109.0",
-    "@typescript-eslint/parser": "^6.2.0",
+    "@typescript-eslint/parser": "^8.28.0",
     "@vscode/test-electron": "^2.3.3",
     "esbuild": "^0.27.2",
-    "eslint": "^8.46.0",
+    "eslint": "^9.22.0",
     "glob": "^11.1.0",
-    "mocha": "^10.8.2",
+    "mocha": "^11.7.5",
     "prettier": "^3.8.1",
     "typescript": "^5.1.6"
+  },
+  "overrides": {
+    "minimatch": "^10.0.1",
+    "serialize-javascript": "^7.0.3",
+    "diff": "^8.0.3"
   },
   "scripts": {
     "vscode:prepublish": "npm run compile && npm run bundle && cd gsl-language-server && npm run compile",

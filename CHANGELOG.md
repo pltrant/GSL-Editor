@@ -2,7 +2,7 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
-## [1.18.0] - 2026-02-20
+## [1.18.0] - 2026-03-01
 
 **Important:** To fully benefit from this release, rerun `GSL: User Setup` so your stored Development and Prime configuration is refreshed.
 
