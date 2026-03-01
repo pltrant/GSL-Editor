@@ -29,7 +29,7 @@ const ERROR_NORECORD = "NORECORD",
     ERROR_UNKNOWN = "?";
 
 interface RSAPeerCertificate extends PeerCertificate {
-    pubkey: Buffer;
+    pubkey: Buffer<ArrayBuffer>;
 }
 
 export interface GameOption {
