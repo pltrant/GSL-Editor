@@ -31,6 +31,11 @@ interface IUploadScriptParams {
 
 type IGetCurrentAuthorParams = Record<string, never>;
 
+interface IGetRoomDataParams {
+    roomId: number;
+    instance?: "prime" | "dev";
+}
+
 const AGENT_UPLOAD_SCRIPT_NUMBER = 24661;
 
 // ---------------------------------------------------------------------------
@@ -553,6 +558,77 @@ class GetCurrentAuthorTool implements vscode.LanguageModelTool<IGetCurrentAuthor
 // ---------------------------------------------------------------------------
 
 /**
+ * Validates and returns a room ID.
+ */
+function parseRequiredRoomId(value: number | undefined): number {
+    if (value === undefined || !Number.isInteger(value) || value < 1) {
+        throw new Error(
+            "Missing or invalid roomId. Provide a positive integer.",
+        );
+    }
+    return value;
+}
+
+class GetRoomDataTool implements vscode.LanguageModelTool<IGetRoomDataParams> {
+    async prepareInvocation(
+        options: vscode.LanguageModelToolInvocationPrepareOptions<IGetRoomDataParams>,
+        _token: vscode.CancellationToken,
+    ) {
+        parseRequiredRoomId(options.input.roomId);
+        const instance = options.input.instance ?? "dev";
+        return {
+            invocationMessage: `Fetching room ${options.input.roomId} from ${instance} server\u2026`,
+        };
+    }
+
+    async invoke(
+        options: vscode.LanguageModelToolInvocationOptions<IGetRoomDataParams>,
+        token: vscode.CancellationToken,
+    ): Promise<vscode.LanguageModelToolResult> {
+        try {
+            throwIfCancelled(token);
+            if (!vscRef) {
+                throw new Error(
+                    "GSL extension is not active. Open a GSL file to activate it.",
+                );
+            }
+
+            const roomId = parseRequiredRoomId(options.input.roomId);
+            const instance = options.input.instance ?? "dev";
+
+            const rawOutput = await withCancellation(
+                vscRef.getRoomData(roomId, instance),
+                token,
+            );
+
+            if (!rawOutput || rawOutput.trim().length === 0) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        `Room ${roomId}: No data returned from ${instance} server. ` +
+                            `The room may not exist.`,
+                    ),
+                ]);
+            }
+
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(rawOutput),
+            ]);
+        } catch (e) {
+            if (isToolCancelled(e)) {
+                return createCancelledToolResult(
+                    "Get room data was cancelled before completion.",
+                );
+            }
+            throw new Error(
+                `Failed to get room data for room ${
+                    options.input.roomId ?? "(missing roomId)"
+                }: ${e instanceof Error ? e.message : String(e)}`,
+            );
+        }
+    }
+}
+
+/**
  * Registers the Copilot language-model tools.  Call from `activate()`.
  *
  * @param context - the extension context (for subscriptions)
@@ -582,5 +658,6 @@ export function registerCopilotTools(
             "gsl-get-current-author",
             new GetCurrentAuthorTool(),
         ),
+        vscode.lm.registerTool("gsl_get_room_data", new GetRoomDataTool()),
     );
 }

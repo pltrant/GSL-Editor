@@ -856,12 +856,15 @@ class EditorClient extends BaseGameClient {
         {
             captureStart,
             captureEnd,
+            abortPattern,
             timeoutMillis,
             includeStartLine,
             includeEndLine,
         }: {
             captureStart: RegExp;
             captureEnd: RegExp;
+            /** If matched before captureStart, resolves immediately with that line. */
+            abortPattern?: RegExp;
             timeoutMillis: number;
             includeStartLine?: boolean;
             includeEndLine?: boolean;
@@ -876,6 +879,13 @@ class EditorClient extends BaseGameClient {
             const output = new OutputProcessor((line: string) => {
                 // Check capture start
                 if (!seenStart) {
+                    // Check abort pattern before start marker
+                    if (abortPattern && line.match(abortPattern)) {
+                        this.off("text", processText);
+                        clearTimeout(timeout);
+                        resolve([line]);
+                        return;
+                    }
                     if (line.match(captureStart)) {
                         seenStart = true;
                         if (includeStartLine) {
