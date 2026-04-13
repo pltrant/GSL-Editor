@@ -36,6 +36,11 @@ interface IGetRoomDataParams {
     instance?: "prime" | "dev";
 }
 
+interface IGetExistenceDataParams {
+    existenceId: number;
+    instance?: "prime" | "dev";
+}
+
 const AGENT_UPLOAD_SCRIPT_NUMBER = 24661;
 
 // ---------------------------------------------------------------------------
@@ -569,6 +574,79 @@ function parseRequiredRoomId(value: number | undefined): number {
     return value;
 }
 
+/**
+ * Validates and returns an existence ID (positive or negative integer).
+ */
+function parseRequiredExistenceId(value: number | undefined): number {
+    if (value === undefined || !Number.isInteger(value) || value === 0) {
+        throw new Error(
+            "Missing or invalid existenceId. Provide a non-zero integer.",
+        );
+    }
+    return value;
+}
+
+class GetExistenceDataTool implements vscode.LanguageModelTool<IGetExistenceDataParams> {
+    async prepareInvocation(
+        options: vscode.LanguageModelToolInvocationPrepareOptions<IGetExistenceDataParams>,
+        _token: vscode.CancellationToken,
+    ) {
+        parseRequiredExistenceId(options.input.existenceId);
+        const instance = options.input.instance ?? "dev";
+        return {
+            invocationMessage: `Fetching existence ${options.input.existenceId} from ${instance} server\u2026`,
+        };
+    }
+
+    async invoke(
+        options: vscode.LanguageModelToolInvocationOptions<IGetExistenceDataParams>,
+        token: vscode.CancellationToken,
+    ): Promise<vscode.LanguageModelToolResult> {
+        try {
+            throwIfCancelled(token);
+            if (!vscRef) {
+                throw new Error(
+                    "GSL extension is not active. Open a GSL file to activate it.",
+                );
+            }
+
+            const existenceId = parseRequiredExistenceId(
+                options.input.existenceId,
+            );
+            const instance = options.input.instance ?? "dev";
+
+            const rawOutput = await withCancellation(
+                vscRef.getExistenceData(existenceId, instance),
+                token,
+            );
+
+            if (!rawOutput || rawOutput.trim().length === 0) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        `Existence ${existenceId}: No data returned from ${instance} server. ` +
+                            `The existence may not exist.`,
+                    ),
+                ]);
+            }
+
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(rawOutput),
+            ]);
+        } catch (e) {
+            if (isToolCancelled(e)) {
+                return createCancelledToolResult(
+                    "Get existence data was cancelled before completion.",
+                );
+            }
+            throw new Error(
+                `Failed to get existence data for ${options.input.existenceId ?? "(missing existenceId)"}: ${
+                    e instanceof Error ? e.message : String(e)
+                }`,
+            );
+        }
+    }
+}
+
 class GetRoomDataTool implements vscode.LanguageModelTool<IGetRoomDataParams> {
     async prepareInvocation(
         options: vscode.LanguageModelToolInvocationPrepareOptions<IGetRoomDataParams>,
@@ -659,5 +737,9 @@ export function registerCopilotTools(
             new GetCurrentAuthorTool(),
         ),
         vscode.lm.registerTool("gsl_get_room_data", new GetRoomDataTool()),
+        vscode.lm.registerTool(
+            "gsl_get_existence_data",
+            new GetExistenceDataTool(),
+        ),
     );
 }

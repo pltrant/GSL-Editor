@@ -249,7 +249,37 @@
                 "dev"
               ],
               "default": "dev",
-              "description": "Which server instance to query. Defaults to 'dev'."
+              "description": "Which server instance to query. Defaults to 'dev', which is typically preferred."
+            }
+          }
+        }
+      },
+      {
+        "name": "gsl_get_existence_data",
+        "displayName": "Get Existence Data",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "getExistenceData",
+        "icon": "$(symbol-misc)",
+        "userDescription": "Retrieve existence (object/item) data from the game server using /se <id>.",
+        "modelDescription": "Sends the /se (show existence) command to the game server for a given existence ID and returns the full existence data output, including the item name, varfields aka properties, flags, and location. Negative IDs are permanent IDs (PID'd) — these are stable references that persist across unload/reload cycles. Positive IDs are temporary and may change. Can target either the Prime (production) or Dev server instance. Defaults to Dev, which is typically preferred. For the room data equivalent, see `gsl_get_room_data`.",
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "existenceId"
+          ],
+          "properties": {
+            "existenceId": {
+              "type": "integer",
+              "description": "The existence ID to look up. Negative IDs are permanent (PID'd) and stable across reloads."
+            },
+            "instance": {
+              "type": "string",
+              "enum": [
+                "prime",
+                "dev"
+              ],
+              "default": "dev",
+              "description": "Which server instance to query. Defaults to 'dev', which is typically preferred."
             }
           }
         }

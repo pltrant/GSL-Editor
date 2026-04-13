@@ -1323,6 +1323,19 @@ export class VSCodeIntegration {
         return result;
     }
 
+    async getExistenceData(
+        existenceId: number,
+        instance: "prime" | "dev",
+    ): Promise<string> {
+        return this.executeShowCommandOnInstance(
+            instance,
+            `/se ${existenceId}`,
+            /^Showing /,
+            /^Flags:/,
+            /^Existence ".*?" not found\./,
+        );
+    }
+
     async getRoomData(
         roomId: number,
         instance: "prime" | "dev",
