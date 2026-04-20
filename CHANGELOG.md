@@ -2,6 +2,13 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.19.0] - 2026-04-20
+
+### Added
+
+- Added Copilot tool `gsl_get_room_data` to retrieve full room data via `/sr`, including Prime/Dev targeting.
+- Added Copilot tool `gsl_get_existence_data` to retrieve full existence data via `/se`, including Prime/Dev targeting.
+
 ## [1.18.0] - 2026-03-01
 
 **Important:** To fully benefit from this release, rerun `GSL: User Setup` so your stored Development and Prime configuration is refreshed.
