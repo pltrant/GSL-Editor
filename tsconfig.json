@@ -1,15 +1,15 @@
 {
-	"compilerOptions": {
-		"target": "ES2022",
-		"lib": ["ES2022"],
-		"module": "commonjs",
-		"moduleResolution": "node",
-		"resolveJsonModule": true,
-		"sourceMap": true,
-		"strict": true,
-		"outDir": ".",
-		"rootDir": "."
-	},
-	"include": ["extension.ts","gsl","gsl-language-server", "test"],
-	"exclude": ["node_modules", ".vscode-test"]
+    "compilerOptions": {
+        "target": "ES2022",
+        "lib": ["ES2022"],
+        "module": "Node16",
+        "moduleResolution": "node16",
+        "resolveJsonModule": true,
+        "sourceMap": true,
+        "strict": true,
+        "outDir": ".",
+        "rootDir": "."
+    },
+    "include": ["extension.ts", "gsl", "gsl-language-server", "test"],
+    "exclude": ["node_modules", ".vscode-test"]
 }
