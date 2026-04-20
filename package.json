@@ -222,6 +222,67 @@
           "type": "object",
           "properties": {}
         }
+      },
+      {
+        "name": "gsl_get_room_data",
+        "displayName": "Get Room Data",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "getRoomData",
+        "icon": "$(compass)",
+        "userDescription": "Retrieve room data from the game server using /sr <room id>.",
+        "modelDescription": "Sends the /sr command to the game server for a given room ID and returns the full room data output, including room name, varfields aka properties, flags, and directions. This does NOT show objects currently in the room, except those explicitly linked in the room description texts. Existence IDs referenced in room text (e.g. $+$-516105D) are PID'd (permanent) and therefore negative — always preserve the negative sign when using them with other tools such as `gsl_get_existence_data`. Can target either the Prime (production) or Dev server instance. Defaults to Dev, which is typically preferred.",
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "roomId"
+          ],
+          "properties": {
+            "roomId": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "The room ID to look up."
+            },
+            "instance": {
+              "type": "string",
+              "enum": [
+                "prime",
+                "dev"
+              ],
+              "default": "dev",
+              "description": "Which server instance to query. Defaults to 'dev', which is typically preferred."
+            }
+          }
+        }
+      },
+      {
+        "name": "gsl_get_existence_data",
+        "displayName": "Get Existence Data",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "getExistenceData",
+        "icon": "$(symbol-misc)",
+        "userDescription": "Retrieve existence (object/item) data from the game server using /se <id>.",
+        "modelDescription": "Sends the /se (show existence) command to the game server for a given existence ID and returns the full existence data output, including the item name, varfields aka properties, flags, and location. Negative IDs are permanent IDs (PID'd) — these are stable references that persist across unload/reload cycles. Positive IDs are temporary and may change. Can target either the Prime (production) or Dev server instance. Defaults to Dev, which is typically preferred. For the room data equivalent, see `gsl_get_room_data`.",
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "existenceId"
+          ],
+          "properties": {
+            "existenceId": {
+              "type": "integer",
+              "description": "The existence ID to look up. Negative IDs are permanent (PID'd) and stable across reloads."
+            },
+            "instance": {
+              "type": "string",
+              "enum": [
+                "prime",
+                "dev"
+              ],
+              "default": "dev",
+              "description": "Which server instance to query. Defaults to 'dev', which is typically preferred."
+            }
+          }
+        }
       }
     ],
     "configuration": {

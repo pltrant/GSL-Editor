@@ -1272,6 +1272,83 @@ export class VSCodeIntegration {
         });
     }
 
+    private async executeShowCommand(
+        client: EditorClientInterface,
+        command: string,
+        captureStart: RegExp,
+        captureEnd: RegExp,
+        abortPattern: RegExp,
+    ): Promise<string> {
+        const TIMEOUT_MS = 15000;
+        const lines = await client.executeCommand(command, {
+            captureStart,
+            captureEnd,
+            abortPattern,
+            timeoutMillis: TIMEOUT_MS,
+            includeStartLine: true,
+            includeEndLine: true,
+        });
+        return lines.join("\n");
+    }
+
+    private async executeShowCommandOnInstance(
+        instance: "prime" | "dev",
+        command: string,
+        captureStart: RegExp,
+        captureEnd: RegExp,
+        abortPattern: RegExp,
+    ): Promise<string> {
+        const task = (client: EditorClientInterface) =>
+            this.executeShowCommand(
+                client,
+                command,
+                captureStart,
+                captureEnd,
+                abortPattern,
+            );
+
+        if (instance === "prime") {
+            return primeService.doPrimeEditorClientTask(
+                task,
+                this.getPrimeServiceDependencies(),
+            );
+        }
+
+        const result = await this.withEditorClient(task);
+        if (result === undefined) {
+            throw new Error(
+                "Dev server not configured. Run 'GSL: User Setup' first.",
+            );
+        }
+        return result;
+    }
+
+    async getExistenceData(
+        existenceId: number,
+        instance: "prime" | "dev",
+    ): Promise<string> {
+        return this.executeShowCommandOnInstance(
+            instance,
+            `/se ${existenceId}`,
+            /^Showing /,
+            /^Flags:/,
+            /^Existence ".*?" not found\./,
+        );
+    }
+
+    async getRoomData(
+        roomId: number,
+        instance: "prime" | "dev",
+    ): Promise<string> {
+        return this.executeShowCommandOnInstance(
+            instance,
+            `/sr ${roomId}`,
+            /^Showing room #\d+/,
+            /^Flags:/,
+            /does not exist or could not be loaded for some reason/,
+        );
+    }
+
     private registerCommands() {
         let subscription: Disposable;
         subscription = commands.registerCommand(
