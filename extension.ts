@@ -47,7 +47,7 @@ import {
 } from "./gsl/editorClient";
 import { formatDate } from "./gsl/util/dateUtil";
 import { OutOfDateButtonManager } from "./gsl/status_bar/scriptOutOfDateButton";
-import { scriptNumberFromFileName } from "./gsl/util/scriptUtil";
+import { inferredScriptNumRegex, scriptNumberFromFileName } from "./gsl/util/scriptUtil";
 import {
     GSLX_AUTOMATIC_DOWNLOADS,
     GSLX_CURRENT_AUTHOR,
@@ -81,6 +81,12 @@ import * as primeService from "./gsl/prime/primeService";
 
 const rx_script_number = /^\d{1,6}$/;
 const rx_script_number_in_filename = /(\d+)\.gsl/;
+
+interface GlobalScriptState {
+    modifier?: string;
+    lastModifiedDate?: Date;
+    fileName?: string;
+}
 
 interface LastSeenScriptModification {
     modifier: string;
@@ -339,12 +345,21 @@ export class GSLExtension {
               };
     }
 
+    static getScriptState(script: number) {
+        let existingState = this.context.globalState.get<GlobalScriptState>(
+            this.scriptPropsKey(script),
+        );
+
+        return existingState ?? {};
+    }
+
     static recordScriptModification(
         script: number,
         modifier: string,
         lastModifiedDate: Date,
     ): void {
         this.context.globalState.update(this.scriptPropsKey(script), {
+            ...GSLExtension.getScriptState(script),
             modifier,
             lastModifiedDate: lastModifiedDate.toISOString(),
         });
@@ -353,16 +368,27 @@ export class GSLExtension {
     static findLastSeenScriptModification(
         script: number,
     ): LastSeenScriptModification | undefined {
-        const output = this.context.globalState.get<{
-            modifier: string;
-            lastModifiedDate: string;
-        }>(this.scriptPropsKey(script));
-        return output
+        const output = GSLExtension.getScriptState(script);
+
+        return output && output.modifier && output.lastModifiedDate
             ? {
                   modifier: output.modifier,
                   lastModifiedDate: new Date(output.lastModifiedDate), // restore from ISO string
               }
             : undefined;
+    }
+
+    static recordScriptFileName(script: number, fileName: string): void {
+        this.context.globalState.update(this.scriptPropsKey(script), {
+            ...GSLExtension.getScriptState(script),
+            fileName,
+        });
+    }
+
+    static findScriptFilename(script: number): string | undefined {
+        const output = GSLExtension.getScriptState(script);
+
+        return output?.fileName ? output.fileName : undefined;
     }
 
     /** @returns key for storing script modification data */
@@ -612,10 +638,56 @@ export class VSCodeIntegration {
             );
         }
         const fileName = path.basename(document.fileName);
-        if (!/^s\d+\.gsl$/i.test(fileName)) {
-            return void window.showErrorMessage(
-                `Invalid script filename: "${fileName}". Expected format: s<number>.gsl`,
-            );
+        const scriptNumberRegex = /^s\d+\.gsl$/i;
+        if (!scriptNumberRegex.test(fileName)) {
+            const inferredScriptMatch = inferredScriptNumRegex.exec(fileName);
+            let inferredScriptNumberAllowed = false;
+
+            if (inferredScriptMatch?.groups) {
+                const scriptNumberFromMatch =
+                    inferredScriptMatch.groups["script"];
+
+                if (scriptNumberRegex.test(scriptNumberFromMatch)) {
+                    const parsedScriptNumber = scriptNumberFromFileName(
+                        scriptNumberFromMatch,
+                    );
+                    const allowedFileName = GSLExtension.findScriptFilename(
+                        Number(parsedScriptNumber),
+                    );
+
+                    if (allowedFileName === fileName) {
+                        inferredScriptNumberAllowed = true;
+                    } else {
+                        const confirmation = await window.showWarningMessage(
+                            "The script file name does not match the normal format (s<number>.gsl). " +
+                                "I inferred a script number (" +
+                                parsedScriptNumber +
+                                ") from it, " +
+                                "but please confirm this is correct so that the correct " +
+                                "script is uploaded.",
+                            { modal: true },
+                            "Yes",
+                        );
+                        if (confirmation === "Yes") {
+                            GSLExtension.recordScriptFileName(
+                                Number(parsedScriptNumber),
+                                fileName,
+                            );
+                            inferredScriptNumberAllowed = true;
+                        }
+                    }
+                }
+            }
+
+            if (!inferredScriptNumberAllowed) {
+                return void window.showErrorMessage(
+                    'Invalid script filename: "' +
+                        fileName +
+                        '". Expected format: s<number>.gsl ' +
+                        "If you want to add a description to the file name, make sure that it ends " +
+                        'the expected format (e.g. "Spell Spawn S000154.gsl").',
+                );
+            }
         }
         if (document.isDirty) {
             let result = false;
