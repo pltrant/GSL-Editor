@@ -283,6 +283,33 @@
                         }
                     }
                 }
+            },
+            {
+                "name": "gsl_slash_agent_command",
+                "displayName": "Run /agent Command",
+                "canBeReferencedInPrompt": true,
+                "toolReferenceName": "slashAgentCommand",
+                "icon": "$(terminal)",
+                "userDescription": "Run a /agent subcommand on the game server and return its output.",
+                "modelDescription": "Sends a `/agent <subcommand> [args...]` command to the game server and returns the full output. The /agent verb is a programmable dispatcher on the game server that supports various subcommands for querying game data. Run with no arguments to list available subcommands. Run with just a subcommand name (no args) to see its usage. Can target either the Prime (production) or Dev server instance. Defaults to Dev. See S24792.gsl for implementation.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string",
+                            "description": "The /agent subcommand and its arguments (e.g. '/vftable PlayerName tableName 0 5'). Omit to list all available subcommands."
+                        },
+                        "instance": {
+                            "type": "string",
+                            "enum": [
+                                "prime",
+                                "dev"
+                            ],
+                            "default": "dev",
+                            "description": "Which server instance to query. Defaults to 'dev'."
+                        }
+                    }
+                }
             }
         ],
         "configuration": {

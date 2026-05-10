@@ -41,6 +41,11 @@ interface IGetExistenceDataParams {
     instance?: "prime" | "dev";
 }
 
+interface IAgentCommandParams {
+    command?: string;
+    instance?: "prime" | "dev";
+}
+
 const AGENT_UPLOAD_SCRIPT_NUMBER = 24661;
 
 // ---------------------------------------------------------------------------
@@ -706,6 +711,65 @@ class GetRoomDataTool implements vscode.LanguageModelTool<IGetRoomDataParams> {
     }
 }
 
+class AgentCommandTool implements vscode.LanguageModelTool<IAgentCommandParams> {
+    async prepareInvocation(
+        options: vscode.LanguageModelToolInvocationPrepareOptions<IAgentCommandParams>,
+        _token: vscode.CancellationToken,
+    ) {
+        const command = options.input.command?.trim();
+        const instance = options.input.instance ?? "dev";
+        const message = command
+            ? `Running /agent ${command} on ${instance} server\u2026`
+            : `Listing available /agent subcommands on ${instance} server\u2026`;
+        return { invocationMessage: message };
+    }
+
+    async invoke(
+        options: vscode.LanguageModelToolInvocationOptions<IAgentCommandParams>,
+        token: vscode.CancellationToken,
+    ): Promise<vscode.LanguageModelToolResult> {
+        try {
+            throwIfCancelled(token);
+            if (!vscRef) {
+                throw new Error(
+                    "GSL extension is not active. Open a GSL file to activate it.",
+                );
+            }
+
+            const command = options.input.command?.trim() ?? "";
+            const instance = options.input.instance ?? "dev";
+
+            const rawOutput = await withCancellation(
+                vscRef.executeAgentCommand(command, instance),
+                token,
+            );
+
+            if (!rawOutput || rawOutput.trim().length === 0) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        `No output returned from /agent ${command} on ${instance} server.`,
+                    ),
+                ]);
+            }
+
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(rawOutput),
+            ]);
+        } catch (e) {
+            if (isToolCancelled(e)) {
+                return createCancelledToolResult(
+                    "Agent command was cancelled before completion.",
+                );
+            }
+            throw new Error(
+                `Failed to run /agent ${options.input.command ?? "(missing command)"}: ${
+                    e instanceof Error ? e.message : String(e)
+                }`,
+            );
+        }
+    }
+}
+
 /**
  * Registers the Copilot language-model tools.  Call from `activate()`.
  *
@@ -740,6 +804,10 @@ export function registerCopilotTools(
         vscode.lm.registerTool(
             "gsl_get_existence_data",
             new GetExistenceDataTool(),
+        ),
+        vscode.lm.registerTool(
+            "gsl_slash_agent_command",
+            new AgentCommandTool(),
         ),
     );
 }

@@ -48,6 +48,7 @@ import {
 import { formatDate } from "./gsl/util/dateUtil";
 import { OutOfDateButtonManager } from "./gsl/status_bar/scriptOutOfDateButton";
 import { scriptNumberFromFileName } from "./gsl/util/scriptUtil";
+import { throwOnControlCharacters } from "./gsl/strings";
 import {
     GSLX_AUTOMATIC_DOWNLOADS,
     GSLX_CURRENT_AUTHOR,
@@ -1278,6 +1279,8 @@ export class VSCodeIntegration {
         captureStart: RegExp,
         captureEnd: RegExp,
         abortPattern: RegExp,
+        includeStartLine: boolean,
+        includeEndLine: boolean,
     ): Promise<string> {
         const TIMEOUT_MS = 15000;
         const lines = await client.executeCommand(command, {
@@ -1285,8 +1288,8 @@ export class VSCodeIntegration {
             captureEnd,
             abortPattern,
             timeoutMillis: TIMEOUT_MS,
-            includeStartLine: true,
-            includeEndLine: true,
+            includeStartLine,
+            includeEndLine,
         });
         return lines.join("\n");
     }
@@ -1297,6 +1300,7 @@ export class VSCodeIntegration {
         captureStart: RegExp,
         captureEnd: RegExp,
         abortPattern: RegExp,
+        { includeStartLine = true, includeEndLine = true } = {},
     ): Promise<string> {
         const task = (client: EditorClientInterface) =>
             this.executeShowCommand(
@@ -1305,6 +1309,8 @@ export class VSCodeIntegration {
                 captureStart,
                 captureEnd,
                 abortPattern,
+                includeStartLine,
+                includeEndLine,
             );
 
         if (instance === "prime") {
@@ -1346,6 +1352,22 @@ export class VSCodeIntegration {
             /^Showing room #\d+/,
             /^Flags:/,
             /does not exist or could not be loaded for some reason/,
+        );
+    }
+
+    async executeAgentCommand(
+        command: string,
+        instance: "prime" | "dev",
+    ): Promise<string> {
+        throwOnControlCharacters(command);
+        const fullCommand = command ? `/agent ${command}` : `/agent`;
+        return this.executeShowCommandOnInstance(
+            instance,
+            fullCommand,
+            /^<<<beginning of output>>>/,
+            /^<<<end of output>>>/,
+            /(?!)/,
+            { includeStartLine: false, includeEndLine: false },
         );
     }
 
