@@ -1355,6 +1355,21 @@ export class VSCodeIntegration {
         );
     }
 
+    async getPlayerVarfields(
+        playerName: string,
+        verbosity: "Full" | "NoTables" | "SkipDefaults",
+        instance: "prime" | "dev",
+    ): Promise<string> {
+        throwOnControlCharacters(playerName);
+        return this.executeShowCommandOnInstance(
+            instance,
+            `/svf ${playerName} ${verbosity}`,
+            /^Variable Fields Attached to player /,
+            /^Flags:/,
+            /^Player .+ not found$/,
+        );
+    }
+
     async executeAgentCommand(
         command: string,
         instance: "prime" | "dev",

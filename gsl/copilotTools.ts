@@ -41,6 +41,12 @@ interface IGetExistenceDataParams {
     instance?: "prime" | "dev";
 }
 
+interface IGetPlayerVarfieldsParams {
+    playerName: string;
+    verbosity?: "Full" | "NoTables" | "SkipDefaults";
+    instance?: "prime" | "dev";
+}
+
 interface IAgentCommandParams {
     command?: string;
     instance?: "prime" | "dev";
@@ -711,6 +717,93 @@ class GetRoomDataTool implements vscode.LanguageModelTool<IGetRoomDataParams> {
     }
 }
 
+const VALID_SVF_VERBOSITIES = new Set(["Full", "NoTables", "SkipDefaults"]);
+
+class GetPlayerVarfieldsTool implements vscode.LanguageModelTool<IGetPlayerVarfieldsParams> {
+    async prepareInvocation(
+        options: vscode.LanguageModelToolInvocationPrepareOptions<IGetPlayerVarfieldsParams>,
+        _token: vscode.CancellationToken,
+    ) {
+        const { playerName, verbosity, instance } = options.input;
+        if (!playerName?.trim()) {
+            throw new Error(
+                "Missing playerName. Provide the player name to look up.",
+            );
+        }
+        if (verbosity && !VALID_SVF_VERBOSITIES.has(verbosity)) {
+            throw new Error(
+                `Invalid verbosity '${verbosity}'. Must be Full, NoTables, or SkipDefaults.`,
+            );
+        }
+        const resolvedInstance = instance ?? "dev";
+        const resolvedVerbosity = verbosity ?? "NoTables";
+        return {
+            invocationMessage: `Fetching varfields for ${playerName.trim()} (${resolvedVerbosity}) from ${resolvedInstance} server\u2026`,
+        };
+    }
+
+    async invoke(
+        options: vscode.LanguageModelToolInvocationOptions<IGetPlayerVarfieldsParams>,
+        token: vscode.CancellationToken,
+    ): Promise<vscode.LanguageModelToolResult> {
+        try {
+            throwIfCancelled(token);
+            if (!vscRef) {
+                throw new Error(
+                    "GSL extension is not active. Open a GSL file to activate it.",
+                );
+            }
+
+            const { playerName, verbosity, instance } = options.input;
+            if (!playerName?.trim()) {
+                throw new Error(
+                    "Missing playerName. Provide the player name to look up.",
+                );
+            }
+            if (verbosity && !VALID_SVF_VERBOSITIES.has(verbosity)) {
+                throw new Error(
+                    `Invalid verbosity '${verbosity}'. Must be Full, NoTables, or SkipDefaults.`,
+                );
+            }
+            const resolvedInstance = instance ?? "dev";
+            const resolvedVerbosity = verbosity ?? "NoTables";
+
+            const rawOutput = await withCancellation(
+                vscRef.getPlayerVarfields(
+                    playerName.trim(),
+                    resolvedVerbosity,
+                    resolvedInstance,
+                ),
+                token,
+            );
+
+            if (!rawOutput || rawOutput.trim().length === 0) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        `Player ${playerName.trim()}: No data returned from ${resolvedInstance} server. ` +
+                            `The player may not exist or may not be logged in.`,
+                    ),
+                ]);
+            }
+
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(rawOutput),
+            ]);
+        } catch (e) {
+            if (isToolCancelled(e)) {
+                return createCancelledToolResult(
+                    "Get player varfields was cancelled before completion.",
+                );
+            }
+            throw new Error(
+                `Failed to get varfields for player ${options.input.playerName ?? "(missing playerName)"}: ${
+                    e instanceof Error ? e.message : String(e)
+                }`,
+            );
+        }
+    }
+}
+
 class AgentCommandTool implements vscode.LanguageModelTool<IAgentCommandParams> {
     async prepareInvocation(
         options: vscode.LanguageModelToolInvocationPrepareOptions<IAgentCommandParams>,
@@ -804,6 +897,10 @@ export function registerCopilotTools(
         vscode.lm.registerTool(
             "gsl_get_existence_data",
             new GetExistenceDataTool(),
+        ),
+        vscode.lm.registerTool(
+            "gsl_get_player_varfields",
+            new GetPlayerVarfieldsTool(),
         ),
         vscode.lm.registerTool(
             "gsl_slash_agent_command",

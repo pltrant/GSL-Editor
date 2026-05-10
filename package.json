@@ -285,6 +285,46 @@
                 }
             },
             {
+                "name": "gsl_get_player_varfields",
+                "displayName": "Get Player Varfields",
+                "canBeReferencedInPrompt": true,
+                "toolReferenceName": "getPlayerVarfields",
+                "icon": "$(person)",
+                "userDescription": "Retrieve a player's variable fields (varfields) from the game server using /svf.",
+                "modelDescription": "Sends the /svf command to the game server for a given player name and returns varfield and flags output.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": [
+                        "playerName"
+                    ],
+                    "properties": {
+                        "playerName": {
+                            "type": "string",
+                            "description": "The player name to look up."
+                        },
+                        "verbosity": {
+                            "type": "string",
+                            "enum": [
+                                "Full",
+                                "NoTables",
+                                "SkipDefaults"
+                            ],
+                            "default": "NoTables",
+                            "description": "Controls output verbosity. 'NoTables' (default) omits table varfields. 'SkipDefaults' omits fields at default values. 'Full' returns everything."
+                        },
+                        "instance": {
+                            "type": "string",
+                            "enum": [
+                                "prime",
+                                "dev"
+                            ],
+                            "default": "dev",
+                            "description": "Which server instance to query. Defaults to 'dev', which is typically preferred."
+                        }
+                    }
+                }
+            },
+            {
                 "name": "gsl_slash_agent_command",
                 "displayName": "Run /agent Command",
                 "canBeReferencedInPrompt": true,
