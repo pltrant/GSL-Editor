@@ -7,4 +7,5 @@
 compile.txt
 node_modules
 scripts/
+tools/credentials.json
 tsconfig.tsbuildinfo

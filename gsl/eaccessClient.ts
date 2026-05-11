@@ -448,7 +448,12 @@ export class EAccessClient extends EventEmitter {
             this.close();
             return;
         }
-        this.selectedCharacter = this.characters[this.selectedCharacterCode];
+        this.selectedCharacter =
+            this.characters[this.selectedCharacterCode] ??
+            ({
+                code: this.selectedCharacterCode,
+                name: this.selectedCharacterCode,
+            } as CharacterOption);
         this.connectionDetails = SAL.parseEAccessResponse(reply);
         this.loginDetails = {
             account: this.account,
@@ -528,8 +533,31 @@ export class EAccessClient extends EventEmitter {
             client.once(EVENT_ERROR, (error: Error) => rejectOnce(error));
             client.once(EVENT_READY, () => client.authorize(account, password));
             client.once(EVENT_GAMES, () => client.selectGame(game));
-            client.once(EVENT_CHARS, () =>
-                client.selectCharacter(character, mode),
+            client.once(
+                EVENT_CHARS,
+                (
+                    characters: CharacterOptionCollection,
+                    codes: Array<string>,
+                ) => {
+                    const resolvedCode =
+                        codes.find((c) => c === character) ??
+                        codes.find(
+                            (c) =>
+                                characters[c].name.toLowerCase() ===
+                                character.toLowerCase(),
+                        );
+                    if (!resolvedCode) {
+                        client.close();
+                        rejectOnce(
+                            createQuickLoginError(
+                                "QuickLoginError",
+                                `Character '${character}' not found. Available: ${codes.map((c) => characters[c].name).join(", ")}`,
+                            ),
+                        );
+                        return;
+                    }
+                    client.selectCharacter(resolvedCode, mode);
+                },
             );
             client.once(EVENT_LAUNCH, (sal: SAL) => resolveOnce(sal));
             client.connect();
