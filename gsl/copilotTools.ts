@@ -67,6 +67,10 @@ interface IGetScriptDataParams {
     instance?: ScriptDataInstance;
 }
 
+interface IGetVerbDataParams {
+    verb: string;
+}
+
 const AGENT_UPLOAD_SCRIPT_NUMBER = 24661;
 
 // ---------------------------------------------------------------------------
@@ -884,6 +888,69 @@ class GetScriptDataTool implements vscode.LanguageModelTool<IGetScriptDataParams
     }
 }
 
+class GetVerbDataTool implements vscode.LanguageModelTool<IGetVerbDataParams> {
+    async prepareInvocation(
+        options: vscode.LanguageModelToolInvocationPrepareOptions<IGetVerbDataParams>,
+        _token: vscode.CancellationToken,
+    ) {
+        if (!options.input.verb?.trim()) {
+            throw new Error("Missing verb. Provide the verb name to look up.");
+        }
+        return {
+            invocationMessage: `Fetching verb data for '${options.input.verb.trim()}'\u2026`,
+        };
+    }
+
+    async invoke(
+        options: vscode.LanguageModelToolInvocationOptions<IGetVerbDataParams>,
+        token: vscode.CancellationToken,
+    ): Promise<vscode.LanguageModelToolResult> {
+        try {
+            throwIfCancelled(token);
+            if (!vscRef) {
+                throw new Error(
+                    "GSL extension is not active. Open a GSL file to activate it.",
+                );
+            }
+
+            const verb = options.input.verb?.trim();
+            if (!verb) {
+                throw new Error(
+                    "Missing verb. Provide the verb name to look up.",
+                );
+            }
+
+            const rawOutput = await withCancellation(
+                vscRef.getVerbData(verb),
+                token,
+            );
+
+            if (!rawOutput || rawOutput.trim().length === 0) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        `Verb '${verb}': No data returned. The verb may not exist.`,
+                    ),
+                ]);
+            }
+
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(rawOutput),
+            ]);
+        } catch (e) {
+            if (isToolCancelled(e)) {
+                return createCancelledToolResult(
+                    "Get verb data was cancelled before completion.",
+                );
+            }
+            throw new Error(
+                `Failed to get verb data for '${options.input.verb ?? "(missing verb)"}': ${
+                    e instanceof Error ? e.message : String(e)
+                }`,
+            );
+        }
+    }
+}
+
 class AgentCommandTool implements vscode.LanguageModelTool<IAgentCommandParams> {
     async prepareInvocation(
         options: vscode.LanguageModelToolInvocationPrepareOptions<IAgentCommandParams>,
@@ -987,5 +1054,6 @@ export function registerCopilotTools(
             new AgentCommandTool(),
         ),
         vscode.lm.registerTool("gsl_get_script_data", new GetScriptDataTool()),
+        vscode.lm.registerTool("gsl_get_verb_data", new GetVerbDataTool()),
     );
 }

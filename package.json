@@ -385,6 +385,27 @@
                         }
                     }
                 }
+            },
+            {
+                "name": "gsl_get_verb_data",
+                "displayName": "Get Verb Data",
+                "canBeReferencedInPrompt": true,
+                "toolReferenceName": "getVerbData",
+                "icon": "$(symbol-event)",
+                "userDescription": "Retrieve verb metadata from the game server using /sv.",
+                "modelDescription": "Sends the /sv (show verb) command to the game server for a given verb name and returns the raw verb metadata output, including the script number that handles the verb, access level, parse code, verb flags, and modification history. Warning: the 'Owned by' field is typically not maintained and is a weak signal — to identify who actually works on a verb's script, look at the 'Last modified by' field or the script's changelog found in the script file itself. Runs on dev server.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": [
+                        "verb"
+                    ],
+                    "properties": {
+                        "verb": {
+                            "type": "string",
+                            "description": "The verb name to look up (e.g. 'sit', '/mongen', 'quest', 'incant')."
+                        }
+                    }
+                }
             }
         ],
         "configuration": {

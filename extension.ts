@@ -1386,6 +1386,28 @@ export class VSCodeIntegration {
         );
     }
 
+    async getVerbData(verb: string): Promise<string> {
+        throwOnControlCharacters(verb);
+        const task = (client: EditorClientInterface) =>
+            this.executeShowCommand(
+                client,
+                `/sv ${verb}`,
+                /^Information about the verb /,
+                /^On /,
+                /does not exist\.$/,
+                true,
+                true,
+            );
+
+        const result = await this.withEditorClient(task);
+        if (result === undefined) {
+            throw new Error(
+                "Dev server not configured. Run 'GSL: User Setup' first.",
+            );
+        }
+        return result;
+    }
+
     async getScriptData(scriptId: number, gameCode: string): Promise<string> {
         const task = (client: EditorClientInterface) =>
             this.executeShowCommand(
