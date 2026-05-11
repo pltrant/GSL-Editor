@@ -1386,6 +1386,27 @@ export class VSCodeIntegration {
         );
     }
 
+    async getScriptData(scriptId: number, gameCode: string): Promise<string> {
+        const task = (client: EditorClientInterface) =>
+            this.executeShowCommand(
+                client,
+                `/ss ${scriptId} ${gameCode} raw`,
+                /^Game: /,
+                /^On |^Unspecified Date/,
+                /^Invalid script/,
+                true,
+                true,
+            );
+
+        const result = await this.withEditorClient(task);
+        if (result === undefined) {
+            throw new Error(
+                "This tool is not available on non-dev servers. Run 'GSL: User Setup' to configure a dev server connection.",
+            );
+        }
+        return result;
+    }
+
     private registerCommands() {
         let subscription: Disposable;
         subscription = commands.registerCommand(

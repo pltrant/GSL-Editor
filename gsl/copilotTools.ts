@@ -52,6 +52,21 @@ interface IAgentCommandParams {
     instance?: "prime" | "dev";
 }
 
+type ScriptDataInstance = "dev" | "shattered" | "platinum" | "prime" | "test";
+
+const SCRIPT_DATA_GAME_CODES: Record<ScriptDataInstance, string> = {
+    dev: "GS4D",
+    shattered: "GSF",
+    prime: "GS4",
+    test: "GST",
+    platinum: "GS4X",
+};
+
+interface IGetScriptDataParams {
+    scriptId: number;
+    instance?: ScriptDataInstance;
+}
+
 const AGENT_UPLOAD_SCRIPT_NUMBER = 24661;
 
 // ---------------------------------------------------------------------------
@@ -804,6 +819,71 @@ class GetPlayerVarfieldsTool implements vscode.LanguageModelTool<IGetPlayerVarfi
     }
 }
 
+class GetScriptDataTool implements vscode.LanguageModelTool<IGetScriptDataParams> {
+    async prepareInvocation(
+        options: vscode.LanguageModelToolInvocationPrepareOptions<IGetScriptDataParams>,
+        _token: vscode.CancellationToken,
+    ) {
+        parseRequiredScriptNumber(options.input.scriptId);
+        const instance = options.input.instance ?? "dev";
+        return {
+            invocationMessage: `Fetching script ${options.input.scriptId} data (${instance}) from dev server\u2026`,
+        };
+    }
+
+    async invoke(
+        options: vscode.LanguageModelToolInvocationOptions<IGetScriptDataParams>,
+        token: vscode.CancellationToken,
+    ): Promise<vscode.LanguageModelToolResult> {
+        try {
+            throwIfCancelled(token);
+            if (!vscRef) {
+                throw new Error(
+                    "GSL extension is not active. Open a GSL file to activate it.",
+                );
+            }
+
+            const scriptId = parseRequiredScriptNumber(options.input.scriptId);
+            const instance = options.input.instance ?? "dev";
+            const gameCode = SCRIPT_DATA_GAME_CODES[instance];
+            if (!gameCode) {
+                throw new Error(
+                    `Invalid instance '${instance}'. Must be one of: ${Object.keys(SCRIPT_DATA_GAME_CODES).join(", ")}.`,
+                );
+            }
+
+            const rawOutput = await withCancellation(
+                vscRef.getScriptData(scriptId, gameCode),
+                token,
+            );
+
+            if (!rawOutput || rawOutput.trim().length === 0) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        `Script ${scriptId}: No data returned for ${instance} (${gameCode}). ` +
+                            `The script may not exist on that instance.`,
+                    ),
+                ]);
+            }
+
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(rawOutput),
+            ]);
+        } catch (e) {
+            if (isToolCancelled(e)) {
+                return createCancelledToolResult(
+                    "Get script data was cancelled before completion.",
+                );
+            }
+            throw new Error(
+                `Failed to get script data for ${options.input.scriptId ?? "(missing scriptId)"}: ${
+                    e instanceof Error ? e.message : String(e)
+                }`,
+            );
+        }
+    }
+}
+
 class AgentCommandTool implements vscode.LanguageModelTool<IAgentCommandParams> {
     async prepareInvocation(
         options: vscode.LanguageModelToolInvocationPrepareOptions<IAgentCommandParams>,
@@ -906,5 +986,6 @@ export function registerCopilotTools(
             "gsl_slash_agent_command",
             new AgentCommandTool(),
         ),
+        vscode.lm.registerTool("gsl_get_script_data", new GetScriptDataTool()),
     );
 }

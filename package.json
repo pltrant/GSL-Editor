@@ -350,6 +350,41 @@
                         }
                     }
                 }
+            },
+            {
+                "name": "gsl_get_script_data",
+                "displayName": "Get Script Data",
+                "canBeReferencedInPrompt": true,
+                "toolReferenceName": "getScriptData",
+                "icon": "$(file-code)",
+                "userDescription": "Retrieve script metadata from the game server using /ss.",
+                "modelDescription": "Sends the /ss (show script) command on the development server for a given script ID and game instance code, returning the raw script metadata output. This is the best way to identify when a script was last updated, by whom, and whether scripts are in sync across servers — compare the output for the same script ID across different instances (e.g. prime versus dev). The instance parameter selects which game's script data to query. Warning: script owner property is typically not maintained and is weak signal - better to look at who has touched the script recently by viewing the script's changelog, found in the script file itself.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": [
+                        "scriptId"
+                    ],
+                    "properties": {
+                        "scriptId": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 999999,
+                            "description": "The script ID to look up."
+                        },
+                        "instance": {
+                            "type": "string",
+                            "enum": [
+                                "dev",
+                                "shattered",
+                                "platinum",
+                                "prime",
+                                "test"
+                            ],
+                            "default": "dev",
+                            "description": "Which game instance to query script data for. Maps to game codes: dev=GS4D, prime=GS4, shattered=GSF, platinum=GS4X, test=GST. Defaults to 'dev'."
+                        }
+                    }
+                }
             }
         ],
         "configuration": {
