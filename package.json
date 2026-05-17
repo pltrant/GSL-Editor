@@ -406,6 +406,29 @@
                         }
                     }
                 }
+            },
+            {
+                "name": "gsl_get_table_metadata",
+                "displayName": "Get Global Table Data",
+                "canBeReferencedInPrompt": true,
+                "toolReferenceName": "getGlobalTableData",
+                "icon": "$(table)",
+                "userDescription": "Retrieve global table header information from the game server using /sl.",
+                "modelDescription": "Sends the /sl (show table) command to the game server for a given table ID and returns the table metadata, including the table description, creator, access level, dimensions (X/Y/Z), total size, and table type flags Does not work on varfield tables (e.g. on players/exists). Runs on dev server.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": [
+                        "tableId"
+                    ],
+                    "properties": {
+                        "tableId": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 999999,
+                            "description": "The global table ID to look up."
+                        }
+                    }
+                }
             }
         ],
         "configuration": {

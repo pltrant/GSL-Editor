@@ -71,6 +71,10 @@ interface IGetVerbDataParams {
     verb: string;
 }
 
+interface IGetGlobalTableDataParams {
+    tableId: number;
+}
+
 const AGENT_UPLOAD_SCRIPT_NUMBER = 24661;
 
 // ---------------------------------------------------------------------------
@@ -888,6 +892,62 @@ class GetScriptDataTool implements vscode.LanguageModelTool<IGetScriptDataParams
     }
 }
 
+class GetGlobalTableDataTool implements vscode.LanguageModelTool<IGetGlobalTableDataParams> {
+    async prepareInvocation(
+        options: vscode.LanguageModelToolInvocationPrepareOptions<IGetGlobalTableDataParams>,
+        _token: vscode.CancellationToken,
+    ) {
+        parseRequiredScriptNumber(options.input.tableId);
+        return {
+            invocationMessage: `Fetching global table ${options.input.tableId} data from dev server\u2026`,
+        };
+    }
+
+    async invoke(
+        options: vscode.LanguageModelToolInvocationOptions<IGetGlobalTableDataParams>,
+        token: vscode.CancellationToken,
+    ): Promise<vscode.LanguageModelToolResult> {
+        try {
+            throwIfCancelled(token);
+            if (!vscRef) {
+                throw new Error(
+                    "GSL extension is not active. Open a GSL file to activate it.",
+                );
+            }
+
+            const tableId = parseRequiredScriptNumber(options.input.tableId);
+
+            const rawOutput = await withCancellation(
+                vscRef.getGlobalTableData(tableId),
+                token,
+            );
+
+            if (!rawOutput || rawOutput.trim().length === 0) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        `Table ${tableId}: No data returned. The table may not exist.`,
+                    ),
+                ]);
+            }
+
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(rawOutput),
+            ]);
+        } catch (e) {
+            if (isToolCancelled(e)) {
+                return createCancelledToolResult(
+                    "Get global table data was cancelled before completion.",
+                );
+            }
+            throw new Error(
+                `Failed to get global table data for ${options.input.tableId ?? "(missing tableId)"}: ${
+                    e instanceof Error ? e.message : String(e)
+                }`,
+            );
+        }
+    }
+}
+
 class GetVerbDataTool implements vscode.LanguageModelTool<IGetVerbDataParams> {
     async prepareInvocation(
         options: vscode.LanguageModelToolInvocationPrepareOptions<IGetVerbDataParams>,
@@ -1055,5 +1115,9 @@ export function registerCopilotTools(
         ),
         vscode.lm.registerTool("gsl_get_script_data", new GetScriptDataTool()),
         vscode.lm.registerTool("gsl_get_verb_data", new GetVerbDataTool()),
+        vscode.lm.registerTool(
+            "gsl_get_table_metadata",
+            new GetGlobalTableDataTool(),
+        ),
     );
 }

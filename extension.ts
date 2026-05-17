@@ -1429,6 +1429,27 @@ export class VSCodeIntegration {
         return result;
     }
 
+    async getGlobalTableData(tableId: number): Promise<string> {
+        const task = (client: EditorClientInterface) =>
+            this.executeShowCommand(
+                client,
+                `/sl ${tableId}`,
+                /^Table \[\d+\] Header Information/,
+                /^\s+Table Type:/,
+                /^ERROR:.*Trouble loading table/,
+                true,
+                true,
+            );
+
+        const result = await this.withEditorClient(task);
+        if (result === undefined) {
+            throw new Error(
+                "Dev server not configured. Run 'GSL: User Setup' first.",
+            );
+        }
+        return result;
+    }
+
     private registerCommands() {
         let subscription: Disposable;
         subscription = commands.registerCommand(
