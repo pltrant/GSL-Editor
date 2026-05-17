@@ -196,7 +196,7 @@
                 "toolReferenceName": "checkGslCompilerErrors",
                 "icon": "$(cloud-upload)",
                 "userDescription": "Check a local GSL script for compiler errors by compiling it in an isolated safety script (S24661) on the development server.",
-                "modelDescription": "Use this tool whenever the task is to check, compile, or validate GSL script compiler errors/warnings. Prefer this tool over generic error tools for GSL compile checks. It compiles a local GSL script file on the development server and returns compiler output, including line-level errors and warnings, so the model can diagnose and fix compilation problems.",
+                "modelDescription": "Use this tool whenever the task is to check, compile, or validate GSL script compiler errors/warnings. Prefer this tool over generic error tools for GSL compile checks. It compiles a local GSL script file on the development server and returns compiler output, including line-level errors and warnings, so the model can diagnose and fix compilation problems. Uses placeholder script 24661 for upload.",
                 "inputSchema": {
                     "type": "object",
                     "required": [
