@@ -41,6 +41,40 @@ interface IGetExistenceDataParams {
     instance?: "prime" | "dev";
 }
 
+interface IGetPlayerVarfieldsParams {
+    playerName: string;
+    verbosity?: "Full" | "NoTables" | "SkipDefaults";
+    instance?: "prime" | "dev";
+}
+
+interface IAgentCommandParams {
+    command?: string;
+    instance?: "prime" | "dev";
+}
+
+type ScriptDataInstance = "dev" | "shattered" | "platinum" | "prime" | "test";
+
+const SCRIPT_DATA_GAME_CODES: Record<ScriptDataInstance, string> = {
+    dev: "GS4D",
+    shattered: "GSF",
+    prime: "GS4",
+    test: "GST",
+    platinum: "GS4X",
+};
+
+interface IGetScriptDataParams {
+    scriptId: number;
+    instance?: ScriptDataInstance;
+}
+
+interface IGetVerbDataParams {
+    verb: string;
+}
+
+interface IGetGlobalTableDataParams {
+    tableId: number;
+}
+
 const AGENT_UPLOAD_SCRIPT_NUMBER = 24661;
 
 // ---------------------------------------------------------------------------
@@ -706,6 +740,336 @@ class GetRoomDataTool implements vscode.LanguageModelTool<IGetRoomDataParams> {
     }
 }
 
+const VALID_SVF_VERBOSITIES = new Set(["Full", "NoTables", "SkipDefaults"]);
+
+class GetPlayerVarfieldsTool implements vscode.LanguageModelTool<IGetPlayerVarfieldsParams> {
+    async prepareInvocation(
+        options: vscode.LanguageModelToolInvocationPrepareOptions<IGetPlayerVarfieldsParams>,
+        _token: vscode.CancellationToken,
+    ) {
+        const { playerName, verbosity, instance } = options.input;
+        if (!playerName?.trim()) {
+            throw new Error(
+                "Missing playerName. Provide the player name to look up.",
+            );
+        }
+        if (verbosity && !VALID_SVF_VERBOSITIES.has(verbosity)) {
+            throw new Error(
+                `Invalid verbosity '${verbosity}'. Must be Full, NoTables, or SkipDefaults.`,
+            );
+        }
+        const resolvedInstance = instance ?? "dev";
+        const resolvedVerbosity = verbosity ?? "NoTables";
+        return {
+            invocationMessage: `Fetching varfields for ${playerName.trim()} (${resolvedVerbosity}) from ${resolvedInstance} server\u2026`,
+        };
+    }
+
+    async invoke(
+        options: vscode.LanguageModelToolInvocationOptions<IGetPlayerVarfieldsParams>,
+        token: vscode.CancellationToken,
+    ): Promise<vscode.LanguageModelToolResult> {
+        try {
+            throwIfCancelled(token);
+            if (!vscRef) {
+                throw new Error(
+                    "GSL extension is not active. Open a GSL file to activate it.",
+                );
+            }
+
+            const { playerName, verbosity, instance } = options.input;
+            if (!playerName?.trim()) {
+                throw new Error(
+                    "Missing playerName. Provide the player name to look up.",
+                );
+            }
+            if (verbosity && !VALID_SVF_VERBOSITIES.has(verbosity)) {
+                throw new Error(
+                    `Invalid verbosity '${verbosity}'. Must be Full, NoTables, or SkipDefaults.`,
+                );
+            }
+            const resolvedInstance = instance ?? "dev";
+            const resolvedVerbosity = verbosity ?? "NoTables";
+
+            const rawOutput = await withCancellation(
+                vscRef.getPlayerVarfields(
+                    playerName.trim(),
+                    resolvedVerbosity,
+                    resolvedInstance,
+                ),
+                token,
+            );
+
+            if (!rawOutput || rawOutput.trim().length === 0) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        `Player ${playerName.trim()}: No data returned from ${resolvedInstance} server. ` +
+                            `The player may not exist or may not be logged in.`,
+                    ),
+                ]);
+            }
+
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(rawOutput),
+            ]);
+        } catch (e) {
+            if (isToolCancelled(e)) {
+                return createCancelledToolResult(
+                    "Get player varfields was cancelled before completion.",
+                );
+            }
+            throw new Error(
+                `Failed to get varfields for player ${options.input.playerName ?? "(missing playerName)"}: ${
+                    e instanceof Error ? e.message : String(e)
+                }`,
+            );
+        }
+    }
+}
+
+class GetScriptDataTool implements vscode.LanguageModelTool<IGetScriptDataParams> {
+    async prepareInvocation(
+        options: vscode.LanguageModelToolInvocationPrepareOptions<IGetScriptDataParams>,
+        _token: vscode.CancellationToken,
+    ) {
+        parseRequiredScriptNumber(options.input.scriptId);
+        const instance = options.input.instance ?? "dev";
+        return {
+            invocationMessage: `Fetching script ${options.input.scriptId} data (${instance}) from dev server\u2026`,
+        };
+    }
+
+    async invoke(
+        options: vscode.LanguageModelToolInvocationOptions<IGetScriptDataParams>,
+        token: vscode.CancellationToken,
+    ): Promise<vscode.LanguageModelToolResult> {
+        try {
+            throwIfCancelled(token);
+            if (!vscRef) {
+                throw new Error(
+                    "GSL extension is not active. Open a GSL file to activate it.",
+                );
+            }
+
+            const scriptId = parseRequiredScriptNumber(options.input.scriptId);
+            const instance = options.input.instance ?? "dev";
+            const gameCode = SCRIPT_DATA_GAME_CODES[instance];
+            if (!gameCode) {
+                throw new Error(
+                    `Invalid instance '${instance}'. Must be one of: ${Object.keys(SCRIPT_DATA_GAME_CODES).join(", ")}.`,
+                );
+            }
+
+            const rawOutput = await withCancellation(
+                vscRef.getScriptData(scriptId, gameCode),
+                token,
+            );
+
+            if (!rawOutput || rawOutput.trim().length === 0) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        `Script ${scriptId}: No data returned for ${instance} (${gameCode}). ` +
+                            `The script may not exist on that instance.`,
+                    ),
+                ]);
+            }
+
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(rawOutput),
+            ]);
+        } catch (e) {
+            if (isToolCancelled(e)) {
+                return createCancelledToolResult(
+                    "Get script data was cancelled before completion.",
+                );
+            }
+            throw new Error(
+                `Failed to get script data for ${options.input.scriptId ?? "(missing scriptId)"}: ${
+                    e instanceof Error ? e.message : String(e)
+                }`,
+            );
+        }
+    }
+}
+
+class GetGlobalTableDataTool implements vscode.LanguageModelTool<IGetGlobalTableDataParams> {
+    async prepareInvocation(
+        options: vscode.LanguageModelToolInvocationPrepareOptions<IGetGlobalTableDataParams>,
+        _token: vscode.CancellationToken,
+    ) {
+        parseRequiredScriptNumber(options.input.tableId);
+        return {
+            invocationMessage: `Fetching global table ${options.input.tableId} data from dev server\u2026`,
+        };
+    }
+
+    async invoke(
+        options: vscode.LanguageModelToolInvocationOptions<IGetGlobalTableDataParams>,
+        token: vscode.CancellationToken,
+    ): Promise<vscode.LanguageModelToolResult> {
+        try {
+            throwIfCancelled(token);
+            if (!vscRef) {
+                throw new Error(
+                    "GSL extension is not active. Open a GSL file to activate it.",
+                );
+            }
+
+            const tableId = parseRequiredScriptNumber(options.input.tableId);
+
+            const rawOutput = await withCancellation(
+                vscRef.getGlobalTableData(tableId),
+                token,
+            );
+
+            if (!rawOutput || rawOutput.trim().length === 0) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        `Table ${tableId}: No data returned. The table may not exist.`,
+                    ),
+                ]);
+            }
+
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(rawOutput),
+            ]);
+        } catch (e) {
+            if (isToolCancelled(e)) {
+                return createCancelledToolResult(
+                    "Get global table data was cancelled before completion.",
+                );
+            }
+            throw new Error(
+                `Failed to get global table data for ${options.input.tableId ?? "(missing tableId)"}: ${
+                    e instanceof Error ? e.message : String(e)
+                }`,
+            );
+        }
+    }
+}
+
+class GetVerbDataTool implements vscode.LanguageModelTool<IGetVerbDataParams> {
+    async prepareInvocation(
+        options: vscode.LanguageModelToolInvocationPrepareOptions<IGetVerbDataParams>,
+        _token: vscode.CancellationToken,
+    ) {
+        if (!options.input.verb?.trim()) {
+            throw new Error("Missing verb. Provide the verb name to look up.");
+        }
+        return {
+            invocationMessage: `Fetching verb data for '${options.input.verb.trim()}'\u2026`,
+        };
+    }
+
+    async invoke(
+        options: vscode.LanguageModelToolInvocationOptions<IGetVerbDataParams>,
+        token: vscode.CancellationToken,
+    ): Promise<vscode.LanguageModelToolResult> {
+        try {
+            throwIfCancelled(token);
+            if (!vscRef) {
+                throw new Error(
+                    "GSL extension is not active. Open a GSL file to activate it.",
+                );
+            }
+
+            const verb = options.input.verb?.trim();
+            if (!verb) {
+                throw new Error(
+                    "Missing verb. Provide the verb name to look up.",
+                );
+            }
+
+            const rawOutput = await withCancellation(
+                vscRef.getVerbData(verb),
+                token,
+            );
+
+            if (!rawOutput || rawOutput.trim().length === 0) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        `Verb '${verb}': No data returned. The verb may not exist.`,
+                    ),
+                ]);
+            }
+
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(rawOutput),
+            ]);
+        } catch (e) {
+            if (isToolCancelled(e)) {
+                return createCancelledToolResult(
+                    "Get verb data was cancelled before completion.",
+                );
+            }
+            throw new Error(
+                `Failed to get verb data for '${options.input.verb ?? "(missing verb)"}': ${
+                    e instanceof Error ? e.message : String(e)
+                }`,
+            );
+        }
+    }
+}
+
+class AgentCommandTool implements vscode.LanguageModelTool<IAgentCommandParams> {
+    async prepareInvocation(
+        options: vscode.LanguageModelToolInvocationPrepareOptions<IAgentCommandParams>,
+        _token: vscode.CancellationToken,
+    ) {
+        const command = options.input.command?.trim();
+        const instance = options.input.instance ?? "dev";
+        const message = command
+            ? `Running /agent ${command} on ${instance} server\u2026`
+            : `Listing available /agent subcommands on ${instance} server\u2026`;
+        return { invocationMessage: message };
+    }
+
+    async invoke(
+        options: vscode.LanguageModelToolInvocationOptions<IAgentCommandParams>,
+        token: vscode.CancellationToken,
+    ): Promise<vscode.LanguageModelToolResult> {
+        try {
+            throwIfCancelled(token);
+            if (!vscRef) {
+                throw new Error(
+                    "GSL extension is not active. Open a GSL file to activate it.",
+                );
+            }
+
+            const command = options.input.command?.trim() ?? "";
+            const instance = options.input.instance ?? "dev";
+
+            const rawOutput = await withCancellation(
+                vscRef.executeAgentCommand(command, instance),
+                token,
+            );
+
+            if (!rawOutput || rawOutput.trim().length === 0) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        `No output returned from /agent ${command} on ${instance} server.`,
+                    ),
+                ]);
+            }
+
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(rawOutput),
+            ]);
+        } catch (e) {
+            if (isToolCancelled(e)) {
+                return createCancelledToolResult(
+                    "Agent command was cancelled before completion.",
+                );
+            }
+            throw new Error(
+                `Failed to run /agent ${options.input.command ?? "(missing command)"}: ${
+                    e instanceof Error ? e.message : String(e)
+                }`,
+            );
+        }
+    }
+}
+
 /**
  * Registers the Copilot language-model tools.  Call from `activate()`.
  *
@@ -740,6 +1104,20 @@ export function registerCopilotTools(
         vscode.lm.registerTool(
             "gsl_get_existence_data",
             new GetExistenceDataTool(),
+        ),
+        vscode.lm.registerTool(
+            "gsl_get_player_varfields",
+            new GetPlayerVarfieldsTool(),
+        ),
+        vscode.lm.registerTool(
+            "gsl_slash_agent_command",
+            new AgentCommandTool(),
+        ),
+        vscode.lm.registerTool("gsl_get_script_data", new GetScriptDataTool()),
+        vscode.lm.registerTool("gsl_get_verb_data", new GetVerbDataTool()),
+        vscode.lm.registerTool(
+            "gsl_get_table_metadata",
+            new GetGlobalTableDataTool(),
         ),
     );
 }

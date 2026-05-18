@@ -2,6 +2,17 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.20.0] - 2026-05-17
+
+### Added
+
+- Added Copilot tool `gsl_agent_command` to run `/agent` commands on Dev/Prime.
+- Added Copilot tool `gsl_get_player_varfields` to retrieve player variable fields via `/svf`, including Prime/Dev targeting.
+- Added Copilot tool `gsl_get_script_data` to fetch raw script data from the script data endpoint.
+- Added Copilot tool `gsl_get_verb_data` to retrieve verb data via `/sv`.
+- Added Copilot tool `gsl_get_global_table_metadata` to retrieve table metadata via `/sv`.
+- Internal Extension Development Usage: Added headless CLI game client for non-interactive tool use.
+
 ## [1.19.0] - 2026-04-20
 
 ### Added

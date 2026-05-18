@@ -15,17 +15,10 @@ import {
     DiagnosticCollection,
     CodeActionKind,
     Range,
+    DiagnosticSeverity,
 } from "vscode";
 
 import { workspace, window, commands, languages, extensions } from "vscode";
-
-import {
-    LanguageClient,
-    LanguageClientOptions,
-    ServerOptions,
-    TransportKind,
-    DiagnosticSeverity,
-} from "vscode-languageclient/node";
 
 import {
     GSLDocumentSymbolProvider,
@@ -48,6 +41,7 @@ import {
 import { formatDate } from "./gsl/util/dateUtil";
 import { OutOfDateButtonManager } from "./gsl/status_bar/scriptOutOfDateButton";
 import { scriptNumberFromFileName } from "./gsl/util/scriptUtil";
+import { throwOnControlCharacters } from "./gsl/strings";
 import {
     GSLX_AUTOMATIC_DOWNLOADS,
     GSLX_CURRENT_AUTHOR,
@@ -1278,6 +1272,8 @@ export class VSCodeIntegration {
         captureStart: RegExp,
         captureEnd: RegExp,
         abortPattern: RegExp,
+        includeStartLine: boolean,
+        includeEndLine: boolean,
     ): Promise<string> {
         const TIMEOUT_MS = 15000;
         const lines = await client.executeCommand(command, {
@@ -1285,8 +1281,8 @@ export class VSCodeIntegration {
             captureEnd,
             abortPattern,
             timeoutMillis: TIMEOUT_MS,
-            includeStartLine: true,
-            includeEndLine: true,
+            includeStartLine,
+            includeEndLine,
         });
         return lines.join("\n");
     }
@@ -1297,6 +1293,7 @@ export class VSCodeIntegration {
         captureStart: RegExp,
         captureEnd: RegExp,
         abortPattern: RegExp,
+        { includeStartLine = true, includeEndLine = true } = {},
     ): Promise<string> {
         const task = (client: EditorClientInterface) =>
             this.executeShowCommand(
@@ -1305,6 +1302,8 @@ export class VSCodeIntegration {
                 captureStart,
                 captureEnd,
                 abortPattern,
+                includeStartLine,
+                includeEndLine,
             );
 
         if (instance === "prime") {
@@ -1347,6 +1346,101 @@ export class VSCodeIntegration {
             /^Flags:/,
             /does not exist or could not be loaded for some reason/,
         );
+    }
+
+    async getPlayerVarfields(
+        playerName: string,
+        verbosity: "Full" | "NoTables" | "SkipDefaults",
+        instance: "prime" | "dev",
+    ): Promise<string> {
+        throwOnControlCharacters(playerName);
+        return this.executeShowCommandOnInstance(
+            instance,
+            `/svf ${playerName} ${verbosity}`,
+            /^Variable Fields Attached to player /,
+            /^Flags:/,
+            /^Player .+ not found$/,
+        );
+    }
+
+    async executeAgentCommand(
+        command: string,
+        instance: "prime" | "dev",
+    ): Promise<string> {
+        throwOnControlCharacters(command);
+        const fullCommand = command ? `/agent ${command}` : `/agent`;
+        return this.executeShowCommandOnInstance(
+            instance,
+            fullCommand,
+            /^<<<beginning of output>>>/,
+            /^<<<end of output>>>/,
+            /(?!)/,
+            { includeStartLine: false, includeEndLine: false },
+        );
+    }
+
+    async getVerbData(verb: string): Promise<string> {
+        throwOnControlCharacters(verb);
+        const task = (client: EditorClientInterface) =>
+            this.executeShowCommand(
+                client,
+                `/sv ${verb}`,
+                /^Information about the verb /,
+                /^On /,
+                /does not exist\.$/,
+                true,
+                true,
+            );
+
+        const result = await this.withEditorClient(task);
+        if (result === undefined) {
+            throw new Error(
+                "Dev server not configured. Run 'GSL: User Setup' first.",
+            );
+        }
+        return result;
+    }
+
+    async getScriptData(scriptId: number, gameCode: string): Promise<string> {
+        const task = (client: EditorClientInterface) =>
+            this.executeShowCommand(
+                client,
+                `/ss ${scriptId} ${gameCode} raw`,
+                /^Game: /,
+                /^On |^Unspecified Date/,
+                /^Invalid script/,
+                true,
+                true,
+            );
+
+        const result = await this.withEditorClient(task);
+        if (result === undefined) {
+            throw new Error(
+                "This tool is not available on non-dev servers. Run 'GSL: User Setup' to configure a dev server connection.",
+            );
+        }
+        return result;
+    }
+
+    async getGlobalTableData(tableId: number): Promise<string> {
+        const task = (client: EditorClientInterface) =>
+            this.executeShowCommand(
+                client,
+                `/sl ${tableId}`,
+                /^Table \[\d+\] Header Information/,
+                /^\s+Table Type:/,
+                /^ERROR:.*Trouble loading table/,
+                true,
+                true,
+            );
+
+        const result = await this.withEditorClient(task);
+        if (result === undefined) {
+            throw new Error(
+                "Dev server not configured. Run 'GSL: User Setup' first.",
+            );
+        }
+        return result;
     }
 
     private registerCommands() {
@@ -1619,55 +1713,10 @@ export class VSCodeIntegration {
     }
 }
 
-class ExtensionLanguageServer {
-    private context: ExtensionContext;
-    private lspClient: LanguageClient;
-
-    constructor(context: ExtensionContext) {
-        this.context = context;
-        this.lspClient = this.startLanguageServer();
-    }
-
-    private startLanguageServer() {
-        const relativePath = path.join(
-            "gsl-language-server",
-            "out",
-            "server.js",
-        );
-        const module = this.context.asAbsolutePath(relativePath);
-        const options = { execArgv: ["--nolazy", "--inspect=6009"] };
-        const transport = TransportKind.ipc;
-
-        const serverOptions: ServerOptions = {
-            run: { module, transport },
-            debug: { module, transport, options },
-        };
-
-        const clientOptions: LanguageClientOptions = {
-            documentSelector: [{ scheme: "file", language: GSL_LANGUAGE_ID }],
-            synchronize: {
-                fileEvents: workspace.createFileSystemWatcher("**/.clientrc"),
-            },
-        };
-
-        const lspClient = new LanguageClient(
-            "gslLanguageServer",
-            "GSL Language Server",
-            serverOptions,
-            clientOptions,
-        );
-
-        lspClient.start();
-
-        return lspClient;
-    }
-}
-
 export let vsc: VSCodeIntegration | undefined = undefined;
 
 export function activate(context: ExtensionContext) {
     vsc = new VSCodeIntegration(context);
-    // const els = new ExtensionLanguageServer (context)
 
     EAccessClient.console = {
         log: (...args: any) => {
