@@ -15,17 +15,10 @@ import {
     DiagnosticCollection,
     CodeActionKind,
     Range,
+    DiagnosticSeverity,
 } from "vscode";
 
 import { workspace, window, commands, languages, extensions } from "vscode";
-
-import {
-    LanguageClient,
-    LanguageClientOptions,
-    ServerOptions,
-    TransportKind,
-    DiagnosticSeverity,
-} from "vscode-languageclient/node";
 
 import {
     GSLDocumentSymbolProvider,
@@ -1720,55 +1713,10 @@ export class VSCodeIntegration {
     }
 }
 
-class ExtensionLanguageServer {
-    private context: ExtensionContext;
-    private lspClient: LanguageClient;
-
-    constructor(context: ExtensionContext) {
-        this.context = context;
-        this.lspClient = this.startLanguageServer();
-    }
-
-    private startLanguageServer() {
-        const relativePath = path.join(
-            "gsl-language-server",
-            "out",
-            "server.js",
-        );
-        const module = this.context.asAbsolutePath(relativePath);
-        const options = { execArgv: ["--nolazy", "--inspect=6009"] };
-        const transport = TransportKind.ipc;
-
-        const serverOptions: ServerOptions = {
-            run: { module, transport },
-            debug: { module, transport, options },
-        };
-
-        const clientOptions: LanguageClientOptions = {
-            documentSelector: [{ scheme: "file", language: GSL_LANGUAGE_ID }],
-            synchronize: {
-                fileEvents: workspace.createFileSystemWatcher("**/.clientrc"),
-            },
-        };
-
-        const lspClient = new LanguageClient(
-            "gslLanguageServer",
-            "GSL Language Server",
-            serverOptions,
-            clientOptions,
-        );
-
-        lspClient.start();
-
-        return lspClient;
-    }
-}
-
 export let vsc: VSCodeIntegration | undefined = undefined;
 
 export function activate(context: ExtensionContext) {
     vsc = new VSCodeIntegration(context);
-    // const els = new ExtensionLanguageServer (context)
 
     EAccessClient.console = {
         log: (...args: any) => {
