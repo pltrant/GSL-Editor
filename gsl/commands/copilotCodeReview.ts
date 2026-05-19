@@ -3,13 +3,7 @@ import * as path from "path";
 
 import { commands, ExtensionContext, window, workspace } from "vscode";
 
-import {
-    GSLX_CURRENT_AUTHOR,
-    GSLX_DEV_ACCOUNT,
-    GSLX_DEV_PASSWORD,
-    GSLX_PRIME_CHARACTER,
-    GSLX_PRIME_INSTANCE,
-} from "../const";
+import { GSLExtension } from "../../extension";
 import {
     GSL_AGENT_COMMANDS_MANAGED_DIR,
     GSL_AGENT_PROMPTS_MANAGED_DIR,
@@ -47,13 +41,9 @@ function hasManagedPromptFiles(rootPath: string): boolean {
 async function verifyPrimeUserSetupPrecondition(
     context: ExtensionContext,
 ): Promise<boolean> {
-    const account = context.globalState.get<string>(GSLX_DEV_ACCOUNT);
-    const password = await context.secrets.get(GSLX_DEV_PASSWORD);
-    const primeInstance = context.globalState.get<string>(GSLX_PRIME_INSTANCE);
-    const primeCharacter =
-        context.globalState.get<string>(GSLX_PRIME_CHARACTER);
-    const author = context.globalState.get<string>(GSLX_CURRENT_AUTHOR)?.trim();
-    if (account && password && primeInstance && primeCharacter && author) {
+    const primeCreds = GSLExtension.readLoginConfigForInstance("prime");
+    const author = GSLExtension.getCurrentAuthor()?.trim();
+    if (primeCreds && author) {
         return true;
     }
 

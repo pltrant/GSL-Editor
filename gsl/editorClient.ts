@@ -129,7 +129,7 @@ export const withEditorClient = async <T>(
     initOptions: InitOptions,
     task: ClientTask<T>,
 ): Promise<T> => {
-    return processorSingleton.enqueueTask(initOptions, task);
+    return withClientForInstance("dev", initOptions, task);
 };
 
 /**
@@ -141,7 +141,7 @@ export const withPrimeEditorClient = async <T>(
     initOptions: InitOptions,
     task: ClientTask<T>,
 ): Promise<T> => {
-    return primeProcessorSingleton.enqueueTask(initOptions, task);
+    return withClientForInstance("prime", initOptions, task);
 };
 
 type TaskController<T> = {
@@ -439,6 +439,29 @@ class TaskQueueProcessor {
 }
 const processorSingleton = new TaskQueueProcessor();
 const primeProcessorSingleton = new TaskQueueProcessor();
+
+const processorRegistry = new Map<string, TaskQueueProcessor>([
+    ["dev", processorSingleton],
+    ["prime", primeProcessorSingleton],
+]);
+
+/**
+ * Provides an `EditorClient` for a named instance, using a per-instance
+ * task queue. Creates a new queue on first use for instances beyond
+ * the built-in "dev" and "prime".
+ */
+export const withClientForInstance = async <T>(
+    instanceKey: string,
+    initOptions: InitOptions,
+    task: ClientTask<T>,
+): Promise<T> => {
+    let processor = processorRegistry.get(instanceKey);
+    if (!processor) {
+        processor = new TaskQueueProcessor();
+        processorRegistry.set(instanceKey, processor);
+    }
+    return processor.enqueueTask(initOptions, task);
+};
 
 /**
  * The interface of an `EditorClient` instance. This layer of indirection

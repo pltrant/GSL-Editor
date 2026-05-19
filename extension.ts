@@ -41,19 +41,12 @@ import {
 import { formatDate } from "./gsl/util/dateUtil";
 import { OutOfDateButtonManager } from "./gsl/status_bar/scriptOutOfDateButton";
 import { scriptNumberFromFileName } from "./gsl/util/scriptUtil";
-import { throwOnControlCharacters } from "./gsl/strings";
 import {
     GSLX_AUTOMATIC_DOWNLOADS,
-    GSLX_CURRENT_AUTHOR,
-    GSLX_DEV_ACCOUNT,
-    GSLX_DEV_CHARACTER,
-    GSLX_DEV_INSTANCE,
     GSLX_DEV_PASSWORD,
     GSLX_DISABLE_LOGIN,
     GSLX_ENABLE_SCRIPT_SYNC_CHECKS,
     GSLX_NEW_INSTALL_FLAG,
-    GSLX_PRIME_CHARACTER,
-    GSLX_PRIME_INSTANCE,
     GSLX_SAVED_VERSION,
     GSL_LANGUAGE_ID,
 } from "./gsl/const";
@@ -64,7 +57,6 @@ import {
 } from "./gsl/codeActionProvider";
 import { subscribeToDocumentChanges } from "./gsl/diagnostics";
 import { formatIndentation } from "./gsl/util/formattingUtil";
-import { registerCopilotTools } from "./gsl/copilotTools";
 import { runDiffWithPrimeCommand } from "./gsl/commands/diffWithPrime";
 import {
     runStartupAgentPromptAutoUpdate,
@@ -72,6 +64,7 @@ import {
 } from "./gsl/commands/syncAgentPrompts";
 import { runCopilotCodeReviewCommand } from "./gsl/commands/copilotCodeReview";
 import * as primeService from "./gsl/prime/primeService";
+import { LoginCredentials } from "./gsl/agentToolOrchestrator";
 
 const rx_script_number = /^\d{1,6}$/;
 const rx_script_number_in_filename = /(\d+)\.gsl/;
@@ -179,7 +172,7 @@ export class GSLExtension {
                 workspace
                     .getConfiguration(GSL_LANGUAGE_ID)
                     .get(GSLX_ENABLE_SCRIPT_SYNC_CHECKS) &&
-                this.context.globalState.get(GSLX_DEV_INSTANCE) === "GS4D" &&
+                GSLExtension.getDevInstance() === "GS4D" &&
                 this.matchesRemoteAccount(scriptProperties.modifier)
             ) {
                 syncStatus = await client
@@ -365,9 +358,9 @@ export class GSLExtension {
     }
 
     static getAccountName(): string | undefined {
-        const name = this.context.globalState.get(GSLX_DEV_ACCOUNT);
-        if (!name) return;
-        return `W_${name}`;
+        const creds = GSLExtension.readLoginConfigForInstance("dev");
+        if (!creds) return;
+        return `W_${creds.account}`;
     }
 
     /**
@@ -378,6 +371,69 @@ export class GSLExtension {
      */
     static matchesRemoteAccount(remoteAccountName: string): boolean {
         return this.getAccountName()?.startsWith(remoteAccountName) || false;
+    }
+
+    static getLoginConfigPath(): string | undefined {
+        const configured = workspace
+            .getConfiguration(GSL_LANGUAGE_ID)
+            .get<string>("loginConfigFile");
+        if (!configured) return undefined;
+        if (configured.startsWith("~")) {
+            const home = process.env.HOME || process.env.USERPROFILE || "";
+            return path.join(home, configured.slice(1));
+        }
+        return configured;
+    }
+
+    static readLoginConfigFile(): Record<string, unknown> | undefined {
+        const filePath = GSLExtension.getLoginConfigPath();
+        if (!filePath || !fs.existsSync(filePath)) return;
+        try {
+            return JSON.parse(fs.readFileSync(filePath, "utf8"));
+        } catch {
+            return;
+        }
+    }
+
+    static readLoginConfigForInstance(
+        instance: string,
+    ): Omit<LoginCredentials, "password"> | undefined {
+        const file = GSLExtension.readLoginConfigFile();
+        if (!file) return;
+        const account = file.account as string | undefined;
+        if (!account) return;
+
+        const instanceKey = `${instance}Instance`;
+        const characterKey = `${instance}Character`;
+        const gameInstance = file[instanceKey] as string | undefined;
+        const character = file[characterKey] as string | undefined;
+        if (!gameInstance || !character) return;
+        return { account, instance: gameInstance, character };
+    }
+
+    static async getLoginForInstance(
+        instance: string,
+        context: ExtensionContext,
+    ): Promise<LoginCredentials | undefined> {
+        const partial = GSLExtension.readLoginConfigForInstance(instance);
+        if (!partial) return;
+        const password = await context.secrets.get(GSLX_DEV_PASSWORD);
+        if (!password) return;
+        return { ...partial, password };
+    }
+
+    static isConfigured(): boolean {
+        return GSLExtension.readLoginConfigForInstance("dev") !== undefined;
+    }
+
+    static getDevInstance(): string | undefined {
+        const file = GSLExtension.readLoginConfigFile();
+        return file?.devInstance as string | undefined;
+    }
+
+    static getCurrentAuthor(): string | undefined {
+        const file = GSLExtension.readLoginConfigFile();
+        return file?.author as string | undefined;
     }
 }
 
@@ -455,6 +511,10 @@ export class VSCodeIntegration {
             { label: "Diff with Prime Server", name: "gsl.diffWithPrime" },
             { label: "Sync Agent Prompts", name: "gsl.syncAgentPrompts" },
             { label: "Copilot Code Review", name: "gsl.copilotCodeReview" },
+            {
+                label: "Open Login Config File",
+                name: "gsl.openLoginConfigFile",
+            },
         ];
 
         this.outputChannel = window.createOutputChannel("GSL Editor (debug)");
@@ -476,7 +536,7 @@ export class VSCodeIntegration {
         this.context.subscriptions.push(this.outOfDateButtonManager.activate());
 
         // Watch active editor for frozen files. Uses periodic polling.
-        if (this.context.globalState.get(GSLX_DEV_INSTANCE) === "GS4D") {
+        if (GSLExtension.getDevInstance() === "GS4D") {
             this.frozenScriptWarningManager = new FrozenScriptWarningManager(
                 this.frozenScriptWarning,
                 this.withEditorClient.bind(this),
@@ -706,6 +766,42 @@ export class VSCodeIntegration {
         await runCopilotCodeReviewCommand({ context: this.context });
     }
 
+    private async commandOpenLoginConfigFile() {
+        const filePath = GSLExtension.getLoginConfigPath();
+        if (!filePath) {
+            return void window.showErrorMessage(
+                "Login config file path is not configured. Run 'GSL: User Setup' first.",
+            );
+        }
+        if (!fs.existsSync(filePath)) {
+            const template = JSON.stringify(
+                {
+                    account: "",
+                    author: "",
+                    devInstance: "GS4D",
+                    primeInstance: "GS3",
+                    testInstance: "GST",
+                    shatteredInstance: "GSF",
+                    platinumInstance: "GS4X",
+                    devCharacter: "",
+                    primeCharacter: "",
+                    testCharacter: "",
+                    shatteredCharacter: "",
+                    platinumCharacter: "",
+                },
+                null,
+                4,
+            );
+            const dir = path.dirname(filePath);
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+            }
+            fs.writeFileSync(filePath, template, "utf8");
+        }
+        const doc = await workspace.openTextDocument(filePath);
+        await window.showTextDocument(doc);
+    }
+
     private async commandCheckDate() {
         if (!window.activeTextEditor || !window.activeTextEditor.document) {
             return void window.showErrorMessage(
@@ -755,13 +851,16 @@ export class VSCodeIntegration {
     private async commandUserSetup() {
         const AUTHOR_PATTERN = /^\w+\/\w+$/;
         const DEV_TO_PRIME: Record<string, string> = { GS4D: "GS3", DRD: "DR" };
+        const DEV_TO_TEST: Record<string, string> = { GS4D: "GST" };
+        const DEV_TO_SHATTERED: Record<string, string> = { GS4D: "GSF" };
+        const DEV_TO_PLATINUM: Record<string, string> = { GS4D: "GSX" };
         const sortCharacterNames = (names: string[]) =>
             [...names].sort((a, b) =>
                 a.localeCompare(b, undefined, { sensitivity: "base" }),
             );
 
         let account = await window.showInputBox({
-            prompt: "Step 1 of 6 (Development): PLAY.NET Account:",
+            prompt: "Step 1: PLAY.NET Account:",
             ignoreFocusOut: true,
         });
         if (!account) {
@@ -771,7 +870,7 @@ export class VSCodeIntegration {
         }
 
         let password = await window.showInputBox({
-            prompt: "Step 2 of 6 (Development): Password:",
+            prompt: "Step 2: Password:",
             ignoreFocusOut: true,
             password: true,
         });
@@ -785,11 +884,8 @@ export class VSCodeIntegration {
         let error: Error | undefined;
         const captureError = (e: Error) => ((error = e), void 0);
 
-        /* login */
-        window.setStatusBarMessage(
-            "User Setup: Step 2 of 6 (Development login)...",
-            5000,
-        );
+        /* login to development */
+        window.setStatusBarMessage("User Setup: Logging in...", 5000);
         const gameChoice = await EAccessClient.login(account, password, {
             name: /.*?development.*?/i,
         }).catch(captureError);
@@ -798,16 +894,11 @@ export class VSCodeIntegration {
             return void window.showErrorMessage(message);
         }
 
-        /* pick a game */
-        const gamePickOptions = {
+        /* pick a dev game */
+        const game = await window.showQuickPick(gameChoice.toNameList(), {
             ignoreFocusOut: true,
-            placeHolder:
-                "Step 3 of 6 (Development): Select a development game (DR or GS) ...",
-        };
-        const game = await window.showQuickPick(
-            gameChoice.toNameList(),
-            gamePickOptions,
-        );
+            placeHolder: "Select a development game (DR or GS)...",
+        });
         if (!game) {
             gameChoice.cancel();
             return void window.showErrorMessage(
@@ -823,19 +914,14 @@ export class VSCodeIntegration {
             return void window.showErrorMessage(message);
         }
 
-        /* pick a character */
-        const characterPickOptions = {
-            ignoreFocusOut: true,
-            placeHolder:
-                "Step 4 of 6 (Development): Which Development character should be used?",
-        };
+        /* pick a dev character */
         const developmentCharacters = sortCharacterNames(
             characterChoice.toNameList(),
         );
-        const character = await window.showQuickPick(
-            developmentCharacters,
-            characterPickOptions,
-        );
+        const character = await window.showQuickPick(developmentCharacters, {
+            ignoreFocusOut: true,
+            placeHolder: "Which Development character should be used?",
+        });
         if (!character) {
             characterChoice.cancel();
             return void window.showErrorMessage(
@@ -850,109 +936,158 @@ export class VSCodeIntegration {
             return void window.showErrorMessage(message);
         }
 
-        /* store development credentials */
         const { loginDetails } = result;
+        const devGameCode = loginDetails.game;
 
-        await Promise.all([
-            this.context.globalState.update(
-                GSLX_DEV_ACCOUNT,
-                loginDetails.account,
-            ),
-            this.context.globalState.update(
-                GSLX_DEV_INSTANCE,
-                loginDetails.game,
-            ),
-            this.context.globalState.update(
-                GSLX_DEV_CHARACTER,
-                loginDetails.character,
-            ),
-            this.context.secrets.store(GSLX_DEV_PASSWORD, password),
-        ]);
-
-        /* map selected development instance to prime instance */
-        const primeGameCode = DEV_TO_PRIME[loginDetails.game];
-        if (!primeGameCode) {
-            return void window.showErrorMessage(
-                `Could not determine prime game from development instance "${loginDetails.game}".`,
-            );
-        }
-
-        /* login and select prime character */
-        window.setStatusBarMessage(
-            "User Setup: Step 5 of 6 (Prime login)...",
-            5000,
-        );
-        const primeGameChoice = await EAccessClient.login(
-            account,
-            password,
-        ).catch(captureError);
-        if (!primeGameChoice) {
-            const message = error ? error.message : "Prime login failed?";
-            return void window.showErrorMessage(message);
-        }
-
-        const primeCharacterChoice = await primeGameChoice
-            .select(primeGameCode)
-            .catch(captureError);
-        if (!primeCharacterChoice) {
-            const message = error ? error.message : "Prime game select failed?";
-            primeGameChoice.cancel();
-            return void window.showErrorMessage(message);
-        }
-
-        const primeCharacterPickOptions = {
-            ignoreFocusOut: true,
-            placeHolder:
-                "Step 5 of 6 (Prime): Which Prime character should be used?",
+        /* Build credentials object — start with dev (no password in file) */
+        const credentials: Record<string, string> = {
+            account: loginDetails.account,
+            devInstance: devGameCode,
+            devCharacter: character,
         };
-        const primeCharacters = sortCharacterNames(
-            primeCharacterChoice.toNameList(),
-        );
-        const primeCharacter = await window.showQuickPick(
-            primeCharacters,
-            primeCharacterPickOptions,
-        );
-        if (!primeCharacter) {
-            primeCharacterChoice.cancel();
-            return void window.showErrorMessage(
-                "No Prime character selected; setup incomplete. Development credentials were saved.",
+
+        /* --- Prime character selection --- */
+        const primeGameCode = DEV_TO_PRIME[devGameCode];
+        if (primeGameCode) {
+            window.setStatusBarMessage(
+                "User Setup: Logging in for Prime...",
+                5000,
             );
+            const primeGameChoice = await EAccessClient.login(
+                account,
+                password,
+            ).catch(captureError);
+            if (primeGameChoice) {
+                const primeCharacterChoice = await primeGameChoice
+                    .select(primeGameCode)
+                    .catch(captureError);
+                if (primeCharacterChoice) {
+                    const primeCharacters = sortCharacterNames(
+                        primeCharacterChoice.toNameList(),
+                    );
+                    const primeCharacter = await window.showQuickPick(
+                        primeCharacters,
+                        {
+                            ignoreFocusOut: true,
+                            placeHolder:
+                                "Which Prime character should be used?",
+                        },
+                    );
+                    if (primeCharacter) {
+                        const primeResult = await primeCharacterChoice
+                            .select(primeCharacterChoice.pick(primeCharacter))
+                            .catch(captureError);
+                        if (primeResult) {
+                            credentials.primeInstance =
+                                primeResult.loginDetails.game;
+                            credentials.primeCharacter = primeCharacter;
+                        }
+                    } else {
+                        primeCharacterChoice.cancel();
+                    }
+                } else {
+                    primeGameChoice.cancel();
+                }
+            }
         }
 
-        const primeResult = await primeCharacterChoice
-            .select(primeCharacterChoice.pick(primeCharacter))
-            .catch(captureError);
-        if (!primeResult) {
-            const message = error
-                ? error.message
-                : "Prime character select failed?";
-            return void window.showErrorMessage(message);
+        /* --- Optional: Test/Shattered/Platinum --- */
+        const additionalServers: Array<{
+            label: string;
+            gameCode: string | undefined;
+            instanceKey: string;
+            characterKey: string;
+        }> = [
+            {
+                label: "Test",
+                gameCode: DEV_TO_TEST[devGameCode],
+                instanceKey: "testInstance",
+                characterKey: "testCharacter",
+            },
+            {
+                label: "Shattered",
+                gameCode: DEV_TO_SHATTERED[devGameCode],
+                instanceKey: "shatteredInstance",
+                characterKey: "shatteredCharacter",
+            },
+            {
+                label: "Platinum",
+                gameCode: DEV_TO_PLATINUM[devGameCode],
+                instanceKey: "platinumInstance",
+                characterKey: "platinumCharacter",
+            },
+        ];
+
+        const availableAdditional = additionalServers.filter((s) => s.gameCode);
+        if (availableAdditional.length > 0) {
+            const configureMore = await window.showQuickPick(["Yes", "No"], {
+                ignoreFocusOut: true,
+                placeHolder:
+                    "Configure additional servers (Test, Shattered, Platinum)?",
+            });
+            if (configureMore === "Yes") {
+                for (const server of availableAdditional) {
+                    window.setStatusBarMessage(
+                        `User Setup: Logging in for ${server.label}...`,
+                        5000,
+                    );
+                    const serverGameChoice = await EAccessClient.login(
+                        account,
+                        password,
+                    ).catch(captureError);
+                    if (!serverGameChoice) {
+                        window.showWarningMessage(
+                            `User Setup: Could not connect for ${server.label}. Skipping.`,
+                        );
+                        continue;
+                    }
+                    const serverCharChoice = await serverGameChoice
+                        .select(server.gameCode!)
+                        .catch(captureError);
+                    if (!serverCharChoice) {
+                        serverGameChoice.cancel();
+                        window.showWarningMessage(
+                            `User Setup: Could not select ${server.label} game. Skipping.`,
+                        );
+                        continue;
+                    }
+                    const serverChars = sortCharacterNames(
+                        serverCharChoice.toNameList(),
+                    );
+                    const serverChar = await window.showQuickPick(serverChars, {
+                        ignoreFocusOut: true,
+                        placeHolder: `Which ${server.label} character should be used?`,
+                    });
+                    if (!serverChar) {
+                        serverCharChoice.cancel();
+                        continue;
+                    }
+                    const serverResult = await serverCharChoice
+                        .select(serverCharChoice.pick(serverChar))
+                        .catch(captureError);
+                    if (serverResult) {
+                        credentials[server.instanceKey] =
+                            serverResult.loginDetails.game;
+                        credentials[server.characterKey] = serverChar;
+                    } else {
+                        window.showWarningMessage(
+                            `User Setup: Failed to launch ${server.label} character. Skipping.`,
+                        );
+                    }
+                }
+            }
         }
 
-        await Promise.all([
-            this.context.globalState.update(
-                GSLX_PRIME_INSTANCE,
-                primeResult.loginDetails.game,
-            ),
-            this.context.globalState.update(
-                GSLX_PRIME_CHARACTER,
-                primeResult.loginDetails.character,
-            ),
-        ]);
-
-        window.setStatusBarMessage(
-            "User Setup: Step 6 of 6 (Changelog Author)...",
-            5000,
-        );
+        /* --- Changelog Author --- */
         while (true) {
             const authorInput = await window.showInputBox({
-                prompt: "Step 6 of 6 (Changelog Author): AlexB/Nyxus",
+                prompt: "Changelog Author (e.g. AlexB/Nyxus):",
                 placeHolder: "AlexB/Nyxus",
                 ignoreFocusOut: true,
             });
             if (!authorInput) {
                 return void window.showErrorMessage(
-                    "No author name entered; setup incomplete. Development and Prime credentials were saved.",
+                    "No author name entered; aborting setup.",
                 );
             }
             const author = authorInput.trim();
@@ -963,13 +1098,55 @@ export class VSCodeIntegration {
                 );
                 continue;
             }
-            await this.context.globalState.update(GSLX_CURRENT_AUTHOR, author);
+            credentials.author = author;
             break;
         }
 
-        window.showInformationMessage(
-            "User setup complete. Development, Prime, and author settings stored.",
+        /* --- Choose save location + write config file --- */
+        const home = process.env.HOME || process.env.USERPROFILE || "";
+        const defaultPath = path.join(home, ".gsl", "loginConfig.json");
+        const existingPath = GSLExtension.getLoginConfigPath();
+
+        const filePath = await window.showInputBox({
+            prompt: "Where should the login config file be saved?",
+            value: existingPath || defaultPath,
+            ignoreFocusOut: true,
+        });
+        if (!filePath) {
+            return void window.showErrorMessage(
+                "No file path entered; aborting setup.",
+            );
+        }
+
+        const resolvedPath = filePath.startsWith("~")
+            ? path.join(home, filePath.slice(1))
+            : filePath;
+        const dir = path.dirname(resolvedPath);
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+        fs.writeFileSync(
+            resolvedPath,
+            JSON.stringify(credentials, null, 4),
+            "utf8",
         );
+        await this.context.secrets.store(GSLX_DEV_PASSWORD, password);
+
+        // Persist the path in the VS Code setting so the extension and
+        // MCP server both know where to find it.
+        await workspace
+            .getConfiguration(GSL_LANGUAGE_ID)
+            .update("loginConfigFile", filePath, true);
+
+        // Also forward to the MCP server process immediately.
+        process.env.GSL_LOGIN_CONFIG_FILE = resolvedPath;
+
+        window.showInformationMessage(
+            `User setup complete. Credentials saved to ${resolvedPath}.`,
+        );
+
+        const doc = await workspace.openTextDocument(resolvedPath);
+        await window.showTextDocument(doc);
     }
 
     private async commandOpenConnection() {
@@ -1212,237 +1389,6 @@ export class VSCodeIntegration {
         );
     }
 
-    async fetchPrimeScript(
-        script: number,
-    ): Promise<{ content: string; isNew: boolean }> {
-        return primeService.fetchPrimeScript(
-            script,
-            this.getPrimeServiceDependencies(),
-        );
-    }
-
-    async fetchPrimeAndDevScriptDiff(script: number): Promise<{
-        devContent: string;
-        primeContent: string;
-        isNewOnPrime: boolean;
-        isNewOnDev: boolean;
-    }> {
-        return primeService.fetchPrimeAndDevScriptDiff(
-            script,
-            this.getPrimeServiceDependencies(),
-        );
-    }
-
-    async uploadScriptForAgent(
-        script: number,
-        document: TextDocument,
-    ): Promise<ScriptCompileResults | undefined> {
-        if (script !== 24661) {
-            throw new Error(
-                `Agent upload is restricted to script 24661. Refusing script ${script}.`,
-            );
-        }
-        return this.withEditorClient(async (client) => {
-            try {
-                return await GSLExtension.uploadScript(
-                    client,
-                    script,
-                    document,
-                    {
-                        skipUploadConfirmation: true,
-                    },
-                );
-            } catch (error) {
-                try {
-                    await client.exitModifyScript();
-                } catch (cleanupError) {
-                    console.warn(
-                        "Failed to exit modify script during agent upload cleanup",
-                        cleanupError,
-                    );
-                }
-                throw error;
-            }
-        });
-    }
-
-    private async executeShowCommand(
-        client: EditorClientInterface,
-        command: string,
-        captureStart: RegExp,
-        captureEnd: RegExp,
-        abortPattern: RegExp,
-        includeStartLine: boolean,
-        includeEndLine: boolean,
-    ): Promise<string> {
-        const TIMEOUT_MS = 15000;
-        const lines = await client.executeCommand(command, {
-            captureStart,
-            captureEnd,
-            abortPattern,
-            timeoutMillis: TIMEOUT_MS,
-            includeStartLine,
-            includeEndLine,
-        });
-        return lines.join("\n");
-    }
-
-    private async executeShowCommandOnInstance(
-        instance: "prime" | "dev",
-        command: string,
-        captureStart: RegExp,
-        captureEnd: RegExp,
-        abortPattern: RegExp,
-        { includeStartLine = true, includeEndLine = true } = {},
-    ): Promise<string> {
-        const task = (client: EditorClientInterface) =>
-            this.executeShowCommand(
-                client,
-                command,
-                captureStart,
-                captureEnd,
-                abortPattern,
-                includeStartLine,
-                includeEndLine,
-            );
-
-        if (instance === "prime") {
-            return primeService.doPrimeEditorClientTask(
-                task,
-                this.getPrimeServiceDependencies(),
-            );
-        }
-
-        const result = await this.withEditorClient(task);
-        if (result === undefined) {
-            throw new Error(
-                "Dev server not configured. Run 'GSL: User Setup' first.",
-            );
-        }
-        return result;
-    }
-
-    async getExistenceData(
-        existenceId: number,
-        instance: "prime" | "dev",
-    ): Promise<string> {
-        return this.executeShowCommandOnInstance(
-            instance,
-            `/se ${existenceId}`,
-            /^Showing /,
-            /^Flags:/,
-            /^Existence ".*?" not found\./,
-        );
-    }
-
-    async getRoomData(
-        roomId: number,
-        instance: "prime" | "dev",
-    ): Promise<string> {
-        return this.executeShowCommandOnInstance(
-            instance,
-            `/sr ${roomId}`,
-            /^Showing room #\d+/,
-            /^Flags:/,
-            /does not exist or could not be loaded for some reason/,
-        );
-    }
-
-    async getPlayerVarfields(
-        playerName: string,
-        verbosity: "Full" | "NoTables" | "SkipDefaults",
-        instance: "prime" | "dev",
-    ): Promise<string> {
-        throwOnControlCharacters(playerName);
-        return this.executeShowCommandOnInstance(
-            instance,
-            `/svf ${playerName} ${verbosity}`,
-            /^Variable Fields Attached to player /,
-            /^Flags:/,
-            /^Player .+ not found$/,
-        );
-    }
-
-    async executeAgentCommand(
-        command: string,
-        instance: "prime" | "dev",
-    ): Promise<string> {
-        throwOnControlCharacters(command);
-        const fullCommand = command ? `/agent ${command}` : `/agent`;
-        return this.executeShowCommandOnInstance(
-            instance,
-            fullCommand,
-            /^<<<beginning of output>>>/,
-            /^<<<end of output>>>/,
-            /(?!)/,
-            { includeStartLine: false, includeEndLine: false },
-        );
-    }
-
-    async getVerbData(verb: string): Promise<string> {
-        throwOnControlCharacters(verb);
-        const task = (client: EditorClientInterface) =>
-            this.executeShowCommand(
-                client,
-                `/sv ${verb}`,
-                /^Information about the verb /,
-                /^On /,
-                /does not exist\.$/,
-                true,
-                true,
-            );
-
-        const result = await this.withEditorClient(task);
-        if (result === undefined) {
-            throw new Error(
-                "Dev server not configured. Run 'GSL: User Setup' first.",
-            );
-        }
-        return result;
-    }
-
-    async getScriptData(scriptId: number, gameCode: string): Promise<string> {
-        const task = (client: EditorClientInterface) =>
-            this.executeShowCommand(
-                client,
-                `/ss ${scriptId} ${gameCode} raw`,
-                /^Game: /,
-                /^On |^Unspecified Date/,
-                /^Invalid script/,
-                true,
-                true,
-            );
-
-        const result = await this.withEditorClient(task);
-        if (result === undefined) {
-            throw new Error(
-                "This tool is not available on non-dev servers. Run 'GSL: User Setup' to configure a dev server connection.",
-            );
-        }
-        return result;
-    }
-
-    async getGlobalTableData(tableId: number): Promise<string> {
-        const task = (client: EditorClientInterface) =>
-            this.executeShowCommand(
-                client,
-                `/sl ${tableId}`,
-                /^Table \[\d+\] Header Information/,
-                /^\s+Table Type:/,
-                /^ERROR:.*Trouble loading table/,
-                true,
-                true,
-            );
-
-        const result = await this.withEditorClient(task);
-        if (result === undefined) {
-            throw new Error(
-                "Dev server not configured. Run 'GSL: User Setup' first.",
-            );
-        }
-        return result;
-    }
-
     private registerCommands() {
         let subscription: Disposable;
         subscription = commands.registerCommand(
@@ -1535,16 +1481,22 @@ export class VSCodeIntegration {
             this,
         );
         this.context.subscriptions.push(subscription);
+        subscription = commands.registerCommand(
+            "gsl.openLoginConfigFile",
+            this.commandOpenLoginConfigFile,
+            this,
+        );
+        this.context.subscriptions.push(subscription);
     }
 
     /* public api */
 
     getGameInstance(): string | undefined {
-        return this.context.globalState.get(GSLX_DEV_INSTANCE);
+        return GSLExtension.getDevInstance();
     }
 
     getCurrentAuthor(): string | undefined {
-        return this.context.globalState.get(GSLX_CURRENT_AUTHOR);
+        return GSLExtension.getCurrentAuthor();
     }
 
     appendLineToGameChannel(text: string) {
@@ -1670,13 +1622,11 @@ export class VSCodeIntegration {
         ) {
             return void window.showErrorMessage("Game login is disabled");
         }
-        const account = this.context.globalState.get<string>(GSLX_DEV_ACCOUNT);
-        const instance =
-            this.context.globalState.get<string>(GSLX_DEV_INSTANCE);
-        const character =
-            this.context.globalState.get<string>(GSLX_DEV_CHARACTER);
-        const password = await this.context.secrets.get(GSLX_DEV_PASSWORD);
-        if (!account || !instance || !character || !password) {
+        const creds = await GSLExtension.getLoginForInstance(
+            "dev",
+            this.context,
+        );
+        if (!creds) {
             this.promptUserSetup();
             return;
         }
@@ -1690,12 +1640,7 @@ export class VSCodeIntegration {
         };
         return withEditorClient(
             {
-                login: {
-                    account,
-                    instance,
-                    character,
-                    password,
-                },
+                login: creds,
                 console: consoleAdapter,
                 downloadLocation: GSLExtension.getDownloadLocation(),
                 ...(this.loggingEnabled
@@ -1755,8 +1700,7 @@ export function activate(context: ExtensionContext) {
                 const config = workspace.getConfiguration(GSL_LANGUAGE_ID);
                 if (!config.get(GSLX_AUTOMATIC_DOWNLOADS)) return;
                 if (!config.get(GSLX_ENABLE_SCRIPT_SYNC_CHECKS)) return;
-                if (context.globalState.get(GSLX_DEV_INSTANCE) !== "GS4D")
-                    return;
+                if (GSLExtension.getDevInstance() !== "GS4D") return;
                 return vsc?.withEditorClient((client) =>
                     client.showScriptCheckStatus(script),
                 );
@@ -1804,8 +1748,17 @@ export function activate(context: ExtensionContext) {
     context.subscriptions.push(lineLengthDiagnostics);
     subscribeToDocumentChanges(context, lineLengthDiagnostics);
 
-    // Register language model tools for Copilot agent mode
-    registerCopilotTools(context, vsc);
+    // Expose credentials to the MCP server child process via environment
+    // variables so that contributes.mcpServers spawns with access to the
+    // game server login. The login config file path and password (stored
+    // in VS Code secrets) are forwarded here.
+    const loginConfigPath = GSLExtension.getLoginConfigPath();
+    if (loginConfigPath) {
+        process.env.GSL_LOGIN_CONFIG_FILE = loginConfigPath;
+    }
+    context.secrets.get(GSLX_DEV_PASSWORD).then((pw) => {
+        if (pw) process.env.GSL_PASSWORD = pw;
+    });
 
     vsc.checkForNewInstall();
     vsc.checkForUpdatedVersion();

@@ -130,6 +130,11 @@
                 "command": "gsl.copilotCodeReview",
                 "title": "Copilot Code Review",
                 "category": "GSL"
+            },
+            {
+                "command": "gsl.openLoginConfigFile",
+                "title": "Open Login Config File",
+                "category": "GSL"
             }
         ],
         "languageModelTools": [
@@ -499,6 +504,11 @@
                     ],
                     "default": "No Delay",
                     "description": "Set the interval for how often the extension checks if the local script is up-to-date with its remote version.  A higher delay can be useful in bandwidth-constrained situations such as on an airplane."
+                },
+                "gsl.loginConfigFile": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Path to the JSON login config file for game server instances. Defaults to ~/.gsl/loginConfig.json if not set. Run 'GSL: User Setup' to create."
                 }
             }
         },

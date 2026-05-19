@@ -15,7 +15,7 @@ import {
     window,
     workspace,
 } from "vscode";
-import { GSLX_DEV_PASSWORD, GSL_LANGUAGE_ID } from "../const";
+import { GSL_LANGUAGE_ID } from "../const";
 import { assertNever } from "../util/typeUtil";
 import { showQuickPick } from "../dialog/QuickPick";
 import { EditorClientInterface } from "../editorClient";
@@ -217,8 +217,7 @@ export class OutOfDateButtonManager {
             return true;
         }
         // Verify game access is possible
-        const password = await this.context.secrets.get(GSLX_DEV_PASSWORD);
-        return !password;
+        return !GSLExtension.isConfigured();
     }
 
     private isExecutionStale(

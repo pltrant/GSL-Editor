@@ -5,28 +5,13 @@ import {
     workspace,
 } from "vscode";
 
-import {
-    EditorClientInterface,
-    withEditorClient,
-    withPrimeEditorClient,
-} from "../editorClient";
-import {
-    GSLX_DEV_CHARACTER,
-    GSLX_DEV_ACCOUNT,
-    GSLX_DEV_INSTANCE,
-    GSLX_DEV_PASSWORD,
-    GSLX_DISABLE_LOGIN,
-    GSLX_PRIME_CHARACTER,
-    GSLX_PRIME_INSTANCE,
-    GSL_LANGUAGE_ID,
-} from "../const";
+import { EditorClientInterface, withPrimeEditorClient } from "../editorClient";
+import { GSLX_DISABLE_LOGIN, GSL_LANGUAGE_ID } from "../const";
+import { GSLExtension } from "../../extension";
 import { scriptNumberFromFileName } from "../util/scriptUtil";
+import { fetchScriptContent, normalizeText } from "../agentToolOrchestrator";
 
 const rx_script_number = /^\d{1,6}$/;
-
-function normalizeText(text: string): string {
-    return text.replace(/\r\n/g, "\n").replace(/\s+$/, "") + "\n";
-}
 
 export interface PrimeServiceDependencies {
     context: ExtensionContext;
@@ -75,115 +60,14 @@ export async function fetchPrimeScriptDiff(
     };
 }
 
-export async function fetchPrimeAndDevScriptDiff(
-    script: number,
-    deps: PrimeServiceDependencies,
-): Promise<{
-    devContent: string;
-    primeContent: string;
-    isNewOnPrime: boolean;
-    isNewOnDev: boolean;
-}> {
-    const [{ content: primeContent, isNew: isNewOnPrime }, devScript] =
-        await Promise.all([
-            fetchPrimeScript(script, deps),
-            fetchDevScript(script, deps),
-        ]);
-
-    return {
-        devContent: devScript.content,
-        primeContent,
-        isNewOnPrime,
-        isNewOnDev: devScript.isNew,
-    };
-}
-
 export async function fetchPrimeScript(
     script: number,
     deps: PrimeServiceDependencies,
 ): Promise<{ content: string; isNew: boolean }> {
-    const primeRaw = await doPrimeEditorClientTask(async (client) => {
-        const scriptProperties = await client.modifyScript(script, true);
-        if (scriptProperties.new) {
-            await client.exitModifyScript();
-            return { content: "", isNew: true };
-        }
-
-        try {
-            const content = await client.captureScript();
-            return { content, isNew: false };
-        } catch (e) {
-            await client.exitModifyScript();
-            throw e;
-        }
-    }, deps);
-
-    if (primeRaw.isNew) {
-        return { content: "", isNew: true };
-    }
-
-    return { content: normalizeText(primeRaw.content), isNew: false };
-}
-
-export async function fetchDevScript(
-    script: number,
-    { context, outputChannel, downloadLocation }: PrimeServiceDependencies,
-): Promise<{ content: string; isNew: boolean }> {
-    if (workspace.getConfiguration(GSL_LANGUAGE_ID).get(GSLX_DISABLE_LOGIN)) {
-        throw new Error("Game login is disabled.");
-    }
-
-    const account = context.globalState.get<string>(GSLX_DEV_ACCOUNT);
-    const instance = context.globalState.get<string>(GSLX_DEV_INSTANCE);
-    const character = context.globalState.get<string>(GSLX_DEV_CHARACTER);
-    const password = await context.secrets.get(GSLX_DEV_PASSWORD);
-    if (!account || !instance || !character || !password) {
-        throw new Error(
-            "Development server not configured. Run 'GSL: User Setup' first.",
-        );
-    }
-
-    const consoleAdapter: { log: (...args: any) => void } = {
-        log: (...args: any) => {
-            outputChannel.append(`[dev: ${args.join(" ")}]\r\n`);
-        },
-    };
-
-    const devRaw = await withEditorClient(
-        {
-            login: {
-                account,
-                instance,
-                character,
-                password,
-            },
-            console: consoleAdapter,
-            downloadLocation,
-            loggingEnabled: false,
-            onCreate: () => {},
-        },
-        async (client) => {
-            const scriptProperties = await client.modifyScript(script, true);
-            if (scriptProperties.new) {
-                await client.exitModifyScript();
-                return { content: "", isNew: true };
-            }
-
-            try {
-                const content = await client.captureScript();
-                return { content, isNew: false };
-            } catch (e) {
-                await client.exitModifyScript();
-                throw e;
-            }
-        },
+    return doPrimeEditorClientTask(
+        (client) => fetchScriptContent(client, script),
+        deps,
     );
-
-    if (devRaw.isNew) {
-        return { content: "", isNew: true };
-    }
-
-    return { content: normalizeText(devRaw.content), isNew: false };
 }
 
 /**
@@ -199,11 +83,8 @@ export async function doPrimeEditorClientTask<T>(
         throw new Error("Game login is disabled.");
     }
 
-    const account = context.globalState.get<string>(GSLX_DEV_ACCOUNT);
-    const instance = context.globalState.get<string>(GSLX_PRIME_INSTANCE);
-    const character = context.globalState.get<string>(GSLX_PRIME_CHARACTER);
-    const password = await context.secrets.get(GSLX_DEV_PASSWORD);
-    if (!account || !instance || !character || !password) {
+    const creds = await GSLExtension.getLoginForInstance("prime", context);
+    if (!creds) {
         throw new Error(
             "Prime server not configured. Run 'GSL: User Setup' first.",
         );
@@ -217,12 +98,7 @@ export async function doPrimeEditorClientTask<T>(
 
     return withPrimeEditorClient(
         {
-            login: {
-                account,
-                instance,
-                character,
-                password,
-            },
+            login: creds,
             console: consoleAdapter,
             downloadLocation,
             loggingEnabled: false,
