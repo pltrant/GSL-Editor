@@ -1660,7 +1660,7 @@ export class VSCodeIntegration {
 
 export let vsc: VSCodeIntegration | undefined = undefined;
 
-export function activate(context: ExtensionContext) {
+export async function activate(context: ExtensionContext) {
     vsc = new VSCodeIntegration(context);
 
     EAccessClient.console = {
@@ -1751,18 +1751,21 @@ export function activate(context: ExtensionContext) {
     // Expose credentials to the MCP server child process via environment
     // variables so that contributes.mcpServers spawns with access to the
     // game server login. The login config file path and password (stored
-    // in VS Code secrets) are forwarded here.
+    // in VS Code secrets) are forwarded here. The password is set on
+    // process.env because contributes.mcpServers inherits the host
+    // environment — cleaned up in deactivate() to limit exposure.
     const loginConfigPath = GSLExtension.getLoginConfigPath();
     if (loginConfigPath) {
         process.env.GSL_LOGIN_CONFIG_FILE = loginConfigPath;
     }
-    context.secrets.get(GSLX_DEV_PASSWORD).then((pw) => {
-        if (pw) process.env.GSL_PASSWORD = pw;
-    });
+    const pw = await context.secrets.get(GSLX_DEV_PASSWORD);
+    if (pw) process.env.GSL_PASSWORD = pw;
 
     vsc.checkForNewInstall();
     vsc.checkForUpdatedVersion();
     void runStartupAgentPromptAutoUpdate({ context });
 }
 
-export function deactivate() {}
+export function deactivate() {
+    delete process.env.GSL_PASSWORD;
+}

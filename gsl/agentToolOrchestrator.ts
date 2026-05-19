@@ -283,7 +283,7 @@ export class AgentToolOrchestrator {
                 try {
                     await client.exitModifyScript();
                 } catch {
-                    // best-effort cleanup
+                    // connection teardown will handle it
                 }
                 throw e;
             }
@@ -319,7 +319,7 @@ export async function fetchScriptContent(
         try {
             await client.exitModifyScript();
         } catch {
-            // best-effort cleanup
+            // connection teardown will handle it
         }
         throw e;
     }

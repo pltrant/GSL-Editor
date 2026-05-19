@@ -1,0 +1,22 @@
+{
+    // The MCP SDK ships CJS .d.ts files that reference DOM types (HeadersInit)
+    // and use ESM imports without a resolution-mode attribute, causing TS2304
+    // and TS1541 under moduleResolution: Node16. skipLibCheck is scoped here
+    // to avoid infecting the main tsconfig.
+    //
+    // Errors without skipLibCheck:
+    //   TS2304: Cannot find name 'HeadersInit'.
+    //   TS1541: Type-only import of an ECMAScript module from a CommonJS
+    //           module must have a 'resolution-mode' attribute.
+    //
+    // https://github.com/modelcontextprotocol/typescript-sdk/pull/2095
+    // Once the SDK ships fixed declarations, delete this file and fold MCP
+    // type-checking back into tsconfig.json.
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "skipLibCheck": true,
+        "noEmit": true
+    },
+    "include": ["gsl/mcp/mcpServer.ts"],
+    "exclude": ["node_modules"]
+}
