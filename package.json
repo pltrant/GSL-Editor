@@ -29,6 +29,7 @@
         "vscode": "^1.109.0"
     },
     "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.29.0",
         "csv-parse": "^5.5.5",
         "diff": "^8.0.3"
     },
@@ -52,8 +53,10 @@
     },
     "scripts": {
         "vscode:prepublish": "npm run compile && npm run bundle",
-        "compile": "tsc -b",
-        "bundle": "esbuild extension.ts --bundle --outfile=extension.js --external:vscode --format=cjs --platform=node",
+        "compile": "tsc -b && npm run bundle:mcp",
+        "bundle": "npm run bundle:extension && npm run bundle:mcp",
+        "bundle:extension": "esbuild extension.ts --bundle --outfile=extension.js --external:vscode --format=cjs --platform=node",
+        "bundle:mcp": "esbuild gsl/mcp/mcpServer.ts --bundle --outfile=gsl/mcp/mcpServer.bundle.js --external:vscode --format=cjs --platform=node",
         "watch": "tsc --watch",
         "test": "node test/runTests.js",
         "format": "prettier --write \"**/*.ts\""
@@ -433,6 +436,15 @@
                 }
             }
         ],
+        "mcpServers": {
+            "gsl-tools": {
+                "type": "stdio",
+                "command": "node",
+                "args": [
+                    "${extensionPath}/gsl/mcp/mcpServer.bundle.js"
+                ]
+            }
+        },
         "configuration": {
             "type": "object",
             "title": "GSL",
