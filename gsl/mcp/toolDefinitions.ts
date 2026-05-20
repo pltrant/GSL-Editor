@@ -59,7 +59,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             "Downloads a GSL script from two server instances and returns a unified diff " +
             "showing exactly what lines differ between them. Use this when the user wants " +
             "to compare, diff, or check differences between two versions of a script " +
-            "across server instances. Returns diff content directly without opening any UI. " +
+            "across server instances. " +
             "The diff reads as: baseInstance (---) compared against compareInstance (+++).",
         inputSchema: {
             type: "object",
@@ -109,8 +109,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             "compiler errors/warnings. Prefer this tool over generic error tools for GSL " +
             "compile checks. It compiles a local GSL script file on the development server " +
             "and returns compiler output, including line-level errors and warnings, so the " +
-            "model can diagnose and fix compilation problems. Uses placeholder script 24661 " +
-            "for upload.",
+            "model can diagnose and fix compilation problems. The file is uploaded to an " +
+            "ephemeral compilation slot (script 24661) that does not persist — no scripts " +
+            "are permanently modified.",
         inputSchema: {
             type: "object",
             required: ["filename"],
@@ -118,7 +119,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
                 filename: {
                     type: "string",
                     description:
-                        "Workspace-relative or absolute path to the .gsl file to upload, such as S24661.gsl.",
+                        "Relative or absolute path to the .gsl file to compile (e.g. 'S02017.gsl').",
                 },
             },
         },
@@ -126,9 +127,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     {
         name: "gsl_get_current_author",
         description:
-            "Returns the current GSL author value configured via User Setup. Use this " +
-            "when generating changelog entries or script metadata that needs the canonical " +
-            "author identity. Format: <AbbreviatedRealName>/<CharacterName>.",
+            "Returns the current GSL author value. Use this when generating changelog " +
+            "entries or script metadata that needs the canonical author identity. " +
+            "Format: <AbbreviatedRealName>/<CharacterName>.",
         inputSchema: {
             type: "object",
             properties: {},
@@ -194,7 +195,8 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         name: "gsl_get_player_varfields",
         description:
             "Sends the /svf command to the game server for a given player name and returns " +
-            "varfield and flags output.",
+            "varfield and flags output. Use this when the user wants to inspect a " +
+            "character's current state — skills, stats, properties, and flag bits.",
         inputSchema: {
             type: "object",
             required: ["playerName"],
@@ -236,7 +238,8 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
                 command: {
                     type: "string",
                     description:
-                        "The /agent subcommand and its arguments (e.g. '/vftable PlayerName tableName 0 5'). " +
+                        "The subcommand and its arguments, without the /agent prefix " +
+                        "(e.g. 'vftable PlayerName tableName 0 5'). " +
                         "Omit to list all available subcommands.",
                 },
                 instance: {
@@ -271,7 +274,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
                 },
                 instance: {
                     type: "string",
-                    enum: ["dev", "shattered", "platinum", "prime", "test"],
+                    enum: ["dev", "prime", "shattered", "platinum", "test"],
                     default: "dev",
                     description:
                         "Which game instance to query script data for. Maps to game codes: " +
