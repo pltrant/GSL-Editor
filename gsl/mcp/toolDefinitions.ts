@@ -30,9 +30,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     {
         name: "gsl_download_script",
         description:
-            "Downloads a GSL script from the specified server instance and returns the " +
-            "full script content as text. Use this when the user wants to read, review, or " +
-            "inspect a version of a script on any server instance.",
+            "Downloads a GSL script from the specified server instance and saves it to a " +
+            "local file. Returns the file path. Use this when the user wants to read, " +
+            "review, or inspect a version of a script on any server instance.",
         inputSchema: {
             type: "object",
             required: ["scriptNumber"],
@@ -106,12 +106,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         name: "gsl_compile_check",
         description:
             "Use this tool whenever the task is to check, compile, or validate GSL script " +
-            "compiler errors/warnings. Prefer this tool over generic error tools for GSL " +
-            "compile checks. It compiles a local GSL script file on the development server " +
+            "compiler errors/warnings. It compiles a local GSL script file on the development server " +
             "and returns compiler output, including line-level errors and warnings, so the " +
             "model can diagnose and fix compilation problems. The file is uploaded to an " +
-            "ephemeral compilation slot (script 24661) that does not persist — no scripts " +
-            "are permanently modified.",
+            "ephemeral compilation slot (script 24661). Use this tool when writing scripts " +
+            "or verifying GSL syntax.",
         inputSchema: {
             type: "object",
             required: ["filename"],
@@ -127,9 +126,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     {
         name: "gsl_get_current_author",
         description:
-            "Returns the current GSL author value. Use this when generating changelog " +
-            "entries or script metadata that needs the canonical author identity. " +
-            "Format: <AbbreviatedRealName>/<CharacterName>.",
+            "Returns the current GSL author value, per the configuration file. Use " +
+            "this when generating changelog entries or script metadata that needs " +
+            "the canonical author identity. Format: <AbbreviatedRealName>/<CharacterName>.",
         inputSchema: {
             type: "object",
             properties: {},

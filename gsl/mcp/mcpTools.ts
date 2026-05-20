@@ -468,17 +468,16 @@ export function createMcpToolHandler(
                         );
                     }
                     const filename = `S${String(scriptNumber).padStart(5, "0")}.${instance}.mcp.gsl`;
-                    const filePath = path.join(
-                        orchestrator.downloadLocation,
-                        filename,
-                    );
-                    fs.writeFileSync(filePath, content, "utf8");
+                    const dir = orchestrator.downloadLocation;
+                    fs.mkdirSync(dir, { recursive: true });
+                    const filePath = path.join(dir, filename);
+                    await fs.promises.writeFile(filePath, content, "utf8");
                     return textResult(
                         `Script ${scriptNumber} downloaded from ${instance} to: ${filePath}`,
                     );
                 } catch (e) {
                     return errorResult(
-                        `Failed to fetch script: ${e instanceof Error ? e.message : String(e)}`,
+                        `Failed to download script: ${e instanceof Error ? e.message : String(e)}`,
                     );
                 }
             };
