@@ -36,6 +36,10 @@ export interface AgentToolOrchestratorDeps {
 export class AgentToolOrchestrator {
     constructor(private deps: AgentToolOrchestratorDeps) {}
 
+    get downloadLocation(): string {
+        return this.deps.downloadLocation;
+    }
+
     // -- credential helpers ------------------------------------------------
 
     private async initOptionsFor(instance: GameInstance): Promise<InitOptions> {

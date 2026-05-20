@@ -467,11 +467,14 @@ export function createMcpToolHandler(
                             `Script ${scriptNumber}: Not found on ${instance} server (new script).`,
                         );
                     }
+                    const filename = `S${String(scriptNumber).padStart(5, "0")}.${instance}.mcp.gsl`;
+                    const filePath = path.join(
+                        orchestrator.downloadLocation,
+                        filename,
+                    );
+                    fs.writeFileSync(filePath, content, "utf8");
                     return textResult(
-                        `Script ${scriptNumber} from ${instance} server:\n\n` +
-                            "```gsl\n" +
-                            content +
-                            "\n```",
+                        `Script ${scriptNumber} downloaded from ${instance} to: ${filePath}`,
                     );
                 } catch (e) {
                     return errorResult(
