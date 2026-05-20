@@ -28,13 +28,11 @@ export interface ToolDefinition {
 
 export const TOOL_DEFINITIONS: ToolDefinition[] = [
     {
-        name: "gsl_diff_with_prime",
+        name: "gsl_download_script",
         description:
-            "Downloads a GSL script from both the Prime (production) and Dev servers, " +
-            "then returns a unified diff showing exactly what lines differ. Use this when " +
-            "the user wants to compare, diff, check differences, or understand what changed " +
-            "between Prime and Dev versions of a script. The tool returns diff content directly " +
-            "and does not write local files or open UI. scriptNumber is required.",
+            "Downloads a GSL script from the specified server instance and returns the " +
+            "full script content as text. Use this when the user wants to read, review, or " +
+            "inspect a version of a script on any server instance.",
         inputSchema: {
             type: "object",
             required: ["scriptNumber"],
@@ -43,31 +41,26 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
                     type: "integer",
                     minimum: 1,
                     maximum: 999999,
-                    description:
-                        "Required GSL script number to diff between Prime and Dev servers.",
+                    description: "GSL script number to fetch.",
                 },
-                context: {
-                    type: "integer",
-                    minimum: 0,
-                    maximum: 100,
+                instance: {
+                    type: "string",
+                    enum: ["dev", "prime", "shattered", "platinum", "test"],
+                    default: "dev",
                     description:
-                        "Number of unchanged context lines to show before and after each change. Defaults to 3 (same as git diff).",
-                },
-                ignoreWhitespace: {
-                    type: "boolean",
-                    description:
-                        "If true, ignore leading/trailing whitespace when comparing lines.",
+                        "Which server instance to fetch from. Defaults to 'dev'.",
                 },
             },
         },
     },
     {
-        name: "gsl_fetch_prime_script",
+        name: "gsl_diff_script_across_instances",
         description:
-            "Downloads a GSL script from the Prime (production) server and returns the " +
-            "full script content as text. Use this when the user wants to read, review, or " +
-            "inspect the production version of a script without comparing it to the local copy. " +
-            "The tool returns the raw script content directly — it does not open any UI.",
+            "Downloads a GSL script from two server instances and returns a unified diff " +
+            "showing exactly what lines differ between them. Use this when the user wants " +
+            "to compare, diff, or check differences between two versions of a script " +
+            "across server instances. Returns diff content directly without opening any UI. " +
+            "The diff reads as: baseInstance (---) compared against compareInstance (+++).",
         inputSchema: {
             type: "object",
             required: ["scriptNumber"],
@@ -76,7 +69,35 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
                     type: "integer",
                     minimum: 1,
                     maximum: 999999,
-                    description: "GSL script number to fetch from Prime.",
+                    description: "GSL script number to diff.",
+                },
+                baseInstance: {
+                    type: "string",
+                    enum: ["dev", "prime", "shattered", "platinum", "test"],
+                    default: "prime",
+                    description:
+                        "Reference instance (--- side of diff). Defaults to 'prime'.",
+                },
+                compareInstance: {
+                    type: "string",
+                    enum: ["dev", "prime", "shattered", "platinum", "test"],
+                    default: "dev",
+                    description:
+                        "Instance to compare against base (+++ side of diff). Defaults to 'dev'.",
+                },
+                context: {
+                    type: "integer",
+                    minimum: 0,
+                    maximum: 100,
+                    default: 3,
+                    description:
+                        "Number of unchanged context lines around each change. Defaults to 3.",
+                },
+                ignoreWhitespace: {
+                    type: "boolean",
+                    default: false,
+                    description:
+                        "If true, ignore leading/trailing whitespace when comparing lines.",
                 },
             },
         },
@@ -229,7 +250,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
     },
     {
-        name: "gsl_get_script_data",
+        name: "gsl_get_script_ss_metadata",
         description:
             "Sends the /ss (show script) command for a given script ID and returns the raw " +
             "script metadata output. This is the best way to identify when a script was last " +

@@ -302,7 +302,7 @@ export function createMcpToolHandler(
                 }
             };
 
-        case "gsl_get_script_data":
+        case "gsl_get_script_ss_metadata":
             return async (args) => {
                 try {
                     const scriptId = parseRequiredPositiveInt(
@@ -380,63 +380,65 @@ export function createMcpToolHandler(
                 }
             };
 
-        case "gsl_diff_with_prime":
+        case "gsl_diff_script_across_instances":
             return async (args) => {
                 try {
                     const scriptNumber = parseRequiredPositiveInt(
                         args.scriptNumber,
                         "scriptNumber",
                     );
+                    const baseInstance = parseInstance(
+                        args.baseInstance,
+                        "prime",
+                    );
+                    const compareInstance = parseInstance(
+                        args.compareInstance,
+                        "dev",
+                    );
                     const diffContext = parseDiffContext(args.context);
                     const ignoreWhitespace =
                         (args.ignoreWhitespace as boolean) ?? false;
 
-                    const {
-                        devContent,
-                        primeContent,
-                        isNewOnPrime,
-                        isNewOnDev,
-                    } =
-                        await orchestrator.fetchPrimeAndDevScriptDiff(
-                            scriptNumber,
-                        );
+                    const [base, compare] = await Promise.all([
+                        orchestrator.fetchScript(scriptNumber, baseInstance),
+                        orchestrator.fetchScript(scriptNumber, compareInstance),
+                    ]);
 
-                    if (isNewOnPrime && isNewOnDev) {
+                    if (base.isNew && compare.isNew) {
                         return textResult(
-                            `Script ${scriptNumber}: Not found on either Prime or Dev server.`,
+                            `Script ${scriptNumber}: Not found on either ${baseInstance} or ${compareInstance}.`,
                         );
                     }
-                    if (isNewOnPrime) {
+                    if (base.isNew) {
                         return textResult(
-                            `Script ${scriptNumber}: Not found on Prime server (appears to be new in Dev).`,
+                            `Script ${scriptNumber}: Not found on ${baseInstance} (exists only on ${compareInstance}).`,
                         );
                     }
-                    if (isNewOnDev) {
+                    if (compare.isNew) {
                         return textResult(
-                            `Script ${scriptNumber}: Not found on Dev server.`,
+                            `Script ${scriptNumber}: Not found on ${compareInstance} (exists only on ${baseInstance}).`,
                         );
                     }
 
                     const diffText = createTwoFilesPatch(
-                        `s${scriptNumber} (Prime)`,
-                        `s${scriptNumber} (Dev)`,
-                        primeContent,
-                        devContent,
+                        `S${scriptNumber}.gsl (${baseInstance})`,
+                        `S${scriptNumber}.gsl (${compareInstance})`,
+                        base.content,
+                        compare.content,
                         undefined,
                         undefined,
                         { context: diffContext, ignoreWhitespace },
                     );
 
-                    // A patch with no hunks means no differences
                     if (!diffText.includes("@@")) {
-                        const noDiffMessage = ignoreWhitespace
-                            ? `Script ${scriptNumber}: No differences between Prime and Dev (ignoring whitespace).`
-                            : `Script ${scriptNumber}: No differences between Prime and Dev.`;
-                        return textResult(noDiffMessage);
+                        const msg = ignoreWhitespace
+                            ? `Script ${scriptNumber}: No differences between ${baseInstance} and ${compareInstance} (ignoring whitespace).`
+                            : `Script ${scriptNumber}: No differences between ${baseInstance} and ${compareInstance}.`;
+                        return textResult(msg);
                     }
 
                     return textResult(
-                        `Script ${scriptNumber}: Differences found between Prime and Dev.\n\n` +
+                        `Script ${scriptNumber}: Differences found (${baseInstance} → ${compareInstance}).\n\n` +
                             "```diff\n" +
                             diffText +
                             "\n```",
@@ -448,29 +450,32 @@ export function createMcpToolHandler(
                 }
             };
 
-        case "gsl_fetch_prime_script":
+        case "gsl_download_script":
             return async (args) => {
                 try {
                     const scriptNumber = parseRequiredPositiveInt(
                         args.scriptNumber,
                         "scriptNumber",
                     );
-                    const { content, isNew } =
-                        await orchestrator.fetchPrimeScript(scriptNumber);
+                    const instance = parseInstance(args.instance, "dev");
+                    const { content, isNew } = await orchestrator.fetchScript(
+                        scriptNumber,
+                        instance,
+                    );
                     if (isNew) {
                         return textResult(
-                            `Script ${scriptNumber}: Not found on Prime server (new script).`,
+                            `Script ${scriptNumber}: Not found on ${instance} server (new script).`,
                         );
                     }
                     return textResult(
-                        `Script ${scriptNumber} from Prime server:\n\n` +
+                        `Script ${scriptNumber} from ${instance} server:\n\n` +
                             "```gsl\n" +
                             content +
                             "\n```",
                     );
                 } catch (e) {
                     return errorResult(
-                        `Failed to fetch script from prime: ${e instanceof Error ? e.message : String(e)}`,
+                        `Failed to fetch script: ${e instanceof Error ? e.message : String(e)}`,
                     );
                 }
             };

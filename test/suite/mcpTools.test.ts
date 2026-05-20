@@ -53,12 +53,12 @@ suite("MCP Tool Definitions", () => {
         assert.ok(names.includes("gsl_get_room_data"));
         assert.ok(names.includes("gsl_get_existence_data"));
         assert.ok(names.includes("gsl_get_player_varfields"));
-        assert.ok(names.includes("gsl_get_script_data"));
+        assert.ok(names.includes("gsl_get_script_ss_metadata"));
         assert.ok(names.includes("gsl_get_verb_data"));
         assert.ok(names.includes("gsl_get_table_metadata"));
         assert.ok(names.includes("gsl_slash_agent_command"));
-        assert.ok(names.includes("gsl_diff_with_prime"));
-        assert.ok(names.includes("gsl_fetch_prime_script"));
+        assert.ok(names.includes("gsl_download_script"));
+        assert.ok(names.includes("gsl_diff_script_across_instances"));
         assert.ok(names.includes("gsl_compile_check"));
         assert.ok(names.includes("gsl_get_current_author"));
     });
@@ -131,9 +131,12 @@ suite("MCP Tool Handlers", () => {
         assert.ok(result.isError);
     });
 
-    test("gsl_get_script_data handler validates missing scriptId", async () => {
+    test("gsl_get_script_ss_metadata handler validates missing scriptId", async () => {
         const orch = new AgentToolOrchestrator(makeDeps());
-        const handler = createMcpToolHandler("gsl_get_script_data", orch);
+        const handler = createMcpToolHandler(
+            "gsl_get_script_ss_metadata",
+            orch,
+        );
         const result = await handler({});
         assert.ok(result.isError);
     });
@@ -145,9 +148,12 @@ suite("MCP Tool Handlers", () => {
         assert.ok(result.isError);
     });
 
-    test("gsl_diff_with_prime handler validates missing scriptNumber", async () => {
+    test("gsl_diff_script_across_instances handler validates missing scriptNumber", async () => {
         const orch = new AgentToolOrchestrator(makeDeps());
-        const handler = createMcpToolHandler("gsl_diff_with_prime", orch);
+        const handler = createMcpToolHandler(
+            "gsl_diff_script_across_instances",
+            orch,
+        );
         const result = await handler({});
         assert.ok(result.isError);
     });

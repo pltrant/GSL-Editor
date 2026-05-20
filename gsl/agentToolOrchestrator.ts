@@ -223,38 +223,13 @@ export class AgentToolOrchestrator {
 
     // -- prime service operations ------------------------------------------
 
-    async fetchPrimeScript(
+    async fetchScript(
         script: number,
+        instance: GameInstance = "dev",
     ): Promise<{ content: string; isNew: boolean }> {
-        return this.withClient("prime", (client) =>
+        return this.withClient(instance, (client) =>
             fetchScriptContent(client, script),
         );
-    }
-
-    async fetchDevScript(
-        script: number,
-    ): Promise<{ content: string; isNew: boolean }> {
-        return this.withClient("dev", (client) =>
-            fetchScriptContent(client, script),
-        );
-    }
-
-    async fetchPrimeAndDevScriptDiff(script: number): Promise<{
-        devContent: string;
-        primeContent: string;
-        isNewOnPrime: boolean;
-        isNewOnDev: boolean;
-    }> {
-        const [prime, dev] = await Promise.all([
-            this.fetchPrimeScript(script),
-            this.fetchDevScript(script),
-        ]);
-        return {
-            devContent: dev.content,
-            primeContent: prime.content,
-            isNewOnPrime: prime.isNew,
-            isNewOnDev: dev.isNew,
-        };
     }
 
     // -- compile check -----------------------------------------------------

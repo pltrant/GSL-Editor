@@ -130,16 +130,16 @@ suite("ToolOrchestrator", () => {
         });
     });
 
-    test("fetchPrimeScript throws when prime credentials missing", async () => {
+    test("fetchScript throws when prime credentials missing", async () => {
         const orch = new AgentToolOrchestrator(makeDeps(depsWithout("prime")));
-        await assert.rejects(() => orch.fetchPrimeScript(100), {
+        await assert.rejects(() => orch.fetchScript(100, "prime"), {
             message: /prime server not configured/,
         });
     });
 
-    test("fetchDevScript throws when dev credentials missing", async () => {
+    test("fetchScript throws when dev credentials missing", async () => {
         const orch = new AgentToolOrchestrator(makeDeps(depsWithout("dev")));
-        await assert.rejects(() => orch.fetchDevScript(100), {
+        await assert.rejects(() => orch.fetchScript(100, "dev"), {
             message: /dev server not configured/,
         });
     });
