@@ -782,7 +782,7 @@ export class VSCodeIntegration {
                     primeInstance: "GS3",
                     testInstance: "GST",
                     shatteredInstance: "GSF",
-                    platinumInstance: "GS4X",
+                    platinumInstance: "GSX",
                     devCharacter: "",
                     primeCharacter: "",
                     testCharacter: "",
