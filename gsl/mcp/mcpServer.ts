@@ -218,6 +218,30 @@ async function main() {
 
     const orchestrator = new AgentToolOrchestrator(deps);
 
+    // Fetch /agent subcommand list from dev for description enrichment.
+    // Fired asynchronously so it does not block server startup.
+    // Best-effort — failures are silently ignored so the server always starts.
+    let agentHelpText: string | undefined;
+    if (!configError) {
+        orchestrator
+            .executeAgentCommand("", "dev")
+            .then((output) => {
+                if (output?.trim()) {
+                    const trimmed = output.trim();
+                    agentHelpText =
+                        trimmed.length > 2000
+                            ? trimmed.slice(0, 2000) + "\n...truncated..."
+                            : trimmed;
+                    console.error(
+                        "[gsl-mcp] Fetched /agent subcommand list for description enrichment.",
+                    );
+                }
+            })
+            .catch(() => {
+                // Ignored — description will use static text only.
+            });
+    }
+
     // Build handler lookup
     const handlers = new Map<
         string,
@@ -250,7 +274,12 @@ async function main() {
     server.setRequestHandler(ListToolsRequestSchema, async () => ({
         tools: TOOL_DEFINITIONS.map((def) => ({
             name: def.name,
-            description: def.description,
+            description:
+                def.name === "gsl_slash_agent_command" && agentHelpText
+                    ? def.description +
+                      "\n\nLast seen /agent output on dev:\n" +
+                      agentHelpText
+                    : def.description,
             inputSchema: def.inputSchema,
         })),
     }));
