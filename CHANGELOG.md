@@ -2,15 +2,23 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
-## [1.20.0] - 2026-05-17
+## [1.20.0] - 2026-05-16
 
 ### Added
 
-- Added Copilot tool `gsl_agent_command` to run `/agent` commands on Dev/Prime.
-- Added Copilot tool `gsl_get_player_varfields` to retrieve player variable fields via `/svf`, including Prime/Dev targeting.
-- Added Copilot tool `gsl_get_script_data` to fetch raw script data from the script data endpoint.
-- Added Copilot tool `gsl_get_verb_data` to retrieve verb data via `/sv`.
-- Added Copilot tool `gsl_get_global_table_metadata` to retrieve table metadata via `/sv`.
+- MCP Server with 11 tools for external AI agents (Copilot, Claude, etc.):
+  - `gsl_download_script` — Download a script to a local file from any instance.
+  - `gsl_diff_script_across_instances` — Unified diff between two server instances.
+  - `gsl_compile_check` — Compile a local .gsl file and return errors/warnings.
+  - `gsl_get_current_author` — Return the configured author identity.
+  - `gsl_get_room_data` — Retrieve full room data via `/sr`.
+  - `gsl_get_existence_data` — Retrieve full existence data via `/se`.
+  - `gsl_get_player_varfields` — Retrieve player varfields/flags via `/svf`.
+  - `gsl_slash_agent_command` — Run `/agent` subcommands on the game server.
+  - `gsl_get_script_ss_metadata` — Retrieve script metadata via `/ss`.
+  - `gsl_get_verb_data` — Retrieve verb metadata via `/sv`.
+  - `gsl_get_table_metadata` — Retrieve global table metadata via `/sl`.
+- MCP requires env variables `GSL_LOGIN_CONFIG_FILE` and `GSL_PASSWORD`. Former is created on `GSL: User Setup`.
 - Internal Extension Development Usage: Added headless CLI game client for non-interactive tool use.
 
 ## [1.19.0] - 2026-04-20
