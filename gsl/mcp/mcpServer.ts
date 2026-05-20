@@ -204,6 +204,13 @@ function loadLoginConfig(): {
 // ---------------------------------------------------------------------------
 
 async function main() {
+    const debug = !!process.env.GSL_MCP_DEBUG;
+    const log = (...args: any[]) => console.error("[gsl-mcp]", ...args);
+    const debugLog = debug
+        ? (...args: any[]) =>
+              console.error(`[gsl-mcp ${new Date().toISOString()}]`, ...args)
+        : () => {};
+
     const { credentials, author, downloadPath, configError } =
         loadLoginConfig();
 
@@ -212,7 +219,7 @@ async function main() {
         getCurrentAuthor: () => author,
         downloadLocation: downloadPath,
         console: {
-            log: (...args: any[]) => console.error("[gsl-mcp]", ...args),
+            log: (...args: any[]) => debugLog(...args),
         },
     };
 
@@ -223,6 +230,8 @@ async function main() {
     // Best-effort — failures are silently ignored so the server always starts.
     let agentHelpText: string | undefined;
     if (!configError) {
+        const startTime = Date.now();
+        debugLog("Starting /agent enrichment fetch on dev...");
         orchestrator
             .executeAgentCommand("", "dev")
             .then((output) => {
@@ -232,13 +241,16 @@ async function main() {
                         trimmed.length > 2000
                             ? trimmed.slice(0, 2000) + "\n...truncated..."
                             : trimmed;
-                    console.error(
-                        "[gsl-mcp] Fetched /agent subcommand list for description enrichment.",
+                    log(
+                        `Fetched /agent subcommand list (${Date.now() - startTime}ms).`,
                     );
                 }
             })
-            .catch(() => {
-                // Ignored — description will use static text only.
+            .catch((err) => {
+                debugLog(
+                    `Failed to fetch /agent subcommand list (${Date.now() - startTime}ms):`,
+                    err instanceof Error ? err.message : err,
+                );
             });
     }
 
@@ -302,11 +314,11 @@ async function main() {
     // Start stdio transport
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.error("[gsl-mcp] Server started on stdio");
+    log("Server started on stdio");
 
     // Graceful shutdown
     const shutdown = async () => {
-        console.error("[gsl-mcp] Shutting down...");
+        debugLog("Shutting down...");
         await server.close();
         process.exit(0);
     };

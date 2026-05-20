@@ -51,7 +51,11 @@ export class AgentToolOrchestrator {
             console: this.deps.console,
             downloadLocation: this.deps.downloadLocation,
             loggingEnabled: false,
-            onCreate: () => {},
+            onCreate: () => {
+                this.deps.console.log(
+                    `Client connected to ${instance} as ${creds.character}`,
+                );
+            },
         };
     }
 
