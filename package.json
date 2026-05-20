@@ -29,6 +29,7 @@
         "vscode": "^1.109.0"
     },
     "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.29.0",
         "csv-parse": "^5.5.5",
         "diff": "^8.0.3"
     },
@@ -52,8 +53,10 @@
     },
     "scripts": {
         "vscode:prepublish": "npm run compile && npm run bundle",
-        "compile": "tsc -b",
-        "bundle": "esbuild extension.ts --bundle --outfile=extension.js --external:vscode --format=cjs --platform=node",
+        "compile": "tsc -b && tsc --project tsconfig.mcp.json && npm run bundle:mcp",
+        "bundle": "npm run bundle:extension && npm run bundle:mcp",
+        "bundle:extension": "esbuild extension.ts --bundle --outfile=extension.js --external:vscode --format=cjs --platform=node",
+        "bundle:mcp": "esbuild gsl/mcp/mcpServer.ts --bundle --outfile=gsl/mcp/mcpServer.bundle.js --external:vscode --format=cjs --platform=node",
         "watch": "tsc --watch",
         "test": "node test/runTests.js",
         "format": "prettier --write \"**/*.ts\""
@@ -130,304 +133,22 @@
                 "command": "gsl.copilotCodeReview",
                 "title": "Copilot Code Review",
                 "category": "GSL"
+            },
+            {
+                "command": "gsl.openLoginConfigFile",
+                "title": "Open Login Config File",
+                "category": "GSL"
             }
         ],
-        "languageModelTools": [
-            {
-                "name": "gsl_diff_with_prime",
-                "displayName": "Diff with Prime Server",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "diffWithPrime",
-                "icon": "$(diff)",
-                "userDescription": "Fetch the Prime (production) and Dev versions of a GSL script and return their diff for analysis.",
-                "modelDescription": "Downloads a GSL script from both the Prime (production) and Dev servers, then returns a unified diff showing exactly what lines differ. Use this when the user wants to compare, diff, check differences, or understand what changed between Prime and Dev versions of a script. The tool returns diff content directly and does not write local files or open UI. scriptNumber is required. Requires the GSL extension to be configured via 'GSL: User Setup'.",
-                "inputSchema": {
-                    "type": "object",
-                    "required": [
-                        "scriptNumber"
-                    ],
-                    "properties": {
-                        "scriptNumber": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 999999,
-                            "description": "Required GSL script number to diff between Prime and Dev servers."
-                        },
-                        "context": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 100,
-                            "description": "Number of unchanged context lines to show before and after each change. Defaults to 3 (same as git diff)."
-                        },
-                        "ignoreWhitespace": {
-                            "type": "boolean",
-                            "description": "If true, ignore leading/trailing whitespace when comparing lines."
-                        }
-                    }
-                }
-            },
-            {
-                "name": "gsl_fetch_prime_script",
-                "displayName": "Fetch Script from Prime Server",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "fetchPrimeScript",
-                "icon": "$(cloud-download)",
-                "userDescription": "Fetch the Prime (production) version of a GSL script and return its full content.",
-                "modelDescription": "Downloads a GSL script from the Prime (production) server and returns the full script content as text. Use this when the user wants to read, review, or inspect the production version of a script without comparing it to the local copy. The tool returns the raw script content directly — it does not open any UI. Requires the GSL extension to be configured with Prime server credentials via 'GSL: User Setup'.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "scriptNumber": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 999999,
-                            "description": "Optional GSL script number to fetch. If omitted, uses the currently active editor's script."
-                        }
-                    }
-                }
-            },
-            {
-                "name": "gsl_compile_check",
-                "displayName": "Check Compiler Errors",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "checkGslCompilerErrors",
-                "icon": "$(cloud-upload)",
-                "userDescription": "Check a local GSL script for compiler errors by compiling it in an isolated safety script (S24661) on the development server.",
-                "modelDescription": "Use this tool whenever the task is to check, compile, or validate GSL script compiler errors/warnings. Prefer this tool over generic error tools for GSL compile checks. It compiles a local GSL script file on the development server and returns compiler output, including line-level errors and warnings, so the model can diagnose and fix compilation problems. Uses placeholder script 24661 for upload.",
-                "inputSchema": {
-                    "type": "object",
-                    "required": [
-                        "filename"
-                    ],
-                    "properties": {
-                        "filename": {
-                            "type": "string",
-                            "description": "Workspace-relative or absolute path to the .gsl file to upload, such as S24661.gsl."
-                        }
-                    }
-                }
-            },
-            {
-                "name": "gsl-get-current-author",
-                "displayName": "Get Current Author",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "getCurrentAuthor",
-                "icon": "$(account)",
-                "userDescription": "Return the current configured GSL author value in <AbbreviatedRealName>/<CharacterName> format.",
-                "modelDescription": "Returns the current GSL author value configured via User Setup. Use this when generating changelog entries or script metadata that needs the canonical author identity.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {}
-                }
-            },
-            {
-                "name": "gsl_get_room_data",
-                "displayName": "Get Room Data",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "getRoomData",
-                "icon": "$(compass)",
-                "userDescription": "Retrieve room data from the game server using /sr <room id>.",
-                "modelDescription": "Sends the /sr command to the game server for a given room ID and returns the full room data output, including room name, varfields aka properties, flags, and directions. This does NOT show objects currently in the room, except those explicitly linked in the room description texts. Existence IDs referenced in room text (e.g. $+$-516105D) are PID'd (permanent) and therefore negative — always preserve the negative sign when using them with other tools such as `gsl_get_existence_data`. Can target either the Prime (production) or Dev server instance. Defaults to Dev, which is typically preferred.",
-                "inputSchema": {
-                    "type": "object",
-                    "required": [
-                        "roomId"
-                    ],
-                    "properties": {
-                        "roomId": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "description": "The room ID to look up."
-                        },
-                        "instance": {
-                            "type": "string",
-                            "enum": [
-                                "prime",
-                                "dev"
-                            ],
-                            "default": "dev",
-                            "description": "Which server instance to query. Defaults to 'dev', which is typically preferred."
-                        }
-                    }
-                }
-            },
-            {
-                "name": "gsl_get_existence_data",
-                "displayName": "Get Existence Data",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "getExistenceData",
-                "icon": "$(symbol-misc)",
-                "userDescription": "Retrieve existence (object/item) data from the game server using /se <id>.",
-                "modelDescription": "Sends the /se (show existence) command to the game server for a given existence ID and returns the full existence data output, including the item name, varfields aka properties, flags, and location. Negative IDs are permanent IDs (PID'd) — these are stable references that persist across unload/reload cycles. Positive IDs are temporary and may change. Can target either the Prime (production) or Dev server instance. Defaults to Dev, which is typically preferred. For the room data equivalent, see `gsl_get_room_data`.",
-                "inputSchema": {
-                    "type": "object",
-                    "required": [
-                        "existenceId"
-                    ],
-                    "properties": {
-                        "existenceId": {
-                            "type": "integer",
-                            "description": "The existence ID to look up. Negative IDs are permanent (PID'd) and stable across reloads."
-                        },
-                        "instance": {
-                            "type": "string",
-                            "enum": [
-                                "prime",
-                                "dev"
-                            ],
-                            "default": "dev",
-                            "description": "Which server instance to query. Defaults to 'dev', which is typically preferred."
-                        }
-                    }
-                }
-            },
-            {
-                "name": "gsl_get_player_varfields",
-                "displayName": "Get Player Varfields",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "getPlayerVarfields",
-                "icon": "$(person)",
-                "userDescription": "Retrieve a player's variable fields (varfields) from the game server using /svf.",
-                "modelDescription": "Sends the /svf command to the game server for a given player name and returns varfield and flags output.",
-                "inputSchema": {
-                    "type": "object",
-                    "required": [
-                        "playerName"
-                    ],
-                    "properties": {
-                        "playerName": {
-                            "type": "string",
-                            "description": "The player name to look up."
-                        },
-                        "verbosity": {
-                            "type": "string",
-                            "enum": [
-                                "Full",
-                                "NoTables",
-                                "SkipDefaults"
-                            ],
-                            "default": "NoTables",
-                            "description": "Controls output verbosity. 'NoTables' (default) omits table varfields. 'SkipDefaults' omits fields at default values. 'Full' returns everything."
-                        },
-                        "instance": {
-                            "type": "string",
-                            "enum": [
-                                "prime",
-                                "dev"
-                            ],
-                            "default": "dev",
-                            "description": "Which server instance to query. Defaults to 'dev', which is typically preferred."
-                        }
-                    }
-                }
-            },
-            {
-                "name": "gsl_slash_agent_command",
-                "displayName": "Run /agent Command",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "slashAgentCommand",
-                "icon": "$(terminal)",
-                "userDescription": "Run a /agent subcommand on the game server and return its output.",
-                "modelDescription": "Sends a `/agent <subcommand> [args...]` command to the game server and returns the full output. The /agent verb is a programmable dispatcher on the game server that supports various subcommands for querying game data. Run with no arguments to list available subcommands. Run with just a subcommand name (no args) to see its usage. Can target either the Prime (production) or Dev server instance. Defaults to Dev. See S24792.gsl for implementation.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "command": {
-                            "type": "string",
-                            "description": "The /agent subcommand and its arguments (e.g. '/vftable PlayerName tableName 0 5'). Omit to list all available subcommands."
-                        },
-                        "instance": {
-                            "type": "string",
-                            "enum": [
-                                "prime",
-                                "dev"
-                            ],
-                            "default": "dev",
-                            "description": "Which server instance to query. Defaults to 'dev'."
-                        }
-                    }
-                }
-            },
-            {
-                "name": "gsl_get_script_data",
-                "displayName": "Get Script Data",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "getScriptData",
-                "icon": "$(file-code)",
-                "userDescription": "Retrieve script metadata from the game server using /ss.",
-                "modelDescription": "Sends the /ss (show script) command on the development server for a given script ID and game instance code, returning the raw script metadata output. This is the best way to identify when a script was last updated, by whom, and whether scripts are in sync across servers — compare the output for the same script ID across different instances (e.g. prime versus dev). The instance parameter selects which game's script data to query. Warning: script owner property is typically not maintained and is weak signal - better to look at who has touched the script recently by viewing the script's changelog, found in the script file itself.",
-                "inputSchema": {
-                    "type": "object",
-                    "required": [
-                        "scriptId"
-                    ],
-                    "properties": {
-                        "scriptId": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 999999,
-                            "description": "The script ID to look up."
-                        },
-                        "instance": {
-                            "type": "string",
-                            "enum": [
-                                "dev",
-                                "shattered",
-                                "platinum",
-                                "prime",
-                                "test"
-                            ],
-                            "default": "dev",
-                            "description": "Which game instance to query script data for. Maps to game codes: dev=GS4D, prime=GS4, shattered=GSF, platinum=GS4X, test=GST. Defaults to 'dev'."
-                        }
-                    }
-                }
-            },
-            {
-                "name": "gsl_get_verb_data",
-                "displayName": "Get Verb Data",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "getVerbData",
-                "icon": "$(symbol-event)",
-                "userDescription": "Retrieve verb metadata from the game server using /sv.",
-                "modelDescription": "Sends the /sv (show verb) command to the game server for a given verb name and returns the raw verb metadata output, including the script number that handles the verb, access level, parse code, verb flags, and modification history. Warning: the 'Owned by' field is typically not maintained and is a weak signal — to identify who actually works on a verb's script, look at the 'Last modified by' field or the script's changelog found in the script file itself. Runs on dev server.",
-                "inputSchema": {
-                    "type": "object",
-                    "required": [
-                        "verb"
-                    ],
-                    "properties": {
-                        "verb": {
-                            "type": "string",
-                            "description": "The verb name to look up (e.g. 'sit', '/mongen', 'quest', 'incant')."
-                        }
-                    }
-                }
-            },
-            {
-                "name": "gsl_get_table_metadata",
-                "displayName": "Get Global Table Data",
-                "canBeReferencedInPrompt": true,
-                "toolReferenceName": "getGlobalTableData",
-                "icon": "$(table)",
-                "userDescription": "Retrieve global table header information from the game server using /sl.",
-                "modelDescription": "Sends the /sl (show table) command to the game server for a given table ID and returns the table metadata, including the table description, creator, access level, dimensions (X/Y/Z), total size, and table type flags Does not work on varfield tables (e.g. on players/exists). Runs on dev server.",
-                "inputSchema": {
-                    "type": "object",
-                    "required": [
-                        "tableId"
-                    ],
-                    "properties": {
-                        "tableId": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 999999,
-                            "description": "The global table ID to look up."
-                        }
-                    }
-                }
+        "mcpServers": {
+            "gsl-tools": {
+                "type": "stdio",
+                "command": "node",
+                "args": [
+                    "${extensionPath}/gsl/mcp/mcpServer.bundle.js"
+                ]
             }
-        ],
+        },
         "configuration": {
             "type": "object",
             "title": "GSL",
@@ -499,6 +220,11 @@
                     ],
                     "default": "No Delay",
                     "description": "Set the interval for how often the extension checks if the local script is up-to-date with its remote version.  A higher delay can be useful in bandwidth-constrained situations such as on an airplane."
+                },
+                "gsl.loginConfigFile": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Path to the JSON login config file for game server instances. Defaults to ~/.gsl/loginConfig.json if not set. Run 'GSL: User Setup' to create."
                 }
             }
         },
