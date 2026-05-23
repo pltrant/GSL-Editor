@@ -8,11 +8,26 @@ import * as path from "path";
 import {
     commands,
     ConfigurationTarget,
+    extensions,
     ExtensionContext,
     Uri,
     window,
     workspace,
 } from "vscode";
+
+function resolveGitPath(): string {
+    const configured = workspace.getConfiguration("git").get<string>("path");
+    if (configured) {
+        return configured;
+    }
+    const gitExtension = extensions.getExtension<{
+        getAPI(version: number): { git: { path: string } };
+    }>("vscode.git");
+    if (gitExtension?.isActive) {
+        return gitExtension.exports.getAPI(1).git.path;
+    }
+    return "git";
+}
 
 const GSL_AGENT_PROMPTS_DEPLOY_KEY_SECRET = "gsl.agentPromptsDeployPrivateKey";
 const GSL_AGENT_PROMPTS_REPO_SSH =
@@ -169,15 +184,16 @@ function runCommand(
             },
             (error, stdout, stderr) => {
                 if (error) {
-                    const message = [
-                        `Command failed: ${command} ${args.join(" ")}`,
-                        stderr?.toString().trim() ||
-                            stdout?.toString().trim() ||
-                            error.message,
-                    ]
-                        .filter(Boolean)
-                        .join("\n");
-                    reject(new Error(message));
+                    if ("code" in error && error.code === "ENOENT") {
+                        reject(new Error(`Could not find "${command}".`));
+                        return;
+                    }
+                    const stderrText = stderr?.toString().trim() ?? "";
+                    const detail =
+                        stderrText ||
+                        stdout?.toString().trim() ||
+                        error.message;
+                    reject(new Error(detail));
                     return;
                 }
                 resolve({
@@ -339,9 +355,13 @@ function resolveSourceAgentsFilePath(clonePath: string): string | undefined {
 }
 
 async function resolveRepositoryHeadSha(repoPath: string): Promise<string> {
-    const { stdout } = await runCommand("git", ["rev-parse", "HEAD"], {
-        cwd: repoPath,
-    });
+    const { stdout } = await runCommand(
+        resolveGitPath(),
+        ["rev-parse", "HEAD"],
+        {
+            cwd: repoPath,
+        },
+    );
     const sha = stdout.trim();
     if (!/^[0-9a-f]{40}$/i.test(sha)) {
         throw new Error("Unable to resolve cloned repository SHA.");
@@ -1033,7 +1053,7 @@ async function cloneAgentPromptsRepo({
     };
 
     await runCommand(
-        "git",
+        resolveGitPath(),
         [
             "clone",
             "--depth",
@@ -1563,10 +1583,15 @@ export async function runSyncAgentPromptsCommand({
             Uri.file(summaryFilePath),
         );
     } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        const isAuthError = /permission denied|authentication|publickey/i.test(
+            detail,
+        );
+        const guidance = isAuthError
+            ? " Check that your deploy key is correctly configured."
+            : "";
         window.showErrorMessage(
-            error instanceof Error
-                ? `Agent prompt sync failed: ${error.message}`
-                : "Agent prompt sync failed.",
+            `Agent prompt sync failed: ${detail}${guidance}`,
         );
     } finally {
         message.dispose();

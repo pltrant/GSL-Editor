@@ -2,6 +2,12 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.20.1] - 2026-05-23
+
+### Fixed
+
+- Resolve git binary via VS Code's bundled extension instead of assuming git is on PATH. Fixes ENOENT errors for users without git installed or not in PATH.
+
 ## [1.20.0] - 2026-05-20
 
 ### Added
