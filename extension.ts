@@ -16,9 +16,10 @@ import {
     CodeActionKind,
     Range,
     DiagnosticSeverity,
+    McpStdioServerDefinition,
 } from "vscode";
 
-import { workspace, window, commands, languages, extensions } from "vscode";
+import { workspace, window, commands, languages, extensions, lm } from "vscode";
 
 import {
     GSLDocumentSymbolProvider,
@@ -1760,6 +1761,22 @@ export async function activate(context: ExtensionContext) {
     }
     const pw = await context.secrets.get(GSLX_DEV_PASSWORD);
     if (pw) process.env.GSL_PASSWORD = pw;
+
+    // Register the MCP server definition provider so that consumers
+    // (e.g. GitHub Copilot) can discover and launch gsl-tools.
+    context.subscriptions.push(
+        lm.registerMcpServerDefinitionProvider("gsl.mcpServer", {
+            provideMcpServerDefinitions() {
+                return [
+                    new McpStdioServerDefinition(
+                        "gsl-tools",
+                        process.execPath,
+                        [context.asAbsolutePath("gsl/mcp/mcpServer.bundle.js")],
+                    ),
+                ];
+            },
+        }),
+    );
 
     vsc.checkForNewInstall();
     vsc.checkForUpdatedVersion();

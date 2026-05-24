@@ -140,15 +140,12 @@
                 "category": "GSL"
             }
         ],
-        "mcpServers": {
-            "gsl-tools": {
-                "type": "stdio",
-                "command": "node",
-                "args": [
-                    "${extensionPath}/gsl/mcp/mcpServer.bundle.js"
-                ]
+        "mcpServerDefinitionProviders": [
+            {
+                "id": "gsl.mcpServer",
+                "label": "GSL Tools"
             }
-        },
+        ],
         "configuration": {
             "type": "object",
             "title": "GSL",
