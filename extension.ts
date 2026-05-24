@@ -16,9 +16,13 @@ import {
     CodeActionKind,
     Range,
     DiagnosticSeverity,
+    McpStdioServerDefinition,
+    LanguageModelTextPart,
+    LanguageModelToolResult,
+    CancellationToken,
 } from "vscode";
 
-import { workspace, window, commands, languages, extensions } from "vscode";
+import { workspace, window, commands, languages, extensions, lm } from "vscode";
 
 import {
     GSLDocumentSymbolProvider,
@@ -1760,6 +1764,45 @@ export async function activate(context: ExtensionContext) {
     }
     const pw = await context.secrets.get(GSLX_DEV_PASSWORD);
     if (pw) process.env.GSL_PASSWORD = pw;
+
+    // Register the MCP server definition provider so that consumers
+    // (e.g. GitHub Copilot) can discover and launch gsl-tools.
+    context.subscriptions.push(
+        lm.registerMcpServerDefinitionProvider("gsl.mcpServer", {
+            provideMcpServerDefinitions() {
+                return [
+                    new McpStdioServerDefinition(
+                        "gsl-tools",
+                        process.execPath,
+                        [context.asAbsolutePath("gsl/mcp/mcpServer.bundle.js")],
+                    ),
+                ];
+            },
+        }),
+    );
+
+    // Register agent tool so Copilot can access the current author
+    // without requiring the MCP server to be enabled.
+    context.subscriptions.push(
+        lm.registerTool("gsl_get_current_author", {
+            invoke(
+                _options: unknown,
+                _token: CancellationToken,
+            ): LanguageModelToolResult {
+                const author = GSLExtension.getCurrentAuthor()?.trim();
+                if (!author) {
+                    return new LanguageModelToolResult([
+                        new LanguageModelTextPart(
+                            "Author is not configured. Run 'GSL: User Setup'.",
+                        ),
+                    ]);
+                }
+                return new LanguageModelToolResult([
+                    new LanguageModelTextPart(author),
+                ]);
+            },
+        }),
+    );
 
     vsc.checkForNewInstall();
     vsc.checkForUpdatedVersion();
