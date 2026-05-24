@@ -17,6 +17,9 @@ import {
     Range,
     DiagnosticSeverity,
     McpStdioServerDefinition,
+    LanguageModelTextPart,
+    LanguageModelToolResult,
+    CancellationToken,
 } from "vscode";
 
 import { workspace, window, commands, languages, extensions, lm } from "vscode";
@@ -1774,6 +1777,29 @@ export async function activate(context: ExtensionContext) {
                         [context.asAbsolutePath("gsl/mcp/mcpServer.bundle.js")],
                     ),
                 ];
+            },
+        }),
+    );
+
+    // Register agent tool so Copilot can access the current author
+    // without requiring the MCP server to be enabled.
+    context.subscriptions.push(
+        lm.registerTool("gsl_get_current_author", {
+            invoke(
+                _options: unknown,
+                _token: CancellationToken,
+            ): LanguageModelToolResult {
+                const author = GSLExtension.getCurrentAuthor()?.trim();
+                if (!author) {
+                    return new LanguageModelToolResult([
+                        new LanguageModelTextPart(
+                            "Author is not configured. Run 'GSL: User Setup'.",
+                        ),
+                    ]);
+                }
+                return new LanguageModelToolResult([
+                    new LanguageModelTextPart(author),
+                ]);
             },
         }),
     );

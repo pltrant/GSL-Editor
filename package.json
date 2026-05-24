@@ -146,6 +146,21 @@
                 "label": "GSL Tools"
             }
         ],
+        "languageModelTools": [
+            {
+                "name": "gsl_get_current_author",
+                "displayName": "Get Current GSL Author",
+                "toolReferenceName": "gsl-get-current-author",
+                "canBeReferencedInPrompt": true,
+                "icon": "$(account)",
+                "userDescription": "Returns the current GSL author from the login config file.",
+                "modelDescription": "Returns the current GSL author value from the user's login configuration file. The author is typically in the format 'AbbreviatedRealName/CharacterName'. Use this tool whenever you need to know who the current developer/author is.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {}
+                }
+            }
+        ],
         "configuration": {
             "type": "object",
             "title": "GSL",
