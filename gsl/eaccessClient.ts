@@ -602,7 +602,9 @@ export class EAccessClient extends EventEmitter {
         return new Promise((resolve, reject) => {
             const options = { debug: true, console: this.console };
             const client = new this(options);
-            client.once(EVENT_CLOSE, () => reject(null));
+            client.once(EVENT_CLOSE, () =>
+                reject(new Error("EAccess connection closed.")),
+            );
             client.once(EVENT_PROBLEM, (code) =>
                 reject(new EAccessError(code)),
             );
@@ -651,7 +653,9 @@ class GameOptionChoice {
     }
     select(code: string): Promise<CharacterOptionChoice> {
         return new Promise((resolve, reject) => {
-            this.client.once(EVENT_CLOSE, () => reject(null));
+            this.client.once(EVENT_CLOSE, () =>
+                reject(new Error("EAccess connection closed.")),
+            );
             this.client.once(EVENT_PROBLEM, (code) =>
                 reject(new EAccessError(code)),
             );
@@ -707,7 +711,9 @@ class CharacterOptionChoice {
         mode?: string,
     ): Promise<{ sal: SAL; loginDetails: LoginDetails }> {
         return new Promise((resolve, reject) => {
-            this.client.once(EVENT_CLOSE, () => reject(null));
+            this.client.once(EVENT_CLOSE, () =>
+                reject(new Error("EAccess connection closed.")),
+            );
             this.client.once(EVENT_PROBLEM, (code) =>
                 reject(new EAccessError(code)),
             );
