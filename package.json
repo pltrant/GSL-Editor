@@ -287,6 +287,11 @@
                 "mac": "cmd+alt+l"
             }
         ],
+        "chatPromptFiles": [
+            {
+                "path": "./bundled-prompts/setup-gsl-agents.prompt.md"
+            }
+        ],
         "languages": [
             {
                 "id": "gsl",
