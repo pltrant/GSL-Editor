@@ -161,10 +161,6 @@ function getManagedFileSetById(fileSetId: string): ManagedFileSet {
     return fileSet;
 }
 
-export const GSL_AGENT_PROMPTS_MANAGED_DIR = getManagedFileSetById(
-    MANAGED_PROMPTS_FILE_SET_ID,
-).targetSubdir;
-
 export const GSL_AGENT_COMMANDS_MANAGED_DIR = getManagedFileSetById(
     MANAGED_COMMANDS_FILE_SET_ID,
 ).targetSubdir;
