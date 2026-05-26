@@ -4,49 +4,55 @@ import * as path from "path";
 
 import { commands, TextDocument, Uri, window, workspace } from "vscode";
 
-export async function runDiffWithPrimeCommand({
+import { GameInstance } from "../agentToolOrchestrator";
+
+export async function runDiffWithLiveServerCommand({
     script,
     document,
-    fetchPrimeScriptDiff,
+    instance,
+    fetchScriptDiff,
 }: {
     script: number;
     document: TextDocument;
-    fetchPrimeScriptDiff: (
+    instance: GameInstance;
+    fetchScriptDiff: (
         script: number,
         document: TextDocument,
     ) => Promise<{
         localContent: string;
-        primeContent: string;
-        isNewOnPrime: boolean;
+        remoteContent: string;
+        isNewOnRemote: boolean;
     }>;
 }): Promise<void> {
-    try {
-        const { localContent, primeContent, isNewOnPrime } =
-            await fetchPrimeScriptDiff(script, document);
+    const label = instance.charAt(0).toUpperCase() + instance.slice(1);
 
-        if (isNewOnPrime) {
+    try {
+        const { localContent, remoteContent, isNewOnRemote } =
+            await fetchScriptDiff(script, document);
+
+        if (isNewOnRemote) {
             window.showWarningMessage(
-                `Script ${script}: Not found on Prime server (appears to be new in Dev).`,
+                `Script ${script}: Not found on ${label} server (appears to be new in Dev).`,
                 { modal: true },
             );
             return;
         }
 
-        if (primeContent === localContent) {
+        if (remoteContent === localContent) {
             window.showWarningMessage(
-                `Script ${script}: No differences found between Prime and Dev.`,
+                `Script ${script}: No differences found between ${label} and Dev.`,
                 { modal: true },
             );
             return;
         }
 
         const tmpDir = await fs.mkdtemp(
-            path.join(os.tmpdir(), "gsl-prime-diff-"),
+            path.join(os.tmpdir(), `gsl-${instance}-diff-`),
         );
         const tmpFile = path.join(tmpDir, path.basename(document.fileName));
-        await fs.writeFile(tmpFile, primeContent);
+        await fs.writeFile(tmpFile, remoteContent);
 
-        const primeUri = Uri.file(tmpFile);
+        const remoteUri = Uri.file(tmpFile);
         const localUri = document.uri;
         let cleanedUp = false;
         const cleanup = async () => {
@@ -59,7 +65,7 @@ export async function runDiffWithPrimeCommand({
         };
         const closeSubscription = workspace.onDidCloseTextDocument(
             (closedDoc) => {
-                if (closedDoc.uri.fsPath === primeUri.fsPath) {
+                if (closedDoc.uri.fsPath === remoteUri.fsPath) {
                     void cleanup();
                 }
             },
@@ -69,9 +75,9 @@ export async function runDiffWithPrimeCommand({
         try {
             await commands.executeCommand(
                 "vscode.diff",
-                primeUri,
+                remoteUri,
                 localUri,
-                `s${script} (Prime \u2194 Dev)`,
+                `s${script} (${label} \u2194 Dev)`,
             );
             diffOpened = true;
         } finally {
@@ -81,7 +87,7 @@ export async function runDiffWithPrimeCommand({
         }
     } catch (e) {
         console.error(e);
-        const error = `Failed to diff script ${script} with prime`;
+        const error = `Failed to diff script ${script} with ${label}`;
         window.showErrorMessage(
             e instanceof Error ? `${error} (${e.message})` : error,
         );

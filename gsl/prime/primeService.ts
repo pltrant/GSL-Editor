@@ -5,11 +5,15 @@ import {
     workspace,
 } from "vscode";
 
-import { EditorClientInterface, withPrimeEditorClient } from "../editorClient";
+import { EditorClientInterface, withClientForInstance } from "../editorClient";
 import { GSLX_DISABLE_LOGIN, GSL_LANGUAGE_ID } from "../const";
 import { GSLExtension } from "../../extension";
 import { scriptNumberFromFileName } from "../util/scriptUtil";
-import { fetchScriptContent, normalizeText } from "../agentToolOrchestrator";
+import {
+    fetchScriptContent,
+    GameInstance,
+    normalizeText,
+} from "../agentToolOrchestrator";
 
 const rx_script_number = /^\d{1,6}$/;
 
@@ -19,22 +23,15 @@ export interface PrimeServiceDependencies {
     downloadLocation: string;
 }
 
-/**
- * Downloads a script from the Prime server and returns both the
- * normalised local and Prime content for comparison.
- *
- * @param script  - The script number
- * @param document - The local TextDocument to compare against Prime
- * @returns An object with `localContent` and `primeContent` strings
- */
-export async function fetchPrimeScriptDiff(
+export async function fetchInstanceScriptDiff(
     script: number,
     document: TextDocument,
+    instance: GameInstance,
     deps: PrimeServiceDependencies,
 ): Promise<{
     localContent: string;
-    primeContent: string;
-    isNewOnPrime: boolean;
+    remoteContent: string;
+    isNewOnRemote: boolean;
 }> {
     if (document.languageId !== GSL_LANGUAGE_ID) {
         throw new Error("Diff requires a GSL document for local comparison.");
@@ -50,32 +47,35 @@ export async function fetchPrimeScriptDiff(
         );
     }
 
-    const { content: primeContent, isNew: isNewOnPrime } =
-        await fetchPrimeScript(script, deps);
+    const { content: remoteContent, isNew: isNewOnRemote } =
+        await fetchInstanceScript(script, instance, deps);
 
     return {
         localContent: normalizeText(document.getText()),
-        primeContent,
-        isNewOnPrime,
+        remoteContent,
+        isNewOnRemote,
     };
 }
 
-export async function fetchPrimeScript(
+export async function fetchInstanceScript(
     script: number,
+    instance: GameInstance,
     deps: PrimeServiceDependencies,
 ): Promise<{ content: string; isNew: boolean }> {
-    return doPrimeEditorClientTask(
+    return doEditorClientTaskForInstance(
+        instance,
         (client) => fetchScriptContent(client, script),
         deps,
     );
 }
 
 /**
- * Provides an `EditorClient` connected to the prime (production) server.
+ * Provides an `EditorClient` connected to a given game server instance.
  * Uses shared account credentials but separate game instance and character.
  * Intended for read-only operations (downloading scripts for diffing).
  */
-export async function doPrimeEditorClientTask<T>(
+export async function doEditorClientTaskForInstance<T>(
+    instance: GameInstance,
     task: (client: EditorClientInterface) => T,
     { context, outputChannel, downloadLocation }: PrimeServiceDependencies,
 ): Promise<T> {
@@ -83,20 +83,21 @@ export async function doPrimeEditorClientTask<T>(
         throw new Error("Game login is disabled.");
     }
 
-    const creds = await GSLExtension.getLoginForInstance("prime", context);
+    const creds = await GSLExtension.getLoginForInstance(instance, context);
     if (!creds) {
         throw new Error(
-            "Prime server not configured. Run 'GSL: User Setup' first.",
+            `${instance} server not configured. Run 'GSL: User Setup' first.`,
         );
     }
 
     const consoleAdapter: { log: (...args: any) => void } = {
         log: (...args: any) => {
-            outputChannel.append(`[prime: ${args.join(" ")}]\r\n`);
+            outputChannel.append(`[${instance}: ${args.join(" ")}]\r\n`);
         },
     };
 
-    return withPrimeEditorClient(
+    return withClientForInstance(
+        instance,
         {
             login: creds,
             console: consoleAdapter,

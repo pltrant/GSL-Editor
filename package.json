@@ -120,8 +120,8 @@
                 "category": "GSL"
             },
             {
-                "command": "gsl.diffWithPrime",
-                "title": "Diff with Prime Server",
+                "command": "gsl.diffWithLiveServer",
+                "title": "Diff with Live Server",
                 "category": "GSL"
             },
             {

@@ -57,7 +57,7 @@ import {
 } from "./gsl/codeActionProvider";
 import { subscribeToDocumentChanges } from "./gsl/diagnostics";
 import { formatIndentation } from "./gsl/util/formattingUtil";
-import { runDiffWithPrimeCommand } from "./gsl/commands/diffWithPrime";
+import { runDiffWithLiveServerCommand } from "./gsl/commands/diffWithLiveServer";
 import {
     runStartupAgentPromptAutoUpdate,
     runSyncAgentPromptsCommand,
@@ -509,7 +509,7 @@ export class VSCodeIntegration {
                 label: "Format Document Indentation",
                 name: "gsl.formatIndentation",
             },
-            { label: "Diff with Prime Server", name: "gsl.diffWithPrime" },
+            { label: "Diff with Live Server", name: "gsl.diffWithLiveServer" },
             { label: "Sync Agent Prompts", name: "gsl.syncAgentPrompts" },
             { label: "Copilot Code Review", name: "gsl.copilotCodeReview" },
             {
@@ -1319,14 +1319,14 @@ export class VSCodeIntegration {
         }
     }
 
-    private async commandDiffWithPrime() {
+    private async commandDiffWithLiveServer() {
         const { activeTextEditor } = window;
         if (
             !activeTextEditor ||
             activeTextEditor.document.languageId !== GSL_LANGUAGE_ID
         ) {
             return void window.showWarningMessage(
-                "Diff with prime requires an active GSL script editor",
+                "Diff requires an active GSL script editor",
             );
         }
 
@@ -1345,16 +1345,74 @@ export class VSCodeIntegration {
             );
         }
 
+        const NON_DEV_INSTANCES: GameInstance[] = [
+            "prime",
+            "shattered",
+            "platinum",
+            "test",
+        ];
+
+        interface InstancePickItem extends QuickPickItem {
+            instance: GameInstance;
+            configured: boolean;
+        }
+
+        const items: InstancePickItem[] = NON_DEV_INSTANCES.map((inst) => {
+            const configured = !!GSLExtension.readLoginConfigForInstance(inst);
+            const label =
+                inst.charAt(0).toUpperCase() + inst.slice(1) + " Server";
+            return {
+                label,
+                instance: inst,
+                configured,
+                description: configured ? undefined : "(no character)",
+            };
+        });
+
+        const instance = await new Promise<GameInstance | undefined>(
+            (resolve) => {
+                let resolved = false;
+                const qp = window.createQuickPick<InstancePickItem>();
+                qp.items = items;
+                qp.placeholder = "Select server to diff against";
+                qp.onDidChangeSelection(([item]) => {
+                    if (!item || resolved) return;
+                    if (!item.configured) {
+                        void window.showWarningMessage(
+                            `${item.label} is not configured. Run 'GSL: User Setup' to add a character.`,
+                        );
+                        return;
+                    }
+                    resolved = true;
+                    resolve(item.instance);
+                    qp.dispose();
+                });
+                qp.onDidHide(() => {
+                    if (!resolved) resolve(undefined);
+                    qp.dispose();
+                });
+                qp.show();
+            },
+        );
+        if (!instance) return;
+
+        const label = instance.charAt(0).toUpperCase() + instance.slice(1);
+
         const msg = window.setStatusBarMessage(
-            `Downloading script ${script} from prime server...`,
+            `Downloading script ${script} from ${label} server...`,
         );
 
         try {
-            return await runDiffWithPrimeCommand({
+            return await runDiffWithLiveServerCommand({
                 script,
                 document,
-                fetchPrimeScriptDiff: (targetScript, targetDocument) =>
-                    this.fetchPrimeScriptDiff(targetScript, targetDocument),
+                instance,
+                fetchScriptDiff: (targetScript, targetDocument) =>
+                    this.fetchInstanceScriptDiff(
+                        targetScript,
+                        targetDocument,
+                        instance,
+                    ),
             });
         } finally {
             msg.dispose();
@@ -1369,13 +1427,14 @@ export class VSCodeIntegration {
         };
     }
 
-    async fetchPrimeScriptDiff(
+    async fetchInstanceScriptDiff(
         script: number,
         document: TextDocument,
+        instance: GameInstance,
     ): Promise<{
         localContent: string;
-        primeContent: string;
-        isNewOnPrime: boolean;
+        remoteContent: string;
+        isNewOnRemote: boolean;
     }> {
         try {
             await this.withEditorClient(() => {});
@@ -1383,9 +1442,10 @@ export class VSCodeIntegration {
             // Dev connection failed — that's fine
         }
 
-        return primeService.fetchPrimeScriptDiff(
+        return primeService.fetchInstanceScriptDiff(
             script,
             document,
+            instance,
             this.getPrimeServiceDependencies(),
         );
     }
@@ -1465,8 +1525,8 @@ export class VSCodeIntegration {
         );
         this.context.subscriptions.push(subscription);
         subscription = commands.registerCommand(
-            "gsl.diffWithPrime",
-            this.commandDiffWithPrime,
+            "gsl.diffWithLiveServer",
+            this.commandDiffWithLiveServer,
             this,
         );
         this.context.subscriptions.push(subscription);
