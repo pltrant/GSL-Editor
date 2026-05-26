@@ -118,7 +118,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
                 filename: {
                     type: "string",
                     description:
-                        "Relative or absolute path to the .gsl file to compile (e.g. 'S02017.gsl').",
+                        "Path to the .gsl file to compile. Prefer an absolute path " +
+                        "(e.g. '/home/user/scripts/S02017.gsl'). A relative path " +
+                        "like 'S02017.gsl' is resolved against the configured download directory.",
                 },
             },
         },

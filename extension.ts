@@ -1764,6 +1764,7 @@ export async function activate(context: ExtensionContext) {
     }
     const pw = await context.secrets.get(GSLX_DEV_PASSWORD);
     if (pw) process.env.GSL_PASSWORD = pw;
+    process.env.GSL_DOWNLOAD_PATH = GSLExtension.getDownloadLocation();
 
     // Register the MCP server definition provider so that consumers
     // (e.g. GitHub Copilot) can discover and launch gsl-tools.
@@ -1811,4 +1812,5 @@ export async function activate(context: ExtensionContext) {
 
 export function deactivate() {
     delete process.env.GSL_PASSWORD;
+    delete process.env.GSL_DOWNLOAD_PATH;
 }

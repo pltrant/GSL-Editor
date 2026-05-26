@@ -491,7 +491,12 @@ export function createMcpToolHandler(
                             "Missing filename. Provide a .gsl file path.",
                         );
                     }
-                    const resolvedPath = path.resolve(filename.trim());
+                    const resolvedPath = path.isAbsolute(filename.trim())
+                        ? filename.trim()
+                        : path.resolve(
+                              orchestrator.downloadLocation,
+                              filename.trim(),
+                          );
                     if (!resolvedPath.endsWith(".gsl")) {
                         throw new Error("File must have a .gsl extension.");
                     }
