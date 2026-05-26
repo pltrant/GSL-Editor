@@ -1766,6 +1766,24 @@ export async function activate(context: ExtensionContext) {
     if (pw) process.env.GSL_PASSWORD = pw;
     process.env.GSL_DOWNLOAD_PATH = GSLExtension.getDownloadLocation();
 
+    // Copy the MCP server bundle to a stable, version-independent path
+    // alongside the login config file so external consumers (Claude Code,
+    // Codex CLI, etc.) don't break when the extension is updated.
+    if (loginConfigPath) {
+        const stableBundlePath = path.join(
+            path.dirname(loginConfigPath),
+            "mcpServer.bundle.js",
+        );
+        const sourceBundlePath = context.asAbsolutePath(
+            "gsl/mcp/mcpServer.bundle.js",
+        );
+        try {
+            fs.copyFileSync(sourceBundlePath, stableBundlePath);
+        } catch (e) {
+            console.error("Failed to copy MCP bundle to stable path:", e);
+        }
+    }
+
     // Register the MCP server definition provider so that consumers
     // (e.g. GitHub Copilot) can discover and launch gsl-tools.
     context.subscriptions.push(

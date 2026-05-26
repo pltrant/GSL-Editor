@@ -8,24 +8,12 @@
  * the game server.
  *
  * Configuration is via environment variables:
+ *   GSL_LOGIN_CONFIG_FILE  – Absolute path to JSON config file (created by GSL: User Setup)
  *   GSL_PASSWORD           – Play.net password (REQUIRED, never stored in file)
- *   GSL_ACCOUNT            – Play.net account name (or use login config file)
- *   GSL_DEV_INSTANCE       – Dev EAccess instance code  (e.g. GS4D)
- *   GSL_DEV_CHARACTER      – Dev character name
- *   GSL_PRIME_INSTANCE     – Prime EAccess instance code (e.g. GS3)
- *   GSL_PRIME_CHARACTER    – Prime character name
- *   GSL_SHATTERED_INSTANCE – Shattered EAccess instance code (e.g. GSF)
- *   GSL_SHATTERED_CHARACTER– Shattered character name
- *   GSL_PLATINUM_INSTANCE  – Platinum EAccess instance code (e.g. GS4X)
- *   GSL_PLATINUM_CHARACTER – Platinum character name
- *   GSL_TEST_INSTANCE      – Test EAccess instance code (e.g. GST)
- *   GSL_TEST_CHARACTER     – Test character name
- *   GSL_AUTHOR             – Changelog author (e.g. AlexB/Nyxus)
- *   GSL_DOWNLOAD_PATH      – Path for temporary script files (defaults to OS tmpdir)
+ *   GSL_DOWNLOAD_PATH      – Absolute path for script files (defaults to OS tmpdir)
  *
- * Alternatively, supply GSL_LOGIN_CONFIG_FILE pointing at a JSON file with
- * the same keys (camelCase) for non-secret values. The password must always
- * be provided via GSL_PASSWORD.
+ * The login config file contains account, instance, character, and author
+ * values. See the extension README for the expected shape.
  */
 
 import * as fs from "fs";
@@ -64,44 +52,21 @@ interface LoginConfigFile {
     downloadPath?: string;
 }
 
-interface InstanceConfig {
-    envInstance: string;
-    envCharacter: string;
-    fileInstance: keyof LoginConfigFile;
-    fileCharacter: keyof LoginConfigFile;
-}
-
-const INSTANCE_CONFIGS: Record<GameInstance, InstanceConfig> = {
-    dev: {
-        envInstance: "GSL_DEV_INSTANCE",
-        envCharacter: "GSL_DEV_CHARACTER",
-        fileInstance: "devInstance",
-        fileCharacter: "devCharacter",
-    },
-    prime: {
-        envInstance: "GSL_PRIME_INSTANCE",
-        envCharacter: "GSL_PRIME_CHARACTER",
-        fileInstance: "primeInstance",
-        fileCharacter: "primeCharacter",
-    },
+const INSTANCE_FILE_KEYS: Record<
+    GameInstance,
+    { instance: keyof LoginConfigFile; character: keyof LoginConfigFile }
+> = {
+    dev: { instance: "devInstance", character: "devCharacter" },
+    prime: { instance: "primeInstance", character: "primeCharacter" },
     shattered: {
-        envInstance: "GSL_SHATTERED_INSTANCE",
-        envCharacter: "GSL_SHATTERED_CHARACTER",
-        fileInstance: "shatteredInstance",
-        fileCharacter: "shatteredCharacter",
+        instance: "shatteredInstance",
+        character: "shatteredCharacter",
     },
     platinum: {
-        envInstance: "GSL_PLATINUM_INSTANCE",
-        envCharacter: "GSL_PLATINUM_CHARACTER",
-        fileInstance: "platinumInstance",
-        fileCharacter: "platinumCharacter",
+        instance: "platinumInstance",
+        character: "platinumCharacter",
     },
-    test: {
-        envInstance: "GSL_TEST_INSTANCE",
-        envCharacter: "GSL_TEST_CHARACTER",
-        fileInstance: "testInstance",
-        fileCharacter: "testCharacter",
-    },
+    test: { instance: "testInstance", character: "testCharacter" },
 };
 
 function loadLoginConfig(): {
@@ -148,7 +113,7 @@ function loadLoginConfig(): {
         };
     }
 
-    const account = process.env.GSL_ACCOUNT ?? file.account;
+    const account = file.account;
     const password = process.env.GSL_PASSWORD;
 
     if (!password) {
@@ -168,24 +133,19 @@ function loadLoginConfig(): {
             author: undefined,
             downloadPath: os.tmpdir(),
             configError:
-                "No account configured. Set GSL_ACCOUNT environment variable " +
-                'or add "account" to your login config file.',
+                'No account configured. Add "account" to your login config file.',
         };
     }
 
-    const author = process.env.GSL_AUTHOR ?? file.author;
+    const author = file.author;
     const downloadPath =
         process.env.GSL_DOWNLOAD_PATH ?? file.downloadPath ?? os.tmpdir();
 
     const credentials = new Map<GameInstance, LoginCredentials>();
 
-    for (const [key, cfg] of Object.entries(INSTANCE_CONFIGS)) {
-        const instance =
-            process.env[cfg.envInstance] ??
-            (file[cfg.fileInstance] as string | undefined);
-        const character =
-            process.env[cfg.envCharacter] ??
-            (file[cfg.fileCharacter] as string | undefined);
+    for (const [key, cfg] of Object.entries(INSTANCE_FILE_KEYS)) {
+        const instance = file[cfg.instance] as string | undefined;
+        const character = file[cfg.character] as string | undefined;
         if (instance && character) {
             credentials.set(key as GameInstance, {
                 account,
