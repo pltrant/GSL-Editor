@@ -468,7 +468,37 @@ export class EAccessClient extends EventEmitter {
 
     /* quick login */
 
+    /**
+     * Mutex: EAccess resets the first session when two connections
+     * authenticate concurrently for the same account. Serializing
+     * quickLogin calls prevents this.
+     */
+    private static loginQueue: Promise<any> = Promise.resolve();
+
     static quickLogin(
+        account: string,
+        password: string,
+        game: string,
+        character: string,
+        mode: string,
+        abortSignal?: AbortSignal,
+    ): Promise<SAL> {
+        const attempt = () =>
+            this.quickLoginImpl(
+                account,
+                password,
+                game,
+                character,
+                mode,
+                abortSignal,
+            );
+        // Chain onto the queue so logins never overlap.
+        const queued = this.loginQueue.then(attempt, attempt);
+        this.loginQueue = queued.catch(() => {});
+        return queued;
+    }
+
+    private static quickLoginImpl(
         account: string,
         password: string,
         game: string,
