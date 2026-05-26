@@ -31,6 +31,11 @@ import {
     GameInstance,
 } from "../agentToolOrchestrator.js";
 import { TOOL_DEFINITIONS, createMcpToolHandler } from "./mcpTools.js";
+import {
+    tryConnectToDaemon,
+    runAsProxy,
+    startDaemonListener,
+} from "./mcpDaemon.js";
 
 // ---------------------------------------------------------------------------
 // Credential loading
@@ -171,6 +176,16 @@ async function main() {
               console.error(`[gsl-mcp ${new Date().toISOString()}]`, ...args)
         : () => {};
 
+    // -----------------------------------------------------------------------
+    // Singleton coordination: if a daemon is already running, become a proxy.
+    // -----------------------------------------------------------------------
+    const existingDaemon = await tryConnectToDaemon();
+    if (existingDaemon) {
+        log("Connected to existing daemon, running as proxy.");
+        runAsProxy(existingDaemon);
+        return;
+    }
+
     const { credentials, author, downloadPath, configError } =
         loadLoginConfig();
 
@@ -242,9 +257,9 @@ async function main() {
         { capabilities: { tools: {} } },
     );
 
-    // tools/list
-    server.setRequestHandler(ListToolsRequestSchema, async () => ({
-        tools: TOOL_DEFINITIONS.map((def) => ({
+    // Shared tool-list getter (used by both primary server and daemon)
+    function getToolList() {
+        return TOOL_DEFINITIONS.map((def) => ({
             name: def.name,
             description:
                 def.name === "gsl_slash_agent_command" && agentHelpText
@@ -253,7 +268,12 @@ async function main() {
                       agentHelpText
                     : def.description,
             inputSchema: def.inputSchema,
-        })),
+        }));
+    }
+
+    // tools/list
+    server.setRequestHandler(ListToolsRequestSchema, async () => ({
+        tools: getToolList(),
     }));
 
     // tools/call
@@ -271,14 +291,56 @@ async function main() {
         return handler(args ?? {});
     });
 
+    // -------------------------------------------------------------------
+    // Daemon listener: accept additional MCP clients over IPC.
+    // -------------------------------------------------------------------
+    const daemon = await startDaemonListener(
+        { handlers, getToolList },
+        debugLog,
+    );
+
+    // If startDaemonListener returns undefined, the socket was already
+    // owned by another daemon. Fall back to proxy mode.
+    if (!daemon) {
+        log("Socket in use, retrying as proxy.");
+        const retrySocket = await tryConnectToDaemon();
+        if (retrySocket) {
+            runAsProxy(retrySocket);
+            return;
+        }
+        // Extremely unlikely: the owner died between our listen attempt
+        // and this connect. Exit and let the harness restart us.
+        log("Daemon unreachable. Exiting.");
+        process.exit(1);
+    }
+
+    log(`Daemon listening on ${daemon.socketPath}`);
+
     // Start stdio transport
     const transport = new StdioServerTransport();
     await server.connect(transport);
     log("Server started on stdio");
 
+    // Allow the daemon to close the primary MCP server before idle exit.
+    daemon.onBeforeIdleExit(async () => {
+        debugLog("Closing primary server before idle exit.");
+        await server.close();
+    });
+
+    // Detect primary stdio EOF directly (not via SDK onclose which may
+    // be overwritten). This triggers the idle countdown reliably.
+    process.stdin.on("end", () => {
+        debugLog("Primary stdio client disconnected (stdin EOF).");
+        daemon.notifyStdioClosed();
+    });
+    process.stdin.on("close", () => {
+        daemon.notifyStdioClosed();
+    });
+
     // Graceful shutdown
     const shutdown = async () => {
         debugLog("Shutting down...");
+        daemon.close();
         await server.close();
         process.exit(0);
     };
