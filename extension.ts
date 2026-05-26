@@ -16,10 +16,6 @@ import {
     CodeActionKind,
     Range,
     DiagnosticSeverity,
-    McpStdioServerDefinition,
-    LanguageModelTextPart,
-    LanguageModelToolResult,
-    CancellationToken,
 } from "vscode";
 
 import { workspace, window, commands, languages, extensions, lm } from "vscode";
@@ -68,7 +64,8 @@ import {
 } from "./gsl/commands/syncAgentPrompts";
 import { runCopilotCodeReviewCommand } from "./gsl/commands/copilotCodeReview";
 import * as primeService from "./gsl/prime/primeService";
-import { LoginCredentials } from "./gsl/agentToolOrchestrator";
+import { GameInstance, LoginCredentials } from "./gsl/agentToolOrchestrator";
+import { registerNativeTools } from "./gsl/commands/registerNativeTools";
 
 const rx_script_number = /^\d{1,6}$/;
 const rx_script_number_in_filename = /(\d+)\.gsl/;
@@ -1752,23 +1749,10 @@ export async function activate(context: ExtensionContext) {
     context.subscriptions.push(lineLengthDiagnostics);
     subscribeToDocumentChanges(context, lineLengthDiagnostics);
 
-    // Expose credentials to the MCP server child process via environment
-    // variables so that contributes.mcpServers spawns with access to the
-    // game server login. The login config file path and password (stored
-    // in VS Code secrets) are forwarded here. The password is set on
-    // process.env because contributes.mcpServers inherits the host
-    // environment — cleaned up in deactivate() to limit exposure.
-    const loginConfigPath = GSLExtension.getLoginConfigPath();
-    if (loginConfigPath) {
-        process.env.GSL_LOGIN_CONFIG_FILE = loginConfigPath;
-    }
-    const pw = await context.secrets.get(GSLX_DEV_PASSWORD);
-    if (pw) process.env.GSL_PASSWORD = pw;
-    process.env.GSL_DOWNLOAD_PATH = GSLExtension.getDownloadLocation();
-
     // Copy the MCP server bundle to a stable, version-independent path
     // alongside the login config file so external consumers (Claude Code,
     // Codex CLI, etc.) don't break when the extension is updated.
+    const loginConfigPath = GSLExtension.getLoginConfigPath();
     if (loginConfigPath) {
         const stableBundlePath = path.join(
             path.dirname(loginConfigPath),
@@ -1784,44 +1768,19 @@ export async function activate(context: ExtensionContext) {
         }
     }
 
-    // Register the MCP server definition provider so that consumers
-    // (e.g. GitHub Copilot) can discover and launch gsl-tools.
-    context.subscriptions.push(
-        lm.registerMcpServerDefinitionProvider("gsl.mcpServer", {
-            provideMcpServerDefinitions() {
-                return [
-                    new McpStdioServerDefinition(
-                        "gsl-tools",
-                        process.execPath,
-                        [context.asAbsolutePath("gsl/mcp/mcpServer.bundle.js")],
-                    ),
-                ];
+    // Register all GSL tools as native VS Code language model tools so
+    // Copilot can invoke them without requiring the MCP server.
+    registerNativeTools(context, {
+        getCredentials: (instance: GameInstance) =>
+            GSLExtension.getLoginForInstance(instance, context),
+        getCurrentAuthor: () => GSLExtension.getCurrentAuthor(),
+        downloadLocation: GSLExtension.getDownloadLocation(),
+        console: {
+            log: (...args: any[]) => {
+                vsc!.outputGameChannel(args.join(" "));
             },
-        }),
-    );
-
-    // Register agent tool so Copilot can access the current author
-    // without requiring the MCP server to be enabled.
-    context.subscriptions.push(
-        lm.registerTool("gsl_get_current_author", {
-            invoke(
-                _options: unknown,
-                _token: CancellationToken,
-            ): LanguageModelToolResult {
-                const author = GSLExtension.getCurrentAuthor()?.trim();
-                if (!author) {
-                    return new LanguageModelToolResult([
-                        new LanguageModelTextPart(
-                            "Author is not configured. Run 'GSL: User Setup'.",
-                        ),
-                    ]);
-                }
-                return new LanguageModelToolResult([
-                    new LanguageModelTextPart(author),
-                ]);
-            },
-        }),
-    );
+        },
+    });
 
     vsc.checkForNewInstall();
     vsc.checkForUpdatedVersion();

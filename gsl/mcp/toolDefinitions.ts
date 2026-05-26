@@ -20,6 +20,13 @@ export interface ToolDefinition {
     name: string;
     description: string;
     inputSchema: ToolInputSchema;
+    /** VS Code languageModelTools metadata */
+    vscode: {
+        displayName: string;
+        toolReferenceName: string;
+        userDescription: string;
+        icon?: string;
+    };
 }
 
 // ---------------------------------------------------------------------------
@@ -33,6 +40,13 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             "Downloads a GSL script from the specified server instance and saves it to a " +
             "local file. Returns the file path. Use this when the user wants to read, " +
             "review, or inspect a version of a script on any server instance.",
+        vscode: {
+            displayName: "Download GSL Script",
+            toolReferenceName: "gsl-download-script",
+            userDescription:
+                "Downloads a GSL script from a game server instance.",
+            icon: "$(cloud-download)",
+        },
         inputSchema: {
             type: "object",
             required: ["scriptNumber"],
@@ -61,6 +75,13 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             "to compare, diff, or check differences between two versions of a script " +
             "across server instances. " +
             "The diff reads as: baseInstance (---) compared against compareInstance (+++).",
+        vscode: {
+            displayName: "Diff GSL Script Across Instances",
+            toolReferenceName: "gsl-diff-script",
+            userDescription:
+                "Compares a GSL script between two server instances.",
+            icon: "$(diff)",
+        },
         inputSchema: {
             type: "object",
             required: ["scriptNumber"],
@@ -111,6 +132,13 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             "model can diagnose and fix compilation problems. The file is uploaded to an " +
             "ephemeral compilation slot (script 24661). Use this tool when writing scripts " +
             "or verifying GSL syntax.",
+        vscode: {
+            displayName: "Compile Check GSL Script",
+            toolReferenceName: "gsl-compile-check",
+            userDescription:
+                "Compiles a GSL script and returns errors/warnings.",
+            icon: "$(check-all)",
+        },
         inputSchema: {
             type: "object",
             required: ["filename"],
@@ -131,6 +159,13 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             "Returns the current GSL author value, per the configuration file. Use " +
             "this when generating changelog entries or script metadata that needs " +
             "the canonical author identity. Format: <AbbreviatedRealName>/<CharacterName>.",
+        vscode: {
+            displayName: "Get Current GSL Author",
+            toolReferenceName: "gsl-get-current-author",
+            userDescription:
+                "Returns the current GSL author from the login config file.",
+            icon: "$(account)",
+        },
         inputSchema: {
             type: "object",
             properties: {},
@@ -146,6 +181,12 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             "room text (e.g. $+$-516105D) are PID'd (permanent) and therefore negative — " +
             "always preserve the negative sign when using them with other tools such as " +
             "`gsl_get_existence_data`. Can target any server instance. Defaults to Dev.",
+        vscode: {
+            displayName: "Get Room Data",
+            toolReferenceName: "gsl-get-room-data",
+            userDescription: "Retrieves room data from the game server.",
+            icon: "$(map)",
+        },
         inputSchema: {
             type: "object",
             required: ["roomId"],
@@ -173,6 +214,13 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             "aka properties, flags, and location. Negative IDs are permanent IDs (PID'd) — " +
             "these are stable references that persist across unload/reload cycles. Positive " +
             "IDs are temporary and may change. Can target any server instance. Defaults to Dev.",
+        vscode: {
+            displayName: "Get Existence Data",
+            toolReferenceName: "gsl-get-existence-data",
+            userDescription:
+                "Retrieves existence (item/object) data from the game server.",
+            icon: "$(package)",
+        },
         inputSchema: {
             type: "object",
             required: ["existenceId"],
@@ -198,6 +246,13 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             "Sends the /svf command to the game server for a given player name and returns " +
             "varfield and flags output. Use this when the user wants to inspect a " +
             "character's current state — skills, stats, properties, and flag bits.",
+        vscode: {
+            displayName: "Get Player Varfields",
+            toolReferenceName: "gsl-get-player-varfields",
+            userDescription:
+                "Retrieves player varfields and flags from the game server.",
+            icon: "$(person)",
+        },
         inputSchema: {
             type: "object",
             required: ["playerName"],
@@ -233,6 +288,12 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             "to list available subcommands. Run with just a subcommand name (no args) to see " +
             "its usage. Can target any server instance. Defaults to Dev. See S24792.gsl for " +
             "implementation.",
+        vscode: {
+            displayName: "Run /agent Command",
+            toolReferenceName: "gsl-agent-command",
+            userDescription: "Runs a /agent subcommand on the game server.",
+            icon: "$(terminal)",
+        },
         inputSchema: {
             type: "object",
             properties: {
@@ -263,6 +324,13 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             "Warning: script owner property is typically not maintained and is weak signal — " +
             "better to look at who has touched the script recently by viewing the script's " +
             "changelog, found in the script file itself.",
+        vscode: {
+            displayName: "Get Script Metadata",
+            toolReferenceName: "gsl-get-script-metadata",
+            userDescription:
+                "Retrieves script metadata (/ss) from the game server.",
+            icon: "$(info)",
+        },
         inputSchema: {
             type: "object",
             required: ["scriptId"],
@@ -294,6 +362,12 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             "maintained and is a weak signal — to identify who actually works on a verb's " +
             "script, look at the 'Last modified by' field or the script's changelog found " +
             "in the script file itself.",
+        vscode: {
+            displayName: "Get Verb Data",
+            toolReferenceName: "gsl-get-verb-data",
+            userDescription: "Retrieves verb metadata from the game server.",
+            icon: "$(symbol-event)",
+        },
         inputSchema: {
             type: "object",
             required: ["verb"],
@@ -320,6 +394,13 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             "metadata, including the table description, creator, access level, dimensions " +
             "(X/Y/Z), total size, and table type flags. Does not work on varfield tables " +
             "(e.g. on players/exists). Can target any server instance. Defaults to Dev.",
+        vscode: {
+            displayName: "Get Table Metadata",
+            toolReferenceName: "gsl-get-table-metadata",
+            userDescription:
+                "Retrieves global table metadata from the game server.",
+            icon: "$(table)",
+        },
         inputSchema: {
             type: "object",
             required: ["tableId"],
