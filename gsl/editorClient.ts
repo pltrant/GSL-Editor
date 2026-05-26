@@ -418,18 +418,50 @@ class TaskQueueProcessor {
         }
 
         const { login, onCreate } = options;
-        const createdClient = this.createEditorClient(options);
-        this.pendingClient = createdClient;
-        this.attachClientInvalidationHandlers(createdClient);
+        const attemptLogin = async () => {
+            const client = this.createEditorClient(options);
+            this.pendingClient = client;
+            this.attachClientInvalidationHandlers(client);
+            try {
+                await client.login(login, taskExecution.abortController.signal);
+                this.assertTaskActive(taskExecution);
+            } catch (e) {
+                this.disposeClient(client);
+                throw e;
+            }
+            return client;
+        };
+
+        let createdClient: EditorClient;
         try {
-            await createdClient.login(
-                login,
-                taskExecution.abortController.signal,
+            createdClient = await attemptLogin();
+        } catch (e) {
+            const error = e instanceof Error ? e : new Error(String(e));
+            if (!shouldResetClient(error)) {
+                throw e;
+            }
+            options.console.log(
+                `[editorClient] Login failed (${error.message}), retrying once...`,
             );
             this.assertTaskActive(taskExecution);
-        } catch (e) {
-            this.disposeClient(createdClient);
-            throw e;
+            const { signal } = taskExecution.abortController;
+            await new Promise<void>((resolve, reject) => {
+                if (signal.aborted) {
+                    reject(signal.reason);
+                    return;
+                }
+                const onAbort = () => {
+                    clearTimeout(timer);
+                    reject(signal.reason);
+                };
+                const timer = setTimeout(() => {
+                    signal.removeEventListener("abort", onAbort);
+                    resolve();
+                }, 500);
+                signal.addEventListener("abort", onAbort, { once: true });
+            });
+            this.assertTaskActive(taskExecution);
+            createdClient = await attemptLogin();
         }
         this.clearClientRefs(createdClient);
         this.client = createdClient;
