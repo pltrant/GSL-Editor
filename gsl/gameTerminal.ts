@@ -9,6 +9,7 @@ export class GameTerminal {
     private writeEmitter: EventEmitter<string>;
 
     private gameClient?: BaseGameClient;
+    private unbindCurrentClient?: () => void;
 
     private ptyInputBuffer: string;
     private ptyInputIndex: number;
@@ -167,7 +168,7 @@ export class GameTerminal {
     bindClient(client: BaseGameClient) {
         if (this.gameClient === client) return;
         if (this.gameClient) {
-            throw new Error("Game client is already bound?");
+            this.unbindCurrentClient?.();
         }
 
         const unbindClient = () => {
@@ -178,6 +179,7 @@ export class GameTerminal {
             client.off("echo", handleClientEcho);
             closeEvent.dispose();
             this.gameClient = undefined;
+            this.unbindCurrentClient = undefined;
         };
 
         const handleClientError = (error: Error) => {
@@ -229,5 +231,6 @@ export class GameTerminal {
         client.on("echo", handleClientEcho);
 
         this.gameClient = client;
+        this.unbindCurrentClient = unbindClient;
     }
 }
