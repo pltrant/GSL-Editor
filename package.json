@@ -140,6 +140,7 @@
                 "category": "GSL"
             }
         ],
+        "_languageModelTools_WARNING": "DO NOT EDIT languageModelTools — auto-generated from gsl/mcp/toolDefinitions.ts by scripts/syncToolsToPackageJson.js",
         "languageModelTools": [
             {
                 "name": "gsl_download_script",
