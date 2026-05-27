@@ -2,6 +2,21 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.20.2] - 2026-05-26
+
+### Added
+
+- `Diff with Prime Server` is now `Diff with Live Server` and can compare the active Dev script against Prime, Shattered, Platinum, or Test.
+- Bundled `/setup-gsl-agents` chat prompt for bootstrapping agentic development.
+- Documented MCP setup for external agents.
+
+### Fixed
+
+- Hardened game login and connection handling.
+- Copilot Code Review command now functions properly.
+- Fixed `gsl_compile_check` so relative file paths resolve from the configured download directory.
+- Improved MCP stability.
+
 ## [1.20.1] - 2026-05-23
 
 ### Fixed
