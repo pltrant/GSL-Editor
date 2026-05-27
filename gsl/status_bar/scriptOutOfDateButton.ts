@@ -182,7 +182,7 @@ export class OutOfDateButtonManager {
                 time: nowInEpochSeconds(),
                 state,
             });
-        });
+        }).catch((e) => console.error(e));
     }
 
     /**
@@ -380,7 +380,7 @@ export class OutOfDateButtonManager {
                 this.button.hide();
                 return this.withEditorClient(async (client) => {
                     return this.showDiff(client, scriptNum, document);
-                });
+                }).catch((e) => console.error(e));
             }
             case OVERWRITE_LOCAL_COPY: {
                 this.button.hide();
@@ -403,13 +403,13 @@ export class OutOfDateButtonManager {
                         );
                     }
                     return void this.showDownloadedScript(result);
-                });
+                }).catch((e) => console.error(e));
             }
             case STOP_MONITORING: {
                 this.renderButton({ state: "ignored", scriptNum });
                 return this.withEditorClient(async (client) => {
                     return this.stopCheckingScript(client, scriptNum);
-                });
+                }).catch((e) => console.error(e));
             }
             default: {
                 console.error("Unexpected user choice", userChoice);

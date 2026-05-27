@@ -418,18 +418,50 @@ class TaskQueueProcessor {
         }
 
         const { login, onCreate } = options;
-        const createdClient = this.createEditorClient(options);
-        this.pendingClient = createdClient;
-        this.attachClientInvalidationHandlers(createdClient);
+        const attemptLogin = async () => {
+            const client = this.createEditorClient(options);
+            this.pendingClient = client;
+            this.attachClientInvalidationHandlers(client);
+            try {
+                await client.login(login, taskExecution.abortController.signal);
+                this.assertTaskActive(taskExecution);
+            } catch (e) {
+                this.disposeClient(client);
+                throw e;
+            }
+            return client;
+        };
+
+        let createdClient: EditorClient;
         try {
-            await createdClient.login(
-                login,
-                taskExecution.abortController.signal,
+            createdClient = await attemptLogin();
+        } catch (e) {
+            const error = e instanceof Error ? e : new Error(String(e));
+            if (!shouldResetClient(error)) {
+                throw e;
+            }
+            options.console.log(
+                `[editorClient] Login failed (${error.message}), retrying once...`,
             );
             this.assertTaskActive(taskExecution);
-        } catch (e) {
-            this.disposeClient(createdClient);
-            throw e;
+            const { signal } = taskExecution.abortController;
+            await new Promise<void>((resolve, reject) => {
+                if (signal.aborted) {
+                    reject(signal.reason);
+                    return;
+                }
+                const onAbort = () => {
+                    clearTimeout(timer);
+                    reject(signal.reason);
+                };
+                const timer = setTimeout(() => {
+                    signal.removeEventListener("abort", onAbort);
+                    resolve();
+                }, 500);
+                signal.addEventListener("abort", onAbort, { once: true });
+            });
+            this.assertTaskActive(taskExecution);
+            createdClient = await attemptLogin();
         }
         this.clearClientRefs(createdClient);
         this.client = createdClient;
@@ -538,15 +570,21 @@ class EditorClient extends BaseGameClient {
     }
 
     protected serverError(error: any): void {
-        // attempt to reconnet on reset connections
+        // attempt to reconnect on reset connections
         if (error.code === "ECONNRESET") {
             this.cleanupServer();
-            this.reconnect().then(() => {
-                if (this.retryCommand.length > 0) {
-                    this.send(this.retryCommand);
-                    this.retryCommand = "";
-                }
-            });
+            this.reconnect()
+                .then(() => {
+                    if (this.retryCommand.length > 0) {
+                        this.send(this.retryCommand);
+                        this.retryCommand = "";
+                    }
+                })
+                .catch(() => {
+                    // Reconnect failed; emit error so the task queue
+                    // resets the client on the next operation.
+                    this.emit("error", error);
+                });
         } else {
             super.serverError(error);
         }
@@ -696,7 +734,16 @@ class EditorClient extends BaseGameClient {
                 }
                 if (done) {
                     clearTimeout(timeout);
-                    if (!keepalive) await this.exitModifyScript();
+                    if (!keepalive) {
+                        try {
+                            await this.exitModifyScript();
+                        } catch (e) {
+                            reject(
+                                e instanceof Error ? e : new Error(String(e)),
+                            );
+                            return;
+                        }
+                    }
                     resolve(scriptProperties as ScriptProperties);
                 }
             };
@@ -711,7 +758,7 @@ class EditorClient extends BaseGameClient {
         return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
                 this.off("text", processText);
-                reject("Modification exit timed out.");
+                reject(new Error("Modification exit timed out."));
             }, clientTimeout);
             const processText = (text: string) => output.accumulate(text);
             const output = new OutputProcessor((line: string) => {
@@ -747,7 +794,12 @@ class EditorClient extends BaseGameClient {
                 if (output.peek(4) === "Edt:") {
                     clearTimeout(timeout);
                     this.off("text", processText);
-                    await this.exitModifyScript();
+                    try {
+                        await this.exitModifyScript();
+                    } catch (e) {
+                        reject(e instanceof Error ? e : new Error(String(e)));
+                        return;
+                    }
                     resolve(scriptLines.join("\r\n"));
                 }
             };
@@ -771,9 +823,19 @@ class EditorClient extends BaseGameClient {
                 errorList: [],
                 status: ScriptCompileStatus.Unknown,
             };
+            const sendFailed = (reason: string) => {
+                clearTimeout(timeout);
+                this.off("text", processText);
+                reject(new Error(reason));
+            };
+            const timeout = setTimeout(
+                () => sendFailed("Script upload timed out."),
+                clientTimeout,
+            );
             const output = new OutputProcessor((line: string) => {
                 let match: RegExpMatchArray | null;
                 if (rx_aborted.test(line) || rx_compiled.test(line)) {
+                    clearTimeout(timeout);
                     this.off("text", processText);
                     resolve(compileResults);
                     return;
@@ -826,13 +888,20 @@ class EditorClient extends BaseGameClient {
                     ) {
                         this.send("G");
                     } else if (
-                        compileResults.status === ScriptCompileStatus.Compiled
-                    ) {
-                        await this.exitModifyScript();
-                    } else if (
+                        compileResults.status ===
+                            ScriptCompileStatus.Compiled ||
                         compileResults.status === ScriptCompileStatus.Failed
                     ) {
-                        await this.exitModifyScript();
+                        try {
+                            await this.exitModifyScript();
+                        } catch (e) {
+                            clearTimeout(timeout);
+                            this.off("text", processText);
+                            reject(
+                                e instanceof Error ? e : new Error(String(e)),
+                            );
+                            return;
+                        }
                     }
                     output.flush();
                 }

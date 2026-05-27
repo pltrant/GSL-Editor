@@ -11,5 +11,5 @@
         "rootDir": "."
     },
     "include": ["extension.ts", "gsl", "gsl-language-server", "test", "tools"],
-    "exclude": ["node_modules", ".vscode-test", "gsl/mcp/mcpServer.ts"]
+    "exclude": ["node_modules", ".vscode-test", "gsl/mcp/mcpServer.ts", "gsl/mcp/mcpDaemon.ts"]
 }

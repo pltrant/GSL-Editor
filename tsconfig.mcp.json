@@ -17,6 +17,6 @@
         "skipLibCheck": true,
         "noEmit": true
     },
-    "include": ["gsl/mcp/mcpServer.ts"],
+    "include": ["gsl/mcp/mcpServer.ts", "gsl/mcp/mcpDaemon.ts"],
     "exclude": ["node_modules"]
 }

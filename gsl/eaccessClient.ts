@@ -468,7 +468,37 @@ export class EAccessClient extends EventEmitter {
 
     /* quick login */
 
+    /**
+     * Mutex: EAccess resets the first session when two connections
+     * authenticate concurrently for the same account. Serializing
+     * quickLogin calls prevents this.
+     */
+    private static loginQueue: Promise<any> = Promise.resolve();
+
     static quickLogin(
+        account: string,
+        password: string,
+        game: string,
+        character: string,
+        mode: string,
+        abortSignal?: AbortSignal,
+    ): Promise<SAL> {
+        const attempt = () =>
+            this.quickLoginImpl(
+                account,
+                password,
+                game,
+                character,
+                mode,
+                abortSignal,
+            );
+        // Chain onto the queue so logins never overlap.
+        const queued = this.loginQueue.then(attempt, attempt);
+        this.loginQueue = queued.catch(() => {});
+        return queued;
+    }
+
+    private static quickLoginImpl(
         account: string,
         password: string,
         game: string,
@@ -602,7 +632,9 @@ export class EAccessClient extends EventEmitter {
         return new Promise((resolve, reject) => {
             const options = { debug: true, console: this.console };
             const client = new this(options);
-            client.once(EVENT_CLOSE, () => reject(null));
+            client.once(EVENT_CLOSE, () =>
+                reject(new Error("EAccess connection closed.")),
+            );
             client.once(EVENT_PROBLEM, (code) =>
                 reject(new EAccessError(code)),
             );
@@ -651,7 +683,9 @@ class GameOptionChoice {
     }
     select(code: string): Promise<CharacterOptionChoice> {
         return new Promise((resolve, reject) => {
-            this.client.once(EVENT_CLOSE, () => reject(null));
+            this.client.once(EVENT_CLOSE, () =>
+                reject(new Error("EAccess connection closed.")),
+            );
             this.client.once(EVENT_PROBLEM, (code) =>
                 reject(new EAccessError(code)),
             );
@@ -707,7 +741,9 @@ class CharacterOptionChoice {
         mode?: string,
     ): Promise<{ sal: SAL; loginDetails: LoginDetails }> {
         return new Promise((resolve, reject) => {
-            this.client.once(EVENT_CLOSE, () => reject(null));
+            this.client.once(EVENT_CLOSE, () =>
+                reject(new Error("EAccess connection closed.")),
+            );
             this.client.once(EVENT_PROBLEM, (code) =>
                 reject(new EAccessError(code)),
             );

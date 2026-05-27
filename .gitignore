@@ -6,6 +6,7 @@
 **/*.js.map
 compile.txt
 node_modules
-scripts/
+scripts/*
+!scripts/syncToolsToPackageJson.js
 tools/credentials.json
 tsconfig.tsbuildinfo
