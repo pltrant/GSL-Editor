@@ -1,5 +1,10 @@
 import * as assert from "assert";
 import {
+    ClientTask,
+    EditorClientInterface,
+    InitOptions,
+} from "../../gsl/editorClient";
+import {
     AgentToolOrchestrator,
     AgentToolOrchestratorDeps,
     LoginCredentials,
@@ -85,6 +90,29 @@ suite("ToolOrchestrator", () => {
         await assert.rejects(() => orch.getRoomData(100, "prime"), {
             message: /prime server not configured/,
         });
+    });
+
+    test("getRoomData loads the room segment before showing it", async () => {
+        const commands: string[] = [];
+        const client = {
+            executeCommand: async (command: string) => {
+                commands.push(command);
+                return command.startsWith("/agent")
+                    ? ["Segment 1 loaded."]
+                    : ["Showing room #100", "Flags: none"];
+            },
+        } as unknown as EditorClientInterface;
+        const runWithClient = async <T>(
+            _instance: string,
+            _options: InitOptions,
+            task: ClientTask<T>,
+        ): Promise<T> => task(client);
+        const orch = new AgentToolOrchestrator(makeDeps(), runWithClient);
+
+        const result = await orch.getRoomData(100, "dev");
+
+        assert.deepStrictEqual(commands, ["/agent /load room 100", "/sr 100"]);
+        assert.strictEqual(result, "Showing room #100\nFlags: none");
     });
 
     test("getExistenceData throws when dev credentials missing", async () => {
