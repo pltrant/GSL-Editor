@@ -115,6 +115,36 @@ suite("ToolOrchestrator", () => {
         assert.strictEqual(result, "Showing room #100\nFlags: none");
     });
 
+    test("executeAgentCommand anchors output delimiters", async () => {
+        // ANSI prefixes are stripped by the client's OutputProcessor before
+        // lines are matched, so the delimiters stay anchored and reject
+        // delimiter text appearing mid-line.
+        const client = {
+            executeCommand: async (command: string, options: any) => {
+                assert.strictEqual(command, "/agent /example");
+                assert.ok(
+                    options.captureStart.test("<<<beginning of output>>>"),
+                );
+                assert.ok(
+                    !options.captureStart.test("see <<<beginning of output>>>"),
+                );
+                assert.ok(options.captureEnd.test("<<<end of output>>>"));
+                assert.ok(!options.captureEnd.test("see <<<end of output>>>"));
+                return ["example rows"];
+            },
+        } as unknown as EditorClientInterface;
+        const runWithClient = async <T>(
+            _instance: string,
+            _options: InitOptions,
+            task: ClientTask<T>,
+        ): Promise<T> => task(client);
+        const orch = new AgentToolOrchestrator(makeDeps(), runWithClient);
+
+        const result = await orch.executeAgentCommand("/example", "dev");
+
+        assert.strictEqual(result, "example rows");
+    });
+
     test("getExistenceData throws when dev credentials missing", async () => {
         const orch = new AgentToolOrchestrator(makeDeps(depsWithout("dev")));
         await assert.rejects(() => orch.getExistenceData(200, "dev"), {

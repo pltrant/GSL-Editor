@@ -1016,7 +1016,13 @@ class EditorClient extends BaseGameClient {
     }
 }
 
-class OutputProcessor {
+// Matches ANSI escape sequences — CSI (e.g. "\x1b[0m"), OSC (e.g.
+// "\x1b]0;title\x07"), and other ECMA-48 escapes (e.g. "\x1b=",
+// "\x1b(B") — so they can be stripped before lines reach
+// pattern-matching handlers.
+const rx_ansi = /\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)?|[ -/]*[0-~])/g;
+
+export class OutputProcessor {
     private buffer: string;
     private handler: (text: string) => void;
     constructor(handler: (text: string) => void) {
@@ -1029,7 +1035,7 @@ class OutputProcessor {
             nl = this.buffer.indexOf("\r\n");
         while (nl > -1) {
             let line = this.buffer.substring(last + 2, nl);
-            this.handler(line);
+            this.handler(line.replace(rx_ansi, ""));
             last = nl;
             nl = this.buffer.indexOf("\r\n", nl + 2);
         }
