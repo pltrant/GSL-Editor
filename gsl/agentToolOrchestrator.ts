@@ -85,8 +85,7 @@ export class AgentToolOrchestrator {
         captureStart: RegExp,
         captureEnd: RegExp,
         abortPattern: RegExp,
-        includeStartLine: boolean,
-        includeEndLine: boolean,
+        { includeStartLine = true, includeEndLine = true } = {},
     ): Promise<string> {
         const TIMEOUT_MS = 15000;
         const lines = await client.executeCommand(command, {
@@ -115,8 +114,7 @@ export class AgentToolOrchestrator {
                 captureStart,
                 captureEnd,
                 abortPattern,
-                includeStartLine,
-                includeEndLine,
+                { includeStartLine, includeEndLine },
             );
 
         return this.withClient(instance, task);
@@ -140,8 +138,6 @@ export class AgentToolOrchestrator {
                 /^Showing room #\d+/,
                 /^Flags:/,
                 /does not exist or could not be loaded for some reason/,
-                true,
-                true,
             );
         });
     }
@@ -195,8 +191,7 @@ export class AgentToolOrchestrator {
             /^<<<beginning of output>>>/,
             /^<<<end of output>>>/,
             /(?!)/,
-            false,
-            false,
+            { includeStartLine: false, includeEndLine: false },
         );
     }
 
@@ -212,8 +207,6 @@ export class AgentToolOrchestrator {
                 /^Information about the verb /,
                 /^On /,
                 /does not exist\.$/,
-                true,
-                true,
             ),
         );
     }
@@ -227,8 +220,6 @@ export class AgentToolOrchestrator {
                 /^Game: /,
                 /^On |^Unspecified Date/,
                 /^Invalid script/,
-                true,
-                true,
             ),
         );
     }
@@ -244,8 +235,6 @@ export class AgentToolOrchestrator {
                 /^Table \[\d+\] Header Information/,
                 /^\s+Table Type:/,
                 /^ERROR:.*Trouble loading table/,
-                true,
-                true,
             ),
         );
     }
