@@ -174,13 +174,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     {
         name: "gsl_get_room_data",
         description:
-            "Sends the /sr command to the game server for a given room ID and returns the " +
-            "full room data output, including room name, varfields aka properties, flags, " +
-            "and directions. This does NOT show objects currently in the room, except those " +
-            "explicitly linked in the room description texts. Existence IDs referenced in " +
-            "room text (e.g. $+$-516105D) are PID'd (permanent) and therefore negative — " +
-            "always preserve the negative sign when using them with other tools such as " +
-            "`gsl_get_existence_data`. Can target any server instance. Defaults to Dev.",
+            "Loads the segment for a given room ID, sends the /sr command to the game " +
+            "server, and returns the full room data output, including room name, varfields " +
+            "aka properties, flags, and directions. This does NOT show objects currently " +
+            "in the room, except those explicitly linked in the room description texts. " +
+            "Existence IDs referenced in room text (e.g. $+$-516105D) are PID'd " +
+            "(permanent) and therefore negative — always preserve the negative sign when " +
+            "using them with other tools such as `gsl_get_existence_data`. Can target any " +
+            "server instance. Defaults to Dev.",
         vscode: {
             displayName: "Get Room Data",
             toolReferenceName: "gsl-get-room-data",

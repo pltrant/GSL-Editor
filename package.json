@@ -277,7 +277,7 @@
                 "canBeReferencedInPrompt": true,
                 "icon": "$(map)",
                 "userDescription": "Retrieves room data from the game server.",
-                "modelDescription": "Sends the /sr command to the game server for a given room ID and returns the full room data output, including room name, varfields aka properties, flags, and directions. This does NOT show objects currently in the room, except those explicitly linked in the room description texts. Existence IDs referenced in room text (e.g. $+$-516105D) are PID'd (permanent) and therefore negative — always preserve the negative sign when using them with other tools such as `gsl_get_existence_data`. Can target any server instance. Defaults to Dev.",
+                "modelDescription": "Loads the segment for a given room ID, sends the /sr command to the game server, and returns the full room data output, including room name, varfields aka properties, flags, and directions. This does NOT show objects currently in the room, except those explicitly linked in the room description texts. Existence IDs referenced in room text (e.g. $+$-516105D) are PID'd (permanent) and therefore negative — always preserve the negative sign when using them with other tools such as `gsl_get_existence_data`. Can target any server instance. Defaults to Dev.",
                 "inputSchema": {
                     "type": "object",
                     "required": [

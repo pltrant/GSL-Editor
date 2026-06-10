@@ -34,7 +34,10 @@ export interface AgentToolOrchestratorDeps {
 // ---------------------------------------------------------------------------
 
 export class AgentToolOrchestrator {
-    constructor(private deps: AgentToolOrchestratorDeps) {}
+    constructor(
+        private deps: AgentToolOrchestratorDeps,
+        private runWithClient: typeof withClientForInstance = withClientForInstance,
+    ) {}
 
     get downloadLocation(): string {
         return this.deps.downloadLocation;
@@ -67,7 +70,7 @@ export class AgentToolOrchestrator {
         instance: GameInstance,
         task: ClientTask<T>,
     ): Promise<T> {
-        return withClientForInstance(
+        return this.runWithClient(
             instance,
             await this.initOptionsFor(instance),
             task,
@@ -82,8 +85,7 @@ export class AgentToolOrchestrator {
         captureStart: RegExp,
         captureEnd: RegExp,
         abortPattern: RegExp,
-        includeStartLine: boolean,
-        includeEndLine: boolean,
+        { includeStartLine = true, includeEndLine = true } = {},
     ): Promise<string> {
         const TIMEOUT_MS = 15000;
         const lines = await client.executeCommand(command, {
@@ -112,8 +114,7 @@ export class AgentToolOrchestrator {
                 captureStart,
                 captureEnd,
                 abortPattern,
-                includeStartLine,
-                includeEndLine,
+                { includeStartLine, includeEndLine },
             );
 
         return this.withClient(instance, task);
@@ -126,13 +127,19 @@ export class AgentToolOrchestrator {
     }
 
     async getRoomData(roomId: number, instance: GameInstance): Promise<string> {
-        return this.executeShowCommandOnInstance(
-            instance,
-            `/sr ${roomId}`,
-            /^Showing room #\d+/,
-            /^Flags:/,
-            /does not exist or could not be loaded for some reason/,
-        );
+        return this.withClient(instance, async (client) => {
+            await this.executeAgentCommandWithClient(
+                client,
+                `/load room ${roomId}`,
+            );
+            return this.executeShowCommand(
+                client,
+                `/sr ${roomId}`,
+                /^Showing room #\d+/,
+                /^Flags:/,
+                /does not exist or could not be loaded for some reason/,
+            );
+        });
     }
 
     async getExistenceData(
@@ -168,9 +175,18 @@ export class AgentToolOrchestrator {
         instance: GameInstance,
     ): Promise<string> {
         throwOnControlCharacters(command);
-        const fullCommand = command ? `/agent ${command}` : `/agent`;
-        return this.executeShowCommandOnInstance(
-            instance,
+        return this.withClient(instance, (client) =>
+            this.executeAgentCommandWithClient(client, command),
+        );
+    }
+
+    private async executeAgentCommandWithClient(
+        client: EditorClientInterface,
+        command: string,
+    ): Promise<string> {
+        const fullCommand = command ? `/agent ${command}` : "/agent";
+        return this.executeShowCommand(
+            client,
             fullCommand,
             /^<<<beginning of output>>>/,
             /^<<<end of output>>>/,
@@ -191,8 +207,6 @@ export class AgentToolOrchestrator {
                 /^Information about the verb /,
                 /^On /,
                 /does not exist\.$/,
-                true,
-                true,
             ),
         );
     }
@@ -206,8 +220,6 @@ export class AgentToolOrchestrator {
                 /^Game: /,
                 /^On |^Unspecified Date/,
                 /^Invalid script/,
-                true,
-                true,
             ),
         );
     }
@@ -223,8 +235,6 @@ export class AgentToolOrchestrator {
                 /^Table \[\d+\] Header Information/,
                 /^\s+Table Type:/,
                 /^ERROR:.*Trouble loading table/,
-                true,
-                true,
             ),
         );
     }

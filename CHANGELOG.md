@@ -2,6 +2,13 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.21.1] - 2026-06-09
+
+### Fixed
+
+- Room data lookups now load the target room's segment before running `/sr`.
+- Internal bug fixes / cleanup.
+
 ## [1.21.0] - 2026-05-27
 
 ### Added
