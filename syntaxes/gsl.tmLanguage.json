@@ -473,7 +473,7 @@
 				{
 					"name": "token.gsl.xml",
 					"begin": "\\$<",
-					"end": "\\$>",
+					"end": "\\$>|(?=\")",
 					"patterns": [
 						{
 							"name": "token.gsl.xml.attribute",
