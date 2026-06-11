@@ -1020,7 +1020,8 @@ class EditorClient extends BaseGameClient {
 // "\x1b]0;title\x07"), and other ECMA-48 escapes (e.g. "\x1b=",
 // "\x1b(B") — so they can be stripped before lines reach
 // pattern-matching handlers.
-const rx_ansi = /\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)?|[ -/]*[0-~])/g;
+const rx_ansi =
+    /\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)?|[ -/]*[0-~])/g;
 
 export class OutputProcessor {
     private buffer: string;
