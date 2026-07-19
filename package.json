@@ -2,7 +2,7 @@
     "name": "gsl",
     "displayName": "GSL",
     "description": "GSL Editor",
-    "version": "1.21.1",
+    "version": "1.21.2",
     "publisher": "patricktrant",
     "author": {
         "name": "Patrick Trant",
@@ -137,6 +137,11 @@
             {
                 "command": "gsl.openLoginConfigFile",
                 "title": "Open Login Config File",
+                "category": "GSL"
+            },
+            {
+                "command": "gsl.installMcpServer",
+                "title": "Install MCP Server",
                 "category": "GSL"
             }
         ],

@@ -4,6 +4,11 @@ All notable changes to the GSL Editor extension will be documented in this file.
 
 ## [1.21.2] - 2026-07-19
 
+### Added
+
+- Added an explicit command to install the bundled MCP server at a remembered
+  user-selected path.
+
 ### Fixed
 
 - DR compile checks now use the correct game-specific safety script.

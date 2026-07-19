@@ -47,7 +47,12 @@ like Claude Code, Codex CLI, or any MCP-compatible client.
 
 1. Run **GSL: User Setup** (`Ctrl+Shift+P` → `GSL: User Setup`) at least once.
    This creates a login config file (typically `~/.gsl/loginConfig.json`).
-2. Note the path to that file — you'll need it below.
+2. Run **GSL: Install MCP Server**. The suggested install path is beside the
+   login config file (typically `~/.gsl/mcpServer.bundle.js`). You can choose a
+   different existing folder, and that path is suggested the next time the
+   command runs. Run the command again after updating the extension to install
+   the latest server.
+3. Note the paths to those files — you'll need them below.
 
 ### Configuration
 

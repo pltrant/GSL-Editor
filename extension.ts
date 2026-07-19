@@ -66,6 +66,7 @@ import { runCopilotCodeReviewCommand } from "./gsl/commands/copilotCodeReview";
 import * as primeService from "./gsl/prime/primeService";
 import { GameInstance, LoginCredentials } from "./gsl/agentToolOrchestrator";
 import { registerNativeTools } from "./gsl/commands/registerNativeTools";
+import { runInstallMcpServerCommand } from "./gsl/commands/installMcpServer";
 
 const rx_script_number = /^\d{1,6}$/;
 const rx_script_number_in_filename = /(\d+)\.gsl/;
@@ -516,6 +517,10 @@ export class VSCodeIntegration {
                 label: "Open Login Config File",
                 name: "gsl.openLoginConfigFile",
             },
+            {
+                label: "Install MCP Server",
+                name: "gsl.installMcpServer",
+            },
         ];
 
         this.outputChannel = window.createOutputChannel("GSL Editor (debug)");
@@ -801,6 +806,13 @@ export class VSCodeIntegration {
         }
         const doc = await workspace.openTextDocument(filePath);
         await window.showTextDocument(doc);
+    }
+
+    private async commandInstallMcpServer() {
+        await runInstallMcpServerCommand({
+            context: this.context,
+            loginConfigPath: GSLExtension.getLoginConfigPath(),
+        });
     }
 
     private async commandCheckDate() {
@@ -1548,6 +1560,12 @@ export class VSCodeIntegration {
             this,
         );
         this.context.subscriptions.push(subscription);
+        subscription = commands.registerCommand(
+            "gsl.installMcpServer",
+            this.commandInstallMcpServer,
+            this,
+        );
+        this.context.subscriptions.push(subscription);
     }
 
     /* public api */
@@ -1808,25 +1826,6 @@ export async function activate(context: ExtensionContext) {
         languages.createDiagnosticCollection("gsl-line-length");
     context.subscriptions.push(lineLengthDiagnostics);
     subscribeToDocumentChanges(context, lineLengthDiagnostics);
-
-    // Copy the MCP server bundle to a stable, version-independent path
-    // alongside the login config file so external consumers (Claude Code,
-    // Codex CLI, etc.) don't break when the extension is updated.
-    const loginConfigPath = GSLExtension.getLoginConfigPath();
-    if (loginConfigPath) {
-        const stableBundlePath = path.join(
-            path.dirname(loginConfigPath),
-            "mcpServer.bundle.js",
-        );
-        const sourceBundlePath = context.asAbsolutePath(
-            "gsl/mcp/mcpServer.bundle.js",
-        );
-        try {
-            fs.copyFileSync(sourceBundlePath, stableBundlePath);
-        } catch (e) {
-            console.error("Failed to copy MCP bundle to stable path:", e);
-        }
-    }
 
     // Register all GSL tools as native VS Code language model tools so
     // Copilot can invoke them without requiring the MCP server.
