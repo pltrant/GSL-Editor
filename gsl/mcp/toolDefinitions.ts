@@ -129,9 +129,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             "Use this tool whenever the task is to check, compile, or validate GSL script " +
             "compiler errors/warnings. It compiles a local GSL script file on the development server " +
             "and returns compiler output, including line-level errors and warnings, so the " +
-            "model can diagnose and fix compilation problems. The file is uploaded to an " +
-            "ephemeral compilation slot (script 24661). Use this tool when writing scripts " +
-            "or verifying GSL syntax.",
+            "model can diagnose and fix compilation problems. The file is uploaded to the " +
+            "game-specific compilation slot (script 24661 in GemStone or 16224 in " +
+            "DragonRealms). Use this tool when writing scripts or verifying GSL syntax.",
         vscode: {
             displayName: "Compile Check GSL Script",
             toolReferenceName: "gsl-compile-check",

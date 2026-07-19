@@ -2,6 +2,12 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.21.2] - 2026-07-19
+
+### Fixed
+
+- DR compile checks now use the correct game-specific safety script.
+
 ## [1.21.1] - 2026-06-11
 
 ### Fixed

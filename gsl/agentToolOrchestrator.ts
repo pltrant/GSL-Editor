@@ -253,18 +253,21 @@ export class AgentToolOrchestrator {
     // -- compile check -----------------------------------------------------
 
     /**
-     * Uploads script content to the safety script (S24661) on the dev server
-     * for compilation, and returns the compile results.
+     * Uploads script content to the game's safety script on the dev server for
+     * compilation, and returns the compile results.
      */
     async uploadAndCompileScript(
         content: string,
     ): Promise<ScriptCompileResults> {
-        const SAFETY_SCRIPT = 24661;
         if (!content || content.match(/^\s*$/)) {
             throw new Error("Cannot upload an empty script file.");
         }
-        return this.withClient("dev", async (client) => {
-            const props = await client.modifyScript(SAFETY_SCRIPT, true);
+        const initOptions = await this.initOptionsFor("dev");
+        const safetyScript = initOptions.login.instance.startsWith("DR")
+            ? 16224
+            : 24661;
+        return this.runWithClient("dev", initOptions, async (client) => {
+            const props = await client.modifyScript(safetyScript, true);
             try {
                 const lines = content.split(/\r?\n/);
                 if (lines[lines.length - 1] !== "") {

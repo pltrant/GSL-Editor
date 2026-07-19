@@ -149,7 +149,7 @@ function formatCompileResults(
                   .join("\n")
             : "(No line-level compiler errors were captured.)";
         return [
-            `Compile failed for ${filename} (uploaded as script ${compileResults.script || 24661}).`,
+            `Compile failed for ${filename} (uploaded as script ${compileResults.script}).`,
             `Errors: ${compileResults.errors}, warnings: ${compileResults.warnings}.`,
             "",
             messages,
@@ -160,7 +160,7 @@ function formatCompileResults(
     if (compileResults.status === 4) {
         const bytesRemaining = compileResults.maxBytes - compileResults.bytes;
         return [
-            `Compile OK for ${filename} (uploaded as script ${compileResults.script || 24661}).`,
+            `Compile OK for ${filename} (uploaded as script ${compileResults.script}).`,
             `Warnings: ${compileResults.warnings}.`,
             `Size: ${compileResults.bytes.toLocaleString()} bytes (${bytesRemaining.toLocaleString()} bytes remaining).`,
             compileResults.path ? `Server path: ${compileResults.path}` : "",
