@@ -2,7 +2,7 @@
     "name": "gsl",
     "displayName": "GSL",
     "description": "GSL Editor",
-    "version": "1.21.0",
+    "version": "1.21.2",
     "publisher": "patricktrant",
     "author": {
         "name": "Patrick Trant",
@@ -138,6 +138,11 @@
                 "command": "gsl.openLoginConfigFile",
                 "title": "Open Login Config File",
                 "category": "GSL"
+            },
+            {
+                "command": "gsl.installMcpServer",
+                "title": "Install MCP Server",
+                "category": "GSL"
             }
         ],
         "_languageModelTools_WARNING": "DO NOT EDIT languageModelTools — auto-generated from gsl/mcp/toolDefinitions.ts by scripts/syncToolsToPackageJson.js",
@@ -243,7 +248,7 @@
                 "canBeReferencedInPrompt": true,
                 "icon": "$(check-all)",
                 "userDescription": "Compiles a GSL script and returns errors/warnings.",
-                "modelDescription": "Use this tool whenever the task is to check, compile, or validate GSL script compiler errors/warnings. It compiles a local GSL script file on the development server and returns compiler output, including line-level errors and warnings, so the model can diagnose and fix compilation problems. The file is uploaded to an ephemeral compilation slot (script 24661). Use this tool when writing scripts or verifying GSL syntax.",
+                "modelDescription": "Use this tool whenever the task is to check, compile, or validate GSL script compiler errors/warnings. It compiles a local GSL script file on the development server and returns compiler output, including line-level errors and warnings, so the model can diagnose and fix compilation problems. The file is uploaded to the game-specific compilation slot (script 24661 in GemStone or 16224 in DragonRealms). Use this tool when writing scripts or verifying GSL syntax.",
                 "inputSchema": {
                     "type": "object",
                     "required": [
