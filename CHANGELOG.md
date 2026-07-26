@@ -2,16 +2,28 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
-## [1.21.2] - 2026-07-19
+## [1.21.2] - 2026-07-26
 
 ### Added
 
-- Added an explicit command to install the bundled MCP server at a remembered
-  user-selected path.
+- Added `GSL: Install MCP Server` to install the bundled MCP server at a
+  remembered user-selected path.
+
+### Changed
+
+- The external MCP server bundle is no longer copied automatically during
+  extension startup. Rerun `GSL: Install MCP Server` after extension updates.
 
 ### Fixed
 
 - DR compile checks now use the correct game-specific safety script.
+- Fixed `GSL: Diff with Live Server` in DR.
+
+### Internal
+
+- Updated esbuild and transitive Hono, body-parser, and fast-uri dependencies.
+- Patched known vulnerabilities in `@hono/node-server`, `brace-expansion`,
+  `js-yaml`, and `serialize-javascript`.
 
 ## [1.21.1] - 2026-06-11
 
