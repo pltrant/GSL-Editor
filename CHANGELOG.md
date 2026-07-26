@@ -2,7 +2,7 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
-## [1.21.2] - 2026-07-19
+## [1.21.3] - 2026-07-26
 
 ### Added
 
@@ -12,6 +12,7 @@ All notable changes to the GSL Editor extension will be documented in this file.
 ### Fixed
 
 - DR compile checks now use the correct game-specific safety script.
+- Fix "GSL: Diff with Live Server" command in DR.
 
 ## [1.21.1] - 2026-06-11
 
