@@ -2,7 +2,7 @@
     "name": "gsl",
     "displayName": "GSL",
     "description": "GSL Editor",
-    "version": "1.21.2",
+    "version": "1.21.1",
     "publisher": "patricktrant",
     "author": {
         "name": "Patrick Trant",
@@ -47,8 +47,11 @@
         "typescript": "^5.1.6"
     },
     "overrides": {
+        "@hono/node-server": "^2.0.5",
+        "brace-expansion": "^5.0.8",
+        "js-yaml": "^4.3.0",
         "minimatch": "^10.0.1",
-        "serialize-javascript": "^7.0.3",
+        "serialize-javascript": "^7.0.5",
         "diff": "^8.0.3"
     },
     "scripts": {
