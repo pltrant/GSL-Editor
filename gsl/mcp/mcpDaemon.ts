@@ -21,6 +21,8 @@ import * as os from "os";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
+    JSONRPCRequest,
+    RequestId,
     CallToolRequestSchema,
     ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
@@ -123,17 +125,136 @@ export function tryConnectToDaemon(): Promise<net.Socket | undefined> {
     });
 }
 
-/**
- * Proxy mode: forward stdin/stdout to/from the daemon socket.
- * The process exits when the connection closes.
- */
-export function runAsProxy(socket: net.Socket): void {
-    process.stdin.pipe(socket);
-    socket.pipe(process.stdout);
+/** Keeps the harness session open across daemon restarts; never replays tools. */
+export async function runAsProxy(
+    socket: net.Socket,
+    connectDaemon: () => Promise<net.Socket>,
+): Promise<void> {
+    const frontend = new StdioServerTransport();
+    const pending = new Set<RequestId>();
+    let initialize: JSONRPCRequest | undefined;
+    let backend: StdioServerTransport;
+    let ready = false;
+    let recovering = false;
 
-    socket.on("close", () => process.exit(0));
-    socket.on("error", () => process.exit(1));
-    process.stdin.on("end", () => socket.end());
+    function failRequest(id: RequestId, message: string) {
+        void frontend.send({
+            jsonrpc: "2.0",
+            id,
+            error: { code: -32000, message },
+        });
+    }
+
+    async function attach(next: net.Socket): Promise<void> {
+        socket = next;
+        backend = new StdioServerTransport(next, next);
+        const transport = backend;
+        await new Promise<void>((resolve, reject) => {
+            const timer = setTimeout(() => {
+                reject(new Error("Daemon initialization timed out."));
+                next.destroy();
+            }, 10_000);
+            let initializing = recovering && initialize !== undefined;
+            transport.onmessage = (message) => {
+                if (
+                    initializing &&
+                    "id" in message &&
+                    message.id === initialize?.id &&
+                    !("method" in message)
+                ) {
+                    if ("error" in message) {
+                        reject(new Error("Daemon initialization failed."));
+                        next.destroy();
+                        return;
+                    }
+                    void transport.send({
+                        jsonrpc: "2.0",
+                        method: "notifications/initialized",
+                    });
+                    initializing = false;
+                    ready = true;
+                    clearTimeout(timer);
+                    resolve();
+                    return;
+                }
+                if (
+                    "id" in message &&
+                    message.id !== undefined &&
+                    !("method" in message)
+                )
+                    pending.delete(message.id);
+                void frontend.send(message);
+            };
+            transport.onerror = () => next.destroy();
+            next.on("error", () => next.destroy());
+            next.on("close", () => {
+                clearTimeout(timer);
+                void transport.close();
+                reject(new Error("Daemon disconnected during initialization."));
+                if (socket !== next) return;
+                ready = false;
+                for (const id of pending) {
+                    failRequest(
+                        id,
+                        "Daemon disconnected; operation outcome is unknown. Request was not replayed.",
+                    );
+                }
+                pending.clear();
+                if (!recovering) void recover();
+            });
+            void transport.start().then(() => {
+                if (initializing) {
+                    void transport.send(initialize!);
+                } else {
+                    ready = true;
+                    clearTimeout(timer);
+                    resolve();
+                }
+            });
+        });
+    }
+
+    async function recover() {
+        recovering = true;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            await new Promise((resolve) =>
+                setTimeout(resolve, 250 * 2 ** attempt),
+            );
+            try {
+                await attach(await connectDaemon());
+                if (socket.destroyed) throw new Error("Daemon disconnected.");
+                recovering = false;
+                return;
+            } catch {
+                socket.destroy();
+            }
+        }
+        console.error(
+            "[gsl-mcp] Daemon reconnect failed after 3 attempts; restart the MCP connection.",
+        );
+        process.exit(1);
+    }
+
+    frontend.onmessage = (message) => {
+        if (!ready || socket.destroyed) {
+            if ("id" in message && "method" in message) {
+                failRequest(
+                    message.id,
+                    "Daemon is reconnecting; request was not sent.",
+                );
+            }
+            return;
+        }
+        if ("id" in message && "method" in message) {
+            pending.add(message.id);
+            if (message.method === "initialize") initialize = message;
+        }
+        void backend.send(message);
+    };
+    frontend.onerror = () => process.exit(1);
+    process.stdin.on("end", () => process.exit(0));
+    await attach(socket);
+    await frontend.start();
 }
 
 // ---------------------------------------------------------------------------

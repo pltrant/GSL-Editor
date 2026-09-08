@@ -1,6 +1,7 @@
 import * as assert from "assert";
 import * as fs from "fs";
 import * as os from "os";
+import * as net from "net";
 import * as path from "path";
 import { spawn, ChildProcessWithoutNullStreams } from "child_process";
 import { createInterface } from "readline";
@@ -166,6 +167,132 @@ suite("MCP daemon process isolation", function () {
         } finally {
             await Promise.all(clients.map((client) => client.stop("SIGKILL")));
             fs.rmSync(home, { recursive: true, force: true });
+        }
+    });
+    test("proxies reinitialize after disconnect and never replay interrupted calls", async () => {
+        const directory = fs.mkdtempSync(
+            path.join(os.tmpdir(), "gsl-reconnect-"),
+        );
+        const socketPath =
+            process.platform === "win32"
+                ? `\\\\.\\pipe\\gsl-reconnect-${process.pid}`
+                : path.join(directory, "daemon.sock");
+        const sockets = new Set<net.Socket>();
+        let initialized = 0;
+        let calls = 0;
+        let rejectInitialization = false;
+        const fakeDaemon = net.createServer((socket) => {
+            sockets.add(socket);
+            socket.on("error", () => {});
+            socket.on("close", () => sockets.delete(socket));
+            let ready = false;
+            createInterface({ input: socket }).on("line", (line) => {
+                const message = JSON.parse(line);
+                if (message.method === "initialize") {
+                    socket.write(
+                        JSON.stringify({
+                            jsonrpc: "2.0",
+                            id: message.id,
+                            ...(rejectInitialization
+                                ? {
+                                      error: {
+                                          code: -32603,
+                                          message: "unavailable",
+                                      },
+                                  }
+                                : {
+                                      result: {
+                                          protocolVersion: "2024-11-05",
+                                          capabilities: {},
+                                          serverInfo: {
+                                              name: "test",
+                                              version: "1",
+                                          },
+                                      },
+                                  }),
+                        }) + "\n",
+                    );
+                } else if (message.method === "notifications/initialized") {
+                    ready = true;
+                    initialized++;
+                } else if (message.method === "tools/call") {
+                    assert.ok(
+                        ready,
+                        "tool forwarded before session initialization",
+                    );
+                    calls++;
+                    if (message.params.name === "hang") return;
+                    socket.write(
+                        JSON.stringify({
+                            jsonrpc: "2.0",
+                            id: message.id,
+                            result: {
+                                content: [
+                                    { type: "text", text: "Test/Author" },
+                                ],
+                            },
+                        }) + "\n",
+                    );
+                }
+            });
+        });
+        await new Promise<void>((resolve) =>
+            fakeDaemon.listen(socketPath, resolve),
+        );
+        const env = {
+            ...process.env,
+            ELECTRON_RUN_AS_NODE: "1",
+            GSL_MCP_SOCKET_PATH: socketPath,
+        };
+        const clients = [new McpProcess(env), new McpProcess(env)];
+        async function waitUntil(check: () => boolean) {
+            const deadline = Date.now() + 5000;
+            while (!check()) {
+                assert.ok(
+                    Date.now() < deadline,
+                    "reconnect condition timed out",
+                );
+                await new Promise((resolve) => setTimeout(resolve, 20));
+            }
+        }
+        try {
+            await Promise.all(clients.map((client) => client.initialize()));
+            await waitUntil(() => initialized === 2);
+            const interrupted = clients.map((client) =>
+                assert.rejects(
+                    client.request("tools/call", { name: "hang" }),
+                    /outcome is unknown.*not replayed/,
+                ),
+            );
+            await waitUntil(() => calls === 2);
+            for (const socket of sockets) socket.destroy();
+            await Promise.all(interrupted);
+            await assert.rejects(
+                clients[0].author(),
+                /reconnecting; request was not sent/,
+            );
+            await waitUntil(() => initialized === 4);
+            await Promise.all(clients.map((client) => client.author()));
+            assert.strictEqual(
+                calls,
+                4,
+                "interrupted calls must not be replayed",
+            );
+            // Repeated reconnect failures must eventually terminate the shim.
+            rejectInitialization = true;
+            for (const socket of sockets) socket.destroy();
+            await waitUntil(() =>
+                clients.every((client) => client.child.exitCode !== null),
+            );
+            for (const client of clients)
+                assert.strictEqual(client.child.exitCode, 1);
+        } finally {
+            await Promise.all(clients.map((client) => client.stop("SIGKILL")));
+            for (const socket of sockets) socket.destroy();
+            await new Promise<void>((resolve) =>
+                fakeDaemon.close(() => resolve()),
+            );
+            fs.rmSync(directory, { recursive: true, force: true });
         }
     });
 });

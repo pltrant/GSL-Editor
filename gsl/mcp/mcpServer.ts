@@ -51,38 +51,45 @@ async function main() {
     // Every harness owns only a proxy. The detached daemon must outlive the
     // harness that first starts it (including SIGTERM/SIGKILL of that proxy).
     if (!process.argv.includes("--daemon")) {
-        let socket = await tryConnectToDaemon();
-        if (!socket) {
-            const logDir = path.join(os.homedir(), ".gsl");
-            fs.mkdirSync(logDir, { recursive: true, mode: 0o700 });
-            const logPath = path.join(logDir, "mcp-daemon.log");
-            const logFd = fs.openSync(logPath, "a", 0o600);
-            const child = spawn(process.execPath, [__filename, "--daemon"], {
-                detached: true,
-                stdio: ["ignore", "ignore", logFd],
-                env: process.env,
-                windowsHide: true,
-            });
-            fs.closeSync(logFd);
-            let spawnError: Error | undefined;
-            child.on("error", (error) => {
-                spawnError = error;
-            });
-            child.unref();
-
-            const deadline = Date.now() + 10_000;
-            while (!socket && Date.now() < deadline) {
-                if (spawnError) throw spawnError;
-                await new Promise((resolve) => setTimeout(resolve, 100));
-                socket = await tryConnectToDaemon();
-            }
+        async function connectDaemon() {
+            let socket = await tryConnectToDaemon();
             if (!socket) {
-                throw new Error(
-                    `Daemon did not become reachable. See ${logPath}`,
+                const logDir = path.join(os.homedir(), ".gsl");
+                fs.mkdirSync(logDir, { recursive: true, mode: 0o700 });
+                const logPath = path.join(logDir, "mcp-daemon.log");
+                const logFd = fs.openSync(logPath, "a", 0o600);
+                const child = spawn(
+                    process.execPath,
+                    [__filename, "--daemon"],
+                    {
+                        detached: true,
+                        stdio: ["ignore", "ignore", logFd],
+                        env: process.env,
+                        windowsHide: true,
+                    },
                 );
+                fs.closeSync(logFd);
+                let spawnError: Error | undefined;
+                child.on("error", (error) => {
+                    spawnError = error;
+                });
+                child.unref();
+
+                const deadline = Date.now() + 10_000;
+                while (!socket && Date.now() < deadline) {
+                    if (spawnError) throw spawnError;
+                    await new Promise((resolve) => setTimeout(resolve, 100));
+                    socket = await tryConnectToDaemon();
+                }
+                if (!socket) {
+                    throw new Error(
+                        `Daemon did not become reachable. See ${logPath}`,
+                    );
+                }
             }
+            return socket;
         }
-        runAsProxy(socket);
+        await runAsProxy(await connectDaemon(), connectDaemon);
         return;
     }
 
