@@ -2,9 +2,8 @@
  * Singleton daemon coordination for the GSL MCP Server.
  *
  * Ensures only one process holds game client connections at a time.
- * The first MCP server process becomes the daemon (also serving its own
- * stdio client). Subsequent processes detect the daemon via a socket path
- * and run as thin proxies, piping stdio directly to the daemon.
+ * All MCP harness processes are proxies. A detached daemon owns game clients,
+ * so terminating any one harness cannot disconnect the others.
  *
  * Cross-platform:
  *   - Windows: Named pipe (\\.\pipe\gsl-mcp-daemon) — kernel-managed lifecycle
@@ -12,7 +11,7 @@
  *
  * Daemon election is atomic: listen() on the socket path either succeeds
  * (you are the daemon) or fails with EADDRINUSE (connect as proxy).
- * No lockfile, no TOCTOU race.
+ * Stale Unix socket cleanup checks file identity before removing a refused socket.
  */
 
 import * as net from "net";
@@ -32,9 +31,10 @@ import {
 
 const SOCKET_DIR = path.join(os.homedir(), ".gsl");
 const SOCKET_PATH =
-    process.platform === "win32"
+    process.env.GSL_MCP_SOCKET_PATH ??
+    (process.platform === "win32"
         ? `\\\\.\\pipe\\gsl-mcp-daemon-${os.userInfo().username}`
-        : path.join(SOCKET_DIR, "mcp-daemon.sock");
+        : path.join(SOCKET_DIR, "mcp-daemon.sock"));
 
 /** Grace period before daemon exits after all clients disconnect. */
 const IDLE_TIMEOUT_MS = 30_000;
@@ -57,10 +57,11 @@ function cleanStaleSocket(): Promise<void> {
             resolve();
             return;
         }
+        const staleSocket = fs.statSync(SOCKET_PATH, { throwIfNoEntry: false });
         const probe = net.connect(SOCKET_PATH);
         const timeout = setTimeout(() => {
             probe.destroy();
-            tryUnlink();
+            // A busy daemon is not evidence of a stale socket.
             resolve();
         }, CONNECT_TIMEOUT_MS);
         probe.on("connect", () => {
@@ -71,17 +72,20 @@ function cleanStaleSocket(): Promise<void> {
         });
         probe.on("error", (err: NodeJS.ErrnoException) => {
             clearTimeout(timeout);
-            if (err.code === "ECONNREFUSED" || err.code === "ENOENT") {
-                tryUnlink();
+            if (err.code === "ECONNREFUSED" && staleSocket) {
+                tryUnlink(staleSocket);
             }
             resolve();
         });
     });
 }
 
-function tryUnlink(): void {
+function tryUnlink(owner: fs.Stats): void {
     try {
-        fs.unlinkSync(SOCKET_PATH);
+        const current = fs.statSync(SOCKET_PATH);
+        if (current.dev === owner.dev && current.ino === owner.ino) {
+            fs.unlinkSync(SOCKET_PATH);
+        }
     } catch {
         // Already gone or permission issue — move on.
     }
@@ -89,7 +93,7 @@ function tryUnlink(): void {
 
 function ensureSocketDir(): void {
     if (process.platform === "win32") return;
-    fs.mkdirSync(SOCKET_DIR, { recursive: true, mode: 0o700 });
+    fs.mkdirSync(path.dirname(SOCKET_PATH), { recursive: true, mode: 0o700 });
 }
 
 // ---------------------------------------------------------------------------
@@ -113,6 +117,7 @@ export function tryConnectToDaemon(): Promise<net.Socket | undefined> {
         });
         socket.on("error", () => {
             clearTimeout(timeout);
+            socket.destroy();
             resolve(undefined);
         });
     });
@@ -137,10 +142,6 @@ export function runAsProxy(socket: net.Socket): void {
 
 export interface DaemonHandle {
     socketPath: string;
-    /** Signal that the primary stdio client has disconnected. */
-    notifyStdioClosed(): void;
-    /** Register a callback invoked before the daemon exits due to idle timeout. */
-    onBeforeIdleExit(fn: () => Promise<void>): void;
     /** Shut down the daemon listener and clean up. */
     close(): void;
 }
@@ -175,25 +176,16 @@ export async function startDaemonListener(
     ensureSocketDir();
     await cleanStaleSocket();
 
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
         const clients = new Set<net.Socket>();
-        let stdioClosed = false;
         let idleTimer: NodeJS.Timeout | undefined;
-        let beforeIdleExitHook: (() => Promise<void>) | undefined;
+        let ownedSocket: fs.Stats | undefined;
 
         function checkIdle() {
             clearTimeout(idleTimer);
-            if (clients.size === 0 && stdioClosed) {
-                idleTimer = setTimeout(async () => {
+            if (clients.size === 0) {
+                idleTimer = setTimeout(() => {
                     debugLog("Idle timeout reached, daemon exiting.");
-                    if (beforeIdleExitHook) {
-                        await Promise.race([
-                            beforeIdleExitHook(),
-                            new Promise((r) => setTimeout(r, 5_000)),
-                        ]).catch((e) =>
-                            debugLog("beforeIdleExit hook error:", e),
-                        );
-                    }
                     cleanup();
                     process.exit(0);
                 }, IDLE_TIMEOUT_MS);
@@ -202,10 +194,9 @@ export async function startDaemonListener(
 
         function cleanup() {
             clearTimeout(idleTimer);
-            beforeIdleExitHook = undefined;
             ipcServer.close();
             for (const s of clients) s.destroy();
-            if (process.platform !== "win32") tryUnlink();
+            if (ownedSocket) tryUnlink(ownedSocket);
         }
 
         const ipcServer = net.createServer((socket) => {
@@ -268,27 +259,27 @@ export async function startDaemonListener(
                 resolve(undefined);
             } else {
                 debugLog("Daemon listen error:", err.message);
-                resolve(undefined);
+                reject(err);
             }
         });
 
         ipcServer.listen(SOCKET_PATH, () => {
             debugLog(`Daemon listening on ${SOCKET_PATH}`);
 
+            if (process.platform !== "win32") {
+                ownedSocket = fs.statSync(SOCKET_PATH);
+                fs.chmodSync(SOCKET_PATH, 0o600);
+            }
+            // Start the timer even if the spawning proxy exits before connecting.
+            checkIdle();
+
             // Only register cleanup once we own the socket.
             process.on("exit", () => {
-                if (process.platform !== "win32") tryUnlink();
+                if (ownedSocket) tryUnlink(ownedSocket);
             });
 
             resolve({
                 socketPath: SOCKET_PATH,
-                notifyStdioClosed() {
-                    stdioClosed = true;
-                    checkIdle();
-                },
-                onBeforeIdleExit(fn: () => Promise<void>) {
-                    beforeIdleExitHook = fn;
-                },
                 close: cleanup,
             });
         });

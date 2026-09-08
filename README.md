@@ -76,6 +76,43 @@ Add the server to your MCP client config. Examples:
 }
 ```
 
+### Concurrent agents and character workers
+
+External agents share a detached daemon. Closing or terminating one agent does
+not disconnect the others. The daemon exits 30 seconds after its last client
+closes. Startup errors and optional `GSL_MCP_DEBUG=1` diagnostics are written to
+`~/.gsl/mcp-daemon.log`.
+
+To allow parallel requests on an instance, add character lists to your existing
+login config file, for example:
+
+```json
+{
+  "devInstance": "GS4D",
+  "devCharacters": ["FirstDevCharacter", "SecondDevCharacter"],
+  "primeInstance": "GS4",
+  "primeCharacters": ["FirstPrimeCharacter", "SecondPrimeCharacter"]
+}
+```
+
+The same pattern works for `shatteredCharacters`, `platinumCharacters`, and
+`testCharacters`. Each character uses the configured account and password.
+Existing `devCharacter`, `primeCharacter`, etc. strings still work as a single
+worker; a plural list replaces the corresponding single-character setting. Keep
+single-character settings if you also use the VS Code extension's editor login.
+
+Each worker owns a connection and handles one complete operation at a time.
+Additional requests wait for the next available worker. Failed operations
+release their worker, and the existing connection recovery handles reconnects.
+Upload-and-compile requests use the same worker pool and can run concurrently
+on separate characters.
+
+After updating the installed MCP bundle or changing worker configuration,
+disconnect all MCP clients, allow the daemon to exit, then reconnect. Clients
+with a closed transport must reconnect to recover. `GSL_MCP_SOCKET_PATH` can
+select a separate Unix socket or Windows named pipe for another account/game;
+agents sharing a pool must use the same path and configuration.
+
 ### VS Code Users
 
 If you're using GitHub Copilot in VS Code, the MCP server tools are registered

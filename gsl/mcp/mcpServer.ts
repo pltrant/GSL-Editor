@@ -18,18 +18,13 @@
 
 import * as fs from "fs";
 import * as os from "os";
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import {
-    CallToolRequestSchema,
-    ListToolsRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+import * as path from "path";
+import { spawn } from "child_process";
 import {
     AgentToolOrchestrator,
     AgentToolOrchestratorDeps,
-    LoginCredentials,
-    GameInstance,
 } from "../agentToolOrchestrator.js";
+import { loadLoginConfig } from "./mcpConfig.js";
 import { TOOL_DEFINITIONS, createMcpToolHandler } from "./mcpTools.js";
 import {
     tryConnectToDaemon,
@@ -40,129 +35,6 @@ import {
 // ---------------------------------------------------------------------------
 // Credential loading
 // ---------------------------------------------------------------------------
-
-interface LoginConfigFile {
-    account?: string;
-    devInstance?: string;
-    devCharacter?: string;
-    primeInstance?: string;
-    primeCharacter?: string;
-    shatteredInstance?: string;
-    shatteredCharacter?: string;
-    platinumInstance?: string;
-    platinumCharacter?: string;
-    testInstance?: string;
-    testCharacter?: string;
-    author?: string;
-    downloadPath?: string;
-}
-
-const INSTANCE_FILE_KEYS: Record<
-    GameInstance,
-    { instance: keyof LoginConfigFile; character: keyof LoginConfigFile }
-> = {
-    dev: { instance: "devInstance", character: "devCharacter" },
-    prime: { instance: "primeInstance", character: "primeCharacter" },
-    shattered: {
-        instance: "shatteredInstance",
-        character: "shatteredCharacter",
-    },
-    platinum: {
-        instance: "platinumInstance",
-        character: "platinumCharacter",
-    },
-    test: { instance: "testInstance", character: "testCharacter" },
-};
-
-function loadLoginConfig(): {
-    credentials: Map<GameInstance, LoginCredentials>;
-    author: string | undefined;
-    downloadPath: string;
-    configError: string | undefined;
-} {
-    const loginConfigPath = process.env.GSL_LOGIN_CONFIG_FILE;
-    if (!loginConfigPath) {
-        return {
-            credentials: new Map(),
-            author: undefined,
-            downloadPath: os.tmpdir(),
-            configError:
-                "GSL_LOGIN_CONFIG_FILE environment variable is not set. " +
-                "Point it at your loginConfig.json (typically ~/.gsl/loginConfig.json). " +
-                "Run 'GSL: User Setup' in VS Code to create one, or see the extension README.",
-        };
-    }
-
-    let file: LoginConfigFile = {};
-    if (fs.existsSync(loginConfigPath)) {
-        try {
-            file = JSON.parse(fs.readFileSync(loginConfigPath, "utf8"));
-        } catch (e) {
-            return {
-                credentials: new Map(),
-                author: undefined,
-                downloadPath: os.tmpdir(),
-                configError:
-                    `Failed to parse login config file at ${loginConfigPath}: ` +
-                    `${e instanceof Error ? e.message : e}`,
-            };
-        }
-    } else {
-        return {
-            credentials: new Map(),
-            author: undefined,
-            downloadPath: os.tmpdir(),
-            configError:
-                `Login config file not found at ${loginConfigPath}. ` +
-                "Run 'GSL: User Setup' in VS Code to create one, or see the extension README.",
-        };
-    }
-
-    const account = file.account;
-    const password = process.env.GSL_PASSWORD;
-
-    if (!password) {
-        return {
-            credentials: new Map(),
-            author: undefined,
-            downloadPath: os.tmpdir(),
-            configError:
-                "GSL_PASSWORD environment variable is not set. " +
-                "The MCP server requires GSL_PASSWORD to authenticate with the game server.",
-        };
-    }
-
-    if (!account) {
-        return {
-            credentials: new Map(),
-            author: undefined,
-            downloadPath: os.tmpdir(),
-            configError:
-                'No account configured. Add "account" to your login config file.',
-        };
-    }
-
-    const author = file.author;
-    const downloadPath =
-        process.env.GSL_DOWNLOAD_PATH ?? file.downloadPath ?? os.tmpdir();
-
-    const credentials = new Map<GameInstance, LoginCredentials>();
-
-    for (const [key, cfg] of Object.entries(INSTANCE_FILE_KEYS)) {
-        const instance = file[cfg.instance] as string | undefined;
-        const character = file[cfg.character] as string | undefined;
-        if (instance && character) {
-            credentials.set(key as GameInstance, {
-                account,
-                password,
-                instance,
-                character,
-            });
-        }
-    }
-
-    return { credentials, author, downloadPath, configError: undefined };
-}
 
 // ---------------------------------------------------------------------------
 // Main
@@ -176,13 +48,41 @@ async function main() {
               console.error(`[gsl-mcp ${new Date().toISOString()}]`, ...args)
         : () => {};
 
-    // -----------------------------------------------------------------------
-    // Singleton coordination: if a daemon is already running, become a proxy.
-    // -----------------------------------------------------------------------
-    const existingDaemon = await tryConnectToDaemon();
-    if (existingDaemon) {
-        log("Connected to existing daemon, running as proxy.");
-        runAsProxy(existingDaemon);
+    // Every harness owns only a proxy. The detached daemon must outlive the
+    // harness that first starts it (including SIGTERM/SIGKILL of that proxy).
+    if (!process.argv.includes("--daemon")) {
+        let socket = await tryConnectToDaemon();
+        if (!socket) {
+            const logDir = path.join(os.homedir(), ".gsl");
+            fs.mkdirSync(logDir, { recursive: true, mode: 0o700 });
+            const logPath = path.join(logDir, "mcp-daemon.log");
+            const logFd = fs.openSync(logPath, "a", 0o600);
+            const child = spawn(process.execPath, [__filename, "--daemon"], {
+                detached: true,
+                stdio: ["ignore", "ignore", logFd],
+                env: process.env,
+                windowsHide: true,
+            });
+            fs.closeSync(logFd);
+            let spawnError: Error | undefined;
+            child.on("error", (error) => {
+                spawnError = error;
+            });
+            child.unref();
+
+            const deadline = Date.now() + 10_000;
+            while (!socket && Date.now() < deadline) {
+                if (spawnError) throw spawnError;
+                await new Promise((resolve) => setTimeout(resolve, 100));
+                socket = await tryConnectToDaemon();
+            }
+            if (!socket) {
+                throw new Error(
+                    `Daemon did not become reachable. See ${logPath}`,
+                );
+            }
+        }
+        runAsProxy(socket);
         return;
     }
 
@@ -200,10 +100,56 @@ async function main() {
 
     const orchestrator = new AgentToolOrchestrator(deps);
 
+    let agentHelpText: string | undefined;
+
+    // Build handler lookup
+    const handlers = new Map<
+        string,
+        (args: Record<string, unknown>) => Promise<{
+            content: Array<{ type: "text"; text: string }>;
+            isError?: boolean;
+        }>
+    >();
+    for (const def of TOOL_DEFINITIONS) {
+        if (configError) {
+            // Server starts but every tool reports the config problem
+            handlers.set(def.name, async () => ({
+                content: [{ type: "text" as const, text: configError }],
+                isError: true,
+            }));
+        } else {
+            handlers.set(
+                def.name,
+                createMcpToolHandler(def.name, orchestrator),
+            );
+        }
+    }
+
+    function getToolList() {
+        return TOOL_DEFINITIONS.map((def) => ({
+            name: def.name,
+            description:
+                def.name === "gsl_slash_agent_command" && agentHelpText
+                    ? def.description +
+                      "\n\nLast seen /agent output on dev:\n" +
+                      agentHelpText
+                    : def.description,
+            inputSchema: def.inputSchema,
+        }));
+    }
+
+    const daemon = await startDaemonListener(
+        { handlers, getToolList },
+        debugLog,
+    );
+
+    // Losing election candidates never open game connections.
+    if (!daemon) return;
+    log(`Daemon listening on ${daemon.socketPath}`);
+
     // Fetch /agent subcommand list from dev for description enrichment.
     // Fired asynchronously so it does not block server startup.
     // Best-effort — failures are silently ignored so the server always starts.
-    let agentHelpText: string | undefined;
     if (!configError) {
         const startTime = Date.now();
         debugLog("Starting /agent enrichment fetch on dev...");
@@ -229,119 +175,10 @@ async function main() {
             });
     }
 
-    // Build handler lookup
-    const handlers = new Map<
-        string,
-        (args: Record<string, unknown>) => Promise<{
-            content: Array<{ type: "text"; text: string }>;
-            isError?: boolean;
-        }>
-    >();
-    for (const def of TOOL_DEFINITIONS) {
-        if (configError) {
-            // Server starts but every tool reports the config problem
-            handlers.set(def.name, async () => ({
-                content: [{ type: "text" as const, text: configError }],
-                isError: true,
-            }));
-        } else {
-            handlers.set(
-                def.name,
-                createMcpToolHandler(def.name, orchestrator),
-            );
-        }
-    }
-
-    const server = new Server(
-        { name: "gsl-tools", version: "1.0.0" },
-        { capabilities: { tools: {} } },
-    );
-
-    // Shared tool-list getter (used by both primary server and daemon)
-    function getToolList() {
-        return TOOL_DEFINITIONS.map((def) => ({
-            name: def.name,
-            description:
-                def.name === "gsl_slash_agent_command" && agentHelpText
-                    ? def.description +
-                      "\n\nLast seen /agent output on dev:\n" +
-                      agentHelpText
-                    : def.description,
-            inputSchema: def.inputSchema,
-        }));
-    }
-
-    // tools/list
-    server.setRequestHandler(ListToolsRequestSchema, async () => ({
-        tools: getToolList(),
-    }));
-
-    // tools/call
-    server.setRequestHandler(CallToolRequestSchema, async (request) => {
-        const { name, arguments: args } = request.params;
-        const handler = handlers.get(name);
-        if (!handler) {
-            return {
-                content: [
-                    { type: "text" as const, text: `Unknown tool: ${name}` },
-                ],
-                isError: true,
-            };
-        }
-        return handler(args ?? {});
-    });
-
-    // -------------------------------------------------------------------
-    // Daemon listener: accept additional MCP clients over IPC.
-    // -------------------------------------------------------------------
-    const daemon = await startDaemonListener(
-        { handlers, getToolList },
-        debugLog,
-    );
-
-    // If startDaemonListener returns undefined, the socket was already
-    // owned by another daemon. Fall back to proxy mode.
-    if (!daemon) {
-        log("Socket in use, retrying as proxy.");
-        const retrySocket = await tryConnectToDaemon();
-        if (retrySocket) {
-            runAsProxy(retrySocket);
-            return;
-        }
-        // Extremely unlikely: the owner died between our listen attempt
-        // and this connect. Exit and let the harness restart us.
-        log("Daemon unreachable. Exiting.");
-        process.exit(1);
-    }
-
-    log(`Daemon listening on ${daemon.socketPath}`);
-
-    // Start stdio transport
-    const transport = new StdioServerTransport();
-    await server.connect(transport);
-    log("Server started on stdio");
-
-    // Allow the daemon to close the primary MCP server before idle exit.
-    daemon.onBeforeIdleExit(async () => {
-        debugLog("Closing primary server before idle exit.");
-        await server.close();
-    });
-
-    // Detect primary stdio EOF directly (not via SDK onclose which may
-    // be overwritten). This triggers the idle countdown reliably.
-    process.stdin.on("end", () => {
-        debugLog("Primary stdio client disconnected (stdin EOF).");
-        daemon.notifyStdioClosed();
-    });
-    process.stdin.on("close", () => {
-        daemon.notifyStdioClosed();
-    });
-
     // Graceful shutdown
-    const shutdown = async () => {
+    const shutdown = () => {
         debugLog("Shutting down...");
         daemon.close();
-        await server.close();
         process.exit(0);
     };
     process.on("SIGINT", shutdown);
