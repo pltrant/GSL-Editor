@@ -1,4 +1,5 @@
 import * as path from "path";
+import { CommandTimeoutDiagnostics } from "./commandTimeoutDiagnostics";
 
 import { BaseGameClient, GameClientOptions } from "./gameClients";
 import { EAccessClient } from "./eaccessClient";
@@ -963,12 +964,20 @@ class EditorClient extends BaseGameClient {
         },
     ): Promise<string[]> {
         const lines: string[] = [];
+        const {
+            account = "",
+            password = "",
+            instance = "unknown",
+            character = "unknown",
+        } = this.loginDetails ?? {};
+        const diagnostics = new CommandTimeoutDiagnostics([account, password]);
 
         return new Promise((resolve, reject) => {
             let seenStart = false;
 
             // Process game output between `start` and `end`
             const output = new OutputProcessor((line: string) => {
+                diagnostics.record(line);
                 // Check capture start
                 if (!seenStart) {
                     // Check abort pattern before start marker
@@ -1007,7 +1016,14 @@ class EditorClient extends BaseGameClient {
             // Handle timeout
             const timeout = setTimeout(() => {
                 this.off("text", processText);
-                reject(new Error(`Command timed out: ${command}`));
+                reject(
+                    diagnostics.timeoutError({
+                        command,
+                        worker: `${instance}/${character}`,
+                        seenStart,
+                        pending: output.peek(),
+                    }),
+                );
             }, timeoutMillis);
 
             // Send command
