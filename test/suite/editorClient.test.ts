@@ -1,5 +1,5 @@
 import * as assert from "assert";
-import { OutputProcessor } from "../../gsl/editorClient";
+import { OutputProcessor, stripGamePrompt } from "../../gsl/editorClient";
 
 suite("OutputProcessor", () => {
     function collect(): { lines: string[]; output: OutputProcessor } {
@@ -49,5 +49,53 @@ suite("OutputProcessor", () => {
         output.accumulate("\x1b[");
         output.accumulate("0mShowing room #100\r\n");
         assert.deepStrictEqual(lines, ["Showing room #100"]);
+    });
+});
+
+suite("Command response prompts", () => {
+    test("recognizes the captured metadata header after a split ANSI prompt", () => {
+        const lines: string[] = [];
+        const output = new OutputProcessor((line) =>
+            lines.push(stripGamePrompt(line)),
+        );
+        output.accumulate("\x1b[0mG");
+        output.accumulate("N>");
+        output.accumulate(
+            "Game: GS4D\r\nName: GCommonProp\r\nOn Mon Sep 07 20:56:37 2026\r\n",
+        );
+        assert.ok(/^Game: /.test(lines[0]));
+        assert.ok(/^On |^Unspecified Date/.test(lines[2]));
+        assert.deepStrictEqual(lines, [
+            "Game: GS4D",
+            "Name: GCommonProp",
+            "On Mon Sep 07 20:56:37 2026",
+        ]);
+    });
+
+    test("handles repeated prompts and preserves non-prompt response text", () => {
+        assert.strictEqual(
+            stripGamePrompt("GN>G>>Invalid script number"),
+            "Invalid script number",
+        );
+        assert.strictEqual(
+            stripGamePrompt("><<<beginning of output>>>"),
+            "<<<beginning of output>>>",
+        );
+        for (const line of [
+            "Game: GS4",
+            "<<<end of output>>>",
+            "Text GN> text",
+            "Name: Example>name",
+        ]) {
+            assert.strictEqual(stripGamePrompt(line), line);
+        }
+    });
+
+    test("the shared processor preserves prompts for other consumers", () => {
+        const lines: string[] = [];
+        new OutputProcessor((line) => lines.push(line)).accumulate(
+            "GN>Game: GS4D\r\n",
+        );
+        assert.deepStrictEqual(lines, ["GN>Game: GS4D"]);
     });
 });

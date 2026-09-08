@@ -978,6 +978,7 @@ class EditorClient extends BaseGameClient {
             // Process game output between `start` and `end`
             const output = new OutputProcessor((line: string) => {
                 diagnostics.record(line);
+                line = stripGamePrompt(line);
                 // Check capture start
                 if (!seenStart) {
                     // Check abort pattern before start marker
@@ -1038,6 +1039,12 @@ class EditorClient extends BaseGameClient {
 // pattern-matching handlers.
 const rx_ansi =
     /\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)?|[ -/]*[0-~])/g;
+
+// Game prompts have no newline and can prefix the next command response.
+// Keep this out of script downloads and preserve raw timeout diagnostics.
+export function stripGamePrompt(line: string): string {
+    return line.replace(/^(?:GN?>|>)+/, "");
+}
 
 export class OutputProcessor {
     private buffer: string;
