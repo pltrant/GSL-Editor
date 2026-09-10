@@ -1,5 +1,4 @@
 import {
-    ClientTask,
     EditorClientInterface,
     InitOptions,
     ScriptCompileResults,
@@ -23,7 +22,7 @@ export interface LoginCredentials {
 export interface AgentToolOrchestratorDeps {
     getCredentials(
         instance: GameInstance,
-    ): Promise<LoginCredentials | undefined>;
+    ): Promise<LoginCredentials | LoginCredentials[] | undefined>;
     getCurrentAuthor(): string | undefined;
     downloadLocation: string;
     console: { log: (...args: any[]) => void };
@@ -34,6 +33,14 @@ export interface AgentToolOrchestratorDeps {
 // ---------------------------------------------------------------------------
 
 export class AgentToolOrchestrator {
+    private pools = new Map<
+        string,
+        {
+            available: LoginCredentials[];
+            waiting: Array<(credentials: LoginCredentials) => void>;
+        }
+    >();
+
     constructor(
         private deps: AgentToolOrchestratorDeps,
         private runWithClient: typeof withClientForInstance = withClientForInstance,
@@ -45,14 +52,10 @@ export class AgentToolOrchestrator {
 
     // -- credential helpers ------------------------------------------------
 
-    private async initOptionsFor(instance: GameInstance): Promise<InitOptions> {
-        const creds = await this.deps.getCredentials(instance);
-        if (!creds) {
-            throw new Error(
-                `${instance} server not configured. ` +
-                    `Add ${instance}Instance and ${instance}Character to your login config file.`,
-            );
-        }
+    private initOptionsFor(
+        instance: GameInstance,
+        creds: LoginCredentials,
+    ): InitOptions {
         return {
             login: creds,
             console: this.deps.console,
@@ -68,13 +71,69 @@ export class AgentToolOrchestrator {
 
     private async withClient<T>(
         instance: GameInstance,
-        task: ClientTask<T>,
+        task: (
+            client: EditorClientInterface,
+            credentials: LoginCredentials,
+        ) => Promise<T>,
     ): Promise<T> {
-        return this.runWithClient(
-            instance,
-            await this.initOptionsFor(instance),
-            task,
+        const configured = await this.deps.getCredentials(instance);
+        if (
+            !configured ||
+            (Array.isArray(configured) && configured.length === 0)
+        ) {
+            throw new Error(
+                `${instance} server not configured. ` +
+                    `Add ${instance}Instance and ${instance}Character or ${instance}Characters to your login config file.`,
+            );
+        }
+        if (!Array.isArray(configured)) {
+            // Preserve the extension's shared single-character editor queue.
+            return this.runWithClient(
+                instance,
+                this.initOptionsFor(instance, configured),
+                (client) => task(client, configured),
+            );
+        }
+
+        const unique = new Map(
+            configured.map((creds) => [
+                JSON.stringify(
+                    [creds.account, creds.instance, creds.character].map(
+                        (part) => part.trim().toLowerCase(),
+                    ),
+                ),
+                creds,
+            ]),
         );
+        const poolKey = JSON.stringify([instance, [...unique.keys()].sort()]);
+        let pool = this.pools.get(poolKey);
+        if (!pool) {
+            pool = { available: [...unique.values()], waiting: [] };
+            this.pools.set(poolKey, pool);
+        }
+        // Reserve a free character for the entire operation. Pending requests
+        // go to the next worker to finish, rather than queueing behind a busy one.
+        const creds =
+            pool.available.shift() ??
+            (await new Promise<LoginCredentials>((resolve) =>
+                pool.waiting.push(resolve),
+            ));
+        const workerKey = JSON.stringify(
+            ["mcp", creds.account, creds.instance, creds.character].map(
+                (part) => part.trim().toLowerCase(),
+            ),
+        );
+        try {
+            return await this.runWithClient(
+                workerKey,
+                this.initOptionsFor(instance, creds),
+                (client) => task(client, creds),
+            );
+        } finally {
+            const next = pool.waiting.shift();
+            if (next) next(creds);
+            else pool.available.push(creds);
+        }
     }
 
     // -- executeShowCommand ------------------------------------------------
@@ -262,11 +321,10 @@ export class AgentToolOrchestrator {
         if (!content || content.match(/^\s*$/)) {
             throw new Error("Cannot upload an empty script file.");
         }
-        const initOptions = await this.initOptionsFor("dev");
-        const safetyScript = initOptions.login.instance.startsWith("DR")
-            ? 16224
-            : 24661;
-        return this.runWithClient("dev", initOptions, async (client) => {
+        return this.withClient("dev", async (client, creds) => {
+            const safetyScript = creds.instance.startsWith("DR")
+                ? 16224
+                : 24661;
             const props = await client.modifyScript(safetyScript, true);
             try {
                 const lines = content.split(/\r?\n/);
