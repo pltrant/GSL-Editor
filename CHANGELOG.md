@@ -2,6 +2,26 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.21.3] - 2026-09-12
+
+### Added
+
+- Added folding markers for GSL regions.
+- External MCP agents can use multiple configured characters to run requests in
+  parallel.
+- Added bounded command timeout diagnostics for MCP operations.
+
+### Fixed
+
+- MCP clients now reconnect after the shared daemon restarts.
+- Game prompts received before command responses no longer disrupt MCP
+  operations.
+
+### Internal
+
+- Updated csv-parse, fast-uri, Hono, humanfs, ip-address, js-yaml, and qs
+  dependencies.
+
 ## [1.21.2] - 2026-07-26
 
 ### Added
