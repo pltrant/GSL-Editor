@@ -1,4 +1,7 @@
 import * as assert from "assert";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 import { TOOL_DEFINITIONS, createMcpToolHandler } from "../../gsl/mcp/mcpTools";
 import {
     AgentToolOrchestrator,
@@ -190,5 +193,236 @@ suite("MCP Tool Handlers", () => {
         const result = await handler({});
         assert.ok(result.isError);
         assert.ok(result.content[0].text.includes("tableId"));
+    });
+});
+
+suite("MCP Script Downloads", () => {
+    let dir: string;
+    let orch: AgentToolOrchestrator;
+    let calls: Array<[number, GameInstance | undefined]>;
+
+    setup(() => {
+        dir = fs.mkdtempSync(path.join(os.tmpdir(), "gsl-download-test-"));
+        orch = new AgentToolOrchestrator(makeDeps({ downloadLocation: dir }));
+        calls = [];
+        orch.fetchScript = async (script, instance) => {
+            calls.push([script, instance]);
+            return { content: `script ${script}`, isNew: false };
+        };
+    });
+
+    teardown(() => {
+        fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    test("single script retains its file name, default instance, and response", async () => {
+        const result = await createMcpToolHandler(
+            "gsl_download_script",
+            orch,
+        )({ scriptNumber: 123 });
+        const filePath = path.join(dir, "S00123.dev.mcp.gsl");
+        assert.deepStrictEqual(calls, [[123, "dev"]]);
+        assert.strictEqual(fs.readFileSync(filePath, "utf8"), "script 123");
+        assert.deepStrictEqual(result, {
+            content: [
+                {
+                    type: "text",
+                    text: `Script 123 downloaded from dev to: ${filePath}`,
+                },
+            ],
+        });
+    });
+
+    test("batch downloads each script from the requested instance", async () => {
+        const result = await createMcpToolHandler(
+            "gsl_download_script",
+            orch,
+        )({ scriptNumber: [123, 456], instance: "prime" });
+        assert.ok(!result.isError);
+        assert.deepStrictEqual(calls, [
+            [123, "prime"],
+            [456, "prime"],
+        ]);
+        assert.strictEqual(result.content.length, 2);
+        for (const script of [123, 456]) {
+            const filePath = path.join(
+                dir,
+                `S${String(script).padStart(5, "0")}.prime.mcp.gsl`,
+            );
+            assert.strictEqual(
+                fs.readFileSync(filePath, "utf8"),
+                `script ${script}`,
+            );
+            assert.ok(
+                result.content.some((item) => item.text.includes(filePath)),
+            );
+        }
+    });
+
+    test("invalid batches are rejected before any downloads", async () => {
+        const handler = createMcpToolHandler("gsl_download_script", orch);
+        for (const scriptNumber of [
+            undefined,
+            [],
+            [123, 0],
+            [123, 1000000],
+            [123, 1.5],
+            [123, "456"],
+            [[123]],
+        ]) {
+            const result = await handler({ scriptNumber });
+            assert.ok(result.isError);
+        }
+        assert.deepStrictEqual(calls, []);
+        assert.deepStrictEqual(fs.readdirSync(dir), []);
+    });
+
+    test("batch continues after missing scripts and download errors", async () => {
+        orch.fetchScript = async (script) => {
+            if (script === 123) return { content: "", isNew: true };
+            if (script === 456) throw new Error("Download failed");
+            return { content: "last script", isNew: false };
+        };
+        const result = await createMcpToolHandler(
+            "gsl_download_script",
+            orch,
+        )({ scriptNumber: [123, 456, 789] });
+        assert.ok(result.isError);
+        assert.strictEqual(result.content.length, 3);
+        assert.ok(result.content[0].text.includes("Script 123: Not found"));
+        assert.ok(
+            result.content[1].text.includes(
+                "Failed to download script 456: Download failed",
+            ),
+        );
+        assert.ok(result.content[2].text.includes("Script 789 downloaded"));
+        assert.deepStrictEqual(fs.readdirSync(dir), ["S00789.dev.mcp.gsl"]);
+        assert.strictEqual(
+            fs.readFileSync(path.join(dir, "S00789.dev.mcp.gsl"), "utf8"),
+            "last script",
+        );
+    });
+});
+
+suite("MCP Script Diffs", () => {
+    let orch: AgentToolOrchestrator;
+    let calls: Array<[number, GameInstance | undefined]>;
+
+    setup(() => {
+        orch = new AgentToolOrchestrator(makeDeps());
+        calls = [];
+        orch.fetchScript = async (script, instance) => {
+            calls.push([script, instance]);
+            return { content: `${instance}\n`, isNew: false };
+        };
+    });
+
+    function diff(args: Record<string, unknown>) {
+        return createMcpToolHandler(
+            "gsl_diff_script_across_instances",
+            orch,
+        )(args);
+    }
+
+    test("scalar and singleton batch preserve default diff output", async () => {
+        const scalar = await diff({ scriptNumber: 123 });
+        assert.deepStrictEqual(await diff({ scriptNumber: [123] }), scalar);
+        assert.ok(!scalar.isError);
+        assert.strictEqual(scalar.content.length, 1);
+        assert.ok(scalar.content[0].text.includes("--- S123.gsl (prime)"));
+        assert.ok(scalar.content[0].text.includes("+++ S123.gsl (dev)"));
+        assert.ok(scalar.content[0].text.includes("-prime\n+dev"));
+    });
+
+    test("batch preserves order and shares instances and context", async () => {
+        const result = await diff({
+            scriptNumber: [456, 123],
+            baseInstance: "dev",
+            compareInstance: "prime",
+            context: 0,
+        });
+        assert.ok(!result.isError);
+        assert.deepStrictEqual(calls, [
+            [456, "dev"],
+            [456, "prime"],
+            [123, "dev"],
+            [123, "prime"],
+        ]);
+        assert.strictEqual(result.content.length, 2);
+        assert.ok(result.content[0].text.includes("Script 456:"));
+        assert.ok(result.content[1].text.includes("Script 123:"));
+        assert.ok(
+            result.content.every((item) => item.text.includes("-dev\n+prime")),
+        );
+    });
+
+    test("invalid batches fail before fetching", async () => {
+        for (const scriptNumber of [
+            [],
+            [123, 0],
+            [123, 1000000],
+            [123, 1.5],
+            [123, "456"],
+            [[123]],
+        ]) {
+            assert.ok((await diff({ scriptNumber })).isError);
+        }
+        assert.deepStrictEqual(calls, []);
+    });
+
+    test("batch continues through missing scripts and fetch failures", async () => {
+        orch.fetchScript = async (script, instance) => {
+            if (script === 4) throw new Error("Fetch failed");
+            const isNew =
+                script === 1 ||
+                (script === 2 && instance === "prime") ||
+                (script === 3 && instance === "dev");
+            return { content: "same\n", isNew };
+        };
+        const result = await diff({ scriptNumber: [1, 2, 3, 4, 5] });
+        assert.ok(result.isError);
+        assert.deepStrictEqual(
+            result.content.map((item) => item.text),
+            [
+                "Script 1: Not found on either prime or dev.",
+                "Script 2: Not found on prime (exists only on dev).",
+                "Script 3: Not found on dev (exists only on prime).",
+                "Failed to diff script 4: Fetch failed",
+                "Script 5: No differences between prime and dev.",
+            ],
+        );
+    });
+
+    test("context and whitespace options apply to every diff", async () => {
+        orch.fetchScript = async (_script, instance) => ({
+            content:
+                instance === "prime"
+                    ? "before\nold\nafter\n"
+                    : "before\nnew\nafter\n",
+            isNew: false,
+        });
+        const result = await diff({ scriptNumber: [1, 2], context: 0 });
+        assert.ok(
+            result.content.every(
+                (item) =>
+                    item.text.includes("@@ -2,1 +2,1 @@\n-old\n+new") &&
+                    !item.text.includes(" before"),
+            ),
+        );
+        orch.fetchScript = async (_script, instance) => ({
+            content: instance === "prime" ? "same\n" : "  same  \n",
+            isNew: false,
+        });
+        const whitespace = await diff({
+            scriptNumber: [1, 2],
+            ignoreWhitespace: true,
+        });
+        assert.ok(
+            whitespace.content.every(
+                (item) =>
+                    item.text.includes("No differences") &&
+                    item.text.includes("ignoring whitespace"),
+            ),
+        );
     });
 });

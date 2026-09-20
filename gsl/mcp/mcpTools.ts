@@ -383,9 +383,16 @@ export function createMcpToolHandler(
         case "gsl_diff_script_across_instances":
             return async (args) => {
                 try {
-                    const scriptNumber = parseRequiredPositiveInt(
-                        args.scriptNumber,
-                        "scriptNumber",
+                    const values = Array.isArray(args.scriptNumber)
+                        ? args.scriptNumber
+                        : [args.scriptNumber];
+                    if (values.length === 0) {
+                        throw new Error(
+                            "scriptNumber must contain at least one script number.",
+                        );
+                    }
+                    const scriptNumbers = values.map((value) =>
+                        parseRequiredPositiveInt(value, "scriptNumber"),
                     );
                     const baseInstance = parseInstance(
                         args.baseInstance,
@@ -399,50 +406,80 @@ export function createMcpToolHandler(
                     const ignoreWhitespace =
                         (args.ignoreWhitespace as boolean) ?? false;
 
-                    const [base, compare] = await Promise.all([
-                        orchestrator.fetchScript(scriptNumber, baseInstance),
-                        orchestrator.fetchScript(scriptNumber, compareInstance),
-                    ]);
+                    const result: McpToolResult = { content: [] };
+                    for (const scriptNumber of scriptNumbers) {
+                        try {
+                            const [base, compare] = await Promise.all([
+                                orchestrator.fetchScript(
+                                    scriptNumber,
+                                    baseInstance,
+                                ),
+                                orchestrator.fetchScript(
+                                    scriptNumber,
+                                    compareInstance,
+                                ),
+                            ]);
 
-                    if (base.isNew && compare.isNew) {
-                        return textResult(
-                            `Script ${scriptNumber}: Not found on either ${baseInstance} or ${compareInstance}.`,
-                        );
-                    }
-                    if (base.isNew) {
-                        return textResult(
-                            `Script ${scriptNumber}: Not found on ${baseInstance} (exists only on ${compareInstance}).`,
-                        );
-                    }
-                    if (compare.isNew) {
-                        return textResult(
-                            `Script ${scriptNumber}: Not found on ${compareInstance} (exists only on ${baseInstance}).`,
-                        );
-                    }
+                            if (base.isNew && compare.isNew) {
+                                result.content.push({
+                                    type: "text",
+                                    text: `Script ${scriptNumber}: Not found on either ${baseInstance} or ${compareInstance}.`,
+                                });
+                                continue;
+                            }
+                            if (base.isNew) {
+                                result.content.push({
+                                    type: "text",
+                                    text: `Script ${scriptNumber}: Not found on ${baseInstance} (exists only on ${compareInstance}).`,
+                                });
+                                continue;
+                            }
+                            if (compare.isNew) {
+                                result.content.push({
+                                    type: "text",
+                                    text: `Script ${scriptNumber}: Not found on ${compareInstance} (exists only on ${baseInstance}).`,
+                                });
+                                continue;
+                            }
 
-                    const diffText = createTwoFilesPatch(
-                        `S${scriptNumber}.gsl (${baseInstance})`,
-                        `S${scriptNumber}.gsl (${compareInstance})`,
-                        base.content,
-                        compare.content,
-                        undefined,
-                        undefined,
-                        { context: diffContext, ignoreWhitespace },
-                    );
+                            const diffText = createTwoFilesPatch(
+                                `S${scriptNumber}.gsl (${baseInstance})`,
+                                `S${scriptNumber}.gsl (${compareInstance})`,
+                                base.content,
+                                compare.content,
+                                undefined,
+                                undefined,
+                                { context: diffContext, ignoreWhitespace },
+                            );
 
-                    if (!diffText.includes("@@")) {
-                        const msg = ignoreWhitespace
-                            ? `Script ${scriptNumber}: No differences between ${baseInstance} and ${compareInstance} (ignoring whitespace).`
-                            : `Script ${scriptNumber}: No differences between ${baseInstance} and ${compareInstance}.`;
-                        return textResult(msg);
+                            if (!diffText.includes("@@")) {
+                                const msg = ignoreWhitespace
+                                    ? `Script ${scriptNumber}: No differences between ${baseInstance} and ${compareInstance} (ignoring whitespace).`
+                                    : `Script ${scriptNumber}: No differences between ${baseInstance} and ${compareInstance}.`;
+                                result.content.push({
+                                    type: "text",
+                                    text: msg,
+                                });
+                                continue;
+                            }
+
+                            result.content.push({
+                                type: "text",
+                                text:
+                                    `Script ${scriptNumber}: Differences found (${baseInstance} → ${compareInstance}).\n\n` +
+                                    "```diff\n" +
+                                    diffText +
+                                    "\n```",
+                            });
+                        } catch (e) {
+                            result.isError = true;
+                            result.content.push({
+                                type: "text",
+                                text: `Failed to diff script ${scriptNumber}: ${e instanceof Error ? e.message : String(e)}`,
+                            });
+                        }
                     }
-
-                    return textResult(
-                        `Script ${scriptNumber}: Differences found (${baseInstance} → ${compareInstance}).\n\n` +
-                            "```diff\n" +
-                            diffText +
-                            "\n```",
-                    );
+                    return result;
                 } catch (e) {
                     return errorResult(
                         `Failed to diff script: ${e instanceof Error ? e.message : String(e)}`,
@@ -453,28 +490,55 @@ export function createMcpToolHandler(
         case "gsl_download_script":
             return async (args) => {
                 try {
-                    const scriptNumber = parseRequiredPositiveInt(
-                        args.scriptNumber,
-                        "scriptNumber",
-                    );
-                    const instance = parseInstance(args.instance, "dev");
-                    const { content, isNew } = await orchestrator.fetchScript(
-                        scriptNumber,
-                        instance,
-                    );
-                    if (isNew) {
-                        return textResult(
-                            `Script ${scriptNumber}: Not found on ${instance} server (new script).`,
+                    const values = Array.isArray(args.scriptNumber)
+                        ? args.scriptNumber
+                        : [args.scriptNumber];
+                    if (values.length === 0) {
+                        throw new Error(
+                            "scriptNumber must contain at least one script number.",
                         );
                     }
-                    const filename = `S${String(scriptNumber).padStart(5, "0")}.${instance}.mcp.gsl`;
-                    const dir = orchestrator.downloadLocation;
-                    fs.mkdirSync(dir, { recursive: true });
-                    const filePath = path.join(dir, filename);
-                    await fs.promises.writeFile(filePath, content, "utf8");
-                    return textResult(
-                        `Script ${scriptNumber} downloaded from ${instance} to: ${filePath}`,
+                    const scriptNumbers = values.map((value) =>
+                        parseRequiredPositiveInt(value, "scriptNumber"),
                     );
+                    const instance = parseInstance(args.instance, "dev");
+                    const result: McpToolResult = { content: [] };
+                    for (const scriptNumber of scriptNumbers) {
+                        try {
+                            const { content, isNew } =
+                                await orchestrator.fetchScript(
+                                    scriptNumber,
+                                    instance,
+                                );
+                            if (isNew) {
+                                result.content.push({
+                                    type: "text",
+                                    text: `Script ${scriptNumber}: Not found on ${instance} server (new script).`,
+                                });
+                                continue;
+                            }
+                            const filename = `S${String(scriptNumber).padStart(5, "0")}.${instance}.mcp.gsl`;
+                            const dir = orchestrator.downloadLocation;
+                            fs.mkdirSync(dir, { recursive: true });
+                            const filePath = path.join(dir, filename);
+                            await fs.promises.writeFile(
+                                filePath,
+                                content,
+                                "utf8",
+                            );
+                            result.content.push({
+                                type: "text",
+                                text: `Script ${scriptNumber} downloaded from ${instance} to: ${filePath}`,
+                            });
+                        } catch (e) {
+                            result.isError = true;
+                            result.content.push({
+                                type: "text",
+                                text: `Failed to download script ${scriptNumber}: ${e instanceof Error ? e.message : String(e)}`,
+                            });
+                        }
+                    }
+                    return result;
                 } catch (e) {
                     return errorResult(
                         `Failed to download script: ${e instanceof Error ? e.message : String(e)}`,

@@ -37,14 +37,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     {
         name: "gsl_download_script",
         description:
-            "Downloads a GSL script from the specified server instance and saves it to a " +
-            "local file. Returns the file path. Use this when the user wants to read, " +
+            "Downloads one or more GSL scripts from the specified server instance and saves them to " +
+            "local files. Returns each file path or download error. Use this when the user wants to read, " +
             "review, or inspect a version of a script on any server instance.",
         vscode: {
             displayName: "Download GSL Script",
             toolReferenceName: "gsl-download-script",
             userDescription:
-                "Downloads a GSL script from a game server instance.",
+                "Downloads one or more GSL scripts from a game server instance.",
             icon: "$(cloud-download)",
         },
         inputSchema: {
@@ -52,10 +52,20 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             required: ["scriptNumber"],
             properties: {
                 scriptNumber: {
-                    type: "integer",
-                    minimum: 1,
-                    maximum: 999999,
-                    description: "GSL script number to fetch.",
+                    oneOf: [
+                        { type: "integer", minimum: 1, maximum: 999999 },
+                        {
+                            type: "array",
+                            minItems: 1,
+                            items: {
+                                type: "integer",
+                                minimum: 1,
+                                maximum: 999999,
+                            },
+                        },
+                    ],
+                    description:
+                        "GSL script number or array of script numbers to fetch.",
                 },
                 instance: {
                     type: "string",
@@ -70,16 +80,16 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     {
         name: "gsl_diff_script_across_instances",
         description:
-            "Downloads a GSL script from two server instances and returns a unified diff " +
+            "Downloads one or more GSL scripts from two server instances and returns a unified diff for each, " +
             "showing exactly what lines differ between them. Use this when the user wants " +
             "to compare, diff, or check differences between two versions of a script " +
-            "across server instances. " +
+            "across server instances. Results follow input order; individual failures do not stop the batch. " +
             "The diff reads as: baseInstance (---) compared against compareInstance (+++).",
         vscode: {
             displayName: "Diff GSL Script Across Instances",
             toolReferenceName: "gsl-diff-script",
             userDescription:
-                "Compares a GSL script between two server instances.",
+                "Compares one or more GSL scripts between two server instances.",
             icon: "$(diff)",
         },
         inputSchema: {
@@ -87,10 +97,20 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             required: ["scriptNumber"],
             properties: {
                 scriptNumber: {
-                    type: "integer",
-                    minimum: 1,
-                    maximum: 999999,
-                    description: "GSL script number to diff.",
+                    oneOf: [
+                        { type: "integer", minimum: 1, maximum: 999999 },
+                        {
+                            type: "array",
+                            minItems: 1,
+                            items: {
+                                type: "integer",
+                                minimum: 1,
+                                maximum: 999999,
+                            },
+                        },
+                    ],
+                    description:
+                        "GSL script number or array of script numbers to diff.",
                 },
                 baseInstance: {
                     type: "string",

@@ -149,6 +149,8 @@ export class BaseGameClient extends EventEmitter {
         } catch {
             // Ignore quit errors during forced reset.
         }
+        // Notify attached terminals before removing listeners during a reset.
+        this.emit("quit");
         this.removeAllListeners();
     }
 }
