@@ -68,6 +68,11 @@
     "contributes": {
         "commands": [
             {
+                "command": "gsl.rollout",
+                "title": "Deploy and Rollin Scripts",
+                "category": "GSL"
+            },
+            {
                 "command": "gsl.downloadScript",
                 "title": "Download Script",
                 "category": "GSL"

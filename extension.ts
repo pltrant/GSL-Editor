@@ -30,6 +30,7 @@ import {
 
 import { EAccessClient } from "./gsl/eaccessClient";
 import { GameTerminal } from "./gsl/gameTerminal";
+import { registerRolloutCommand } from "./gsl/commands/rollout";
 import {
     ScriptCompileStatus,
     ScriptError,
@@ -458,7 +459,11 @@ export class VSCodeIntegration {
 
     private outputChannel: OutputChannel;
 
-    private gameTerminal?: GameTerminal;
+    private gameTerminals = new Map<GameInstance, GameTerminal>();
+
+    private get gameTerminal() {
+        return this.gameTerminals.get("dev");
+    }
 
     private loggingEnabled: boolean;
 
@@ -492,6 +497,7 @@ export class VSCodeIntegration {
 
         this.commandList = [
             { label: "Download Script", name: "gsl.downloadScript" },
+            { label: "Deploy and Rollin", name: "gsl.rollout" },
             { label: "Upload Script", name: "gsl.uploadScript" },
             { label: "Check script modification date", name: "gsl.checkDate" },
             { label: "List GSL Tokens", name: "gsl.listTokens" },
@@ -1184,24 +1190,35 @@ export class VSCodeIntegration {
     }
 
     private async commandOpenTerminal() {
-        if (this.gameTerminal) {
-            this.gameTerminal.show(true);
+        let localGameTerminal = this.gameTerminal;
+        if (localGameTerminal?.isConnected) {
+            localGameTerminal.show(true);
             return;
         }
-        try {
-            const localGameTerminal = (this.gameTerminal = new GameTerminal(
-                () => (this.gameTerminal = undefined),
-            ));
-            this.gameTerminal.show(true);
-            await this.withEditorClient((client) => {
-                if (localGameTerminal !== this.gameTerminal) return; // stale
-                this.gameTerminal.bindClient(client);
+        if (!localGameTerminal) {
+            const newTerminal = new GameTerminal(() => {
+                if (this.gameTerminal === newTerminal)
+                    this.gameTerminals.delete("dev");
             });
+            localGameTerminal = newTerminal;
+            this.gameTerminals.set("dev", newTerminal);
+            this.context.subscriptions.push(newTerminal);
+        }
+        localGameTerminal.show(true);
+        localGameTerminal.connecting();
+        try {
+            await this.withEditorClient((client) => {
+                if (localGameTerminal !== this.gameTerminal) return;
+                localGameTerminal.bindClient(client);
+            });
+            if (!localGameTerminal.isClosed && !localGameTerminal.isConnected)
+                localGameTerminal.connectionFailed(
+                    "Check GSL login settings and complete User Setup, then run Open Game Terminal again.",
+                );
         } catch (e) {
             console.error(e);
-            window.setStatusBarMessage(
-                "Failed to bind terminal to game client",
-                5000,
+            localGameTerminal.connectionFailed(
+                e instanceof Error ? e.message : String(e),
             );
         }
     }
@@ -1463,6 +1480,7 @@ export class VSCodeIntegration {
     }
 
     private registerCommands() {
+        registerRolloutCommand(this.context, this.gameTerminals);
         let subscription: Disposable;
         subscription = commands.registerCommand(
             "gsl.downloadScript",

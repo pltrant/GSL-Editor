@@ -1,5 +1,6 @@
 import * as path from "path";
 import { CommandTimeoutDiagnostics } from "./commandTimeoutDiagnostics";
+import { executeRolloutCommand, RolloutItem } from "./rollout";
 
 import { BaseGameClient, GameClientOptions } from "./gameClients";
 import { EAccessClient } from "./eaccessClient";
@@ -184,6 +185,8 @@ const NON_RESETTABLE_ERROR_NAMES = new Set([
     "QuickLoginCancelledError",
     "EditorClientMissingVerbError",
     "EditorClientMissingScriptError",
+    // Definitive server failures can keep the connection; unknown outcomes reset.
+    "RolloutCommandError",
 ]);
 
 function getErrorCode(error: Error): string | undefined {
@@ -505,6 +508,36 @@ export const withClientForInstance = async <T>(
 export type EditorClientInterface = InstanceType<typeof EditorClient>;
 
 class EditorClient extends BaseGameClient {
+    private rolloutInProgress = false;
+
+    matchesLogin(login: InitOptions["login"]): boolean {
+        return ["account", "instance", "character"].every(
+            (key) =>
+                String(this.loginDetails?.[key]).toLowerCase() ===
+                String(login[key as keyof typeof login]).toLowerCase(),
+        );
+    }
+
+    async executeRollout(
+        action: "deploy" | "rollin",
+        item: RolloutItem,
+        scriptId: number | undefined,
+        signal: AbortSignal,
+    ): Promise<number> {
+        this.retryCommand = "";
+        this.rolloutInProgress = true;
+        try {
+            return await executeRolloutCommand(
+                this,
+                action,
+                item,
+                scriptId,
+                signal,
+            );
+        } finally {
+            this.rolloutInProgress = false;
+        }
+    }
     private interactive: boolean;
     private loginDetails: any;
     private retryCommand: string;
@@ -571,6 +604,10 @@ class EditorClient extends BaseGameClient {
     }
 
     protected serverError(error: any): void {
+        if (this.rolloutInProgress) {
+            super.serverError(error);
+            return;
+        }
         // attempt to reconnect on reset connections
         if (error.code === "ECONNRESET") {
             this.cleanupServer();

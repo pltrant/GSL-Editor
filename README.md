@@ -17,6 +17,31 @@ The GSL Editor is an extension for the GemStone Language for Simutronics' Intera
 
 Setup instructions can be found [here](https://github.com/pltrant/GSL-Editor/blob/master/setup.md).
 
+## Deploy and Rollin
+
+Run **GSL: Deploy and Rollin Scripts**, choose a configured origin and targets,
+then enter script IDs, filenames, ranges, or verb names: `29, incant, s07890.gsl, 9800-9805`.
+Every participant needs an instance and character configured through **GSL: User Setup**.
+
+The command opens split game terminals, reusing the origin terminal when open.
+Review the queued commands and click **Start rollout**. All items deploy in input
+order before rolling into each target in turn. Commands include `confirm` and
+wait for server completion; duplicates are removed. This deploys the server's
+version, so upload and compile local changes first. Verb names are limited to
+seven characters, including any leading slash.
+
+After all rollins succeed, Dev runs `/ss check` with the space-separated script
+IDs (including resolved verb IDs). Configure a Dev character for this status
+check; its terminal opens even when Dev is not an origin or target.
+
+Terminal input is disabled during rollout. Cancel, a closed rollout terminal,
+loss of VS Code focus, or an unconfirmed/failed command stops further dispatch.
+Commands already sent may still complete. An unknown outcome disconnects the
+affected client to prevent late results from being mistaken for a later rollout.
+Verify server status before retrying.
+Terminals remain open afterward. Each pane is revealed before dispatch, but
+VS Code's terminal API cannot enforce continuous visibility or attention.
+
 ## Known Issues
 
 Submit bugs to the [issue tracker](https://github.com/pltrant/GSL-Editor/issues).
