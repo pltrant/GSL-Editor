@@ -37,14 +37,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     {
         name: "gsl_download_script",
         description:
-            "Downloads a GSL script from the specified server instance and saves it to a " +
-            "local file. Returns the file path. Use this when the user wants to read, " +
+            "Downloads one or more GSL scripts from the specified server instance and saves them to " +
+            "local files. Returns each file path or download error. Use this when the user wants to read, " +
             "review, or inspect a version of a script on any server instance.",
         vscode: {
             displayName: "Download GSL Script",
             toolReferenceName: "gsl-download-script",
             userDescription:
-                "Downloads a GSL script from a game server instance.",
+                "Downloads one or more GSL scripts from a game server instance.",
             icon: "$(cloud-download)",
         },
         inputSchema: {
@@ -52,10 +52,20 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             required: ["scriptNumber"],
             properties: {
                 scriptNumber: {
-                    type: "integer",
-                    minimum: 1,
-                    maximum: 999999,
-                    description: "GSL script number to fetch.",
+                    oneOf: [
+                        { type: "integer", minimum: 1, maximum: 999999 },
+                        {
+                            type: "array",
+                            minItems: 1,
+                            items: {
+                                type: "integer",
+                                minimum: 1,
+                                maximum: 999999,
+                            },
+                        },
+                    ],
+                    description:
+                        "GSL script number or array of script numbers to fetch.",
                 },
                 instance: {
                     type: "string",

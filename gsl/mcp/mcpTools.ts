@@ -453,28 +453,55 @@ export function createMcpToolHandler(
         case "gsl_download_script":
             return async (args) => {
                 try {
-                    const scriptNumber = parseRequiredPositiveInt(
-                        args.scriptNumber,
-                        "scriptNumber",
-                    );
-                    const instance = parseInstance(args.instance, "dev");
-                    const { content, isNew } = await orchestrator.fetchScript(
-                        scriptNumber,
-                        instance,
-                    );
-                    if (isNew) {
-                        return textResult(
-                            `Script ${scriptNumber}: Not found on ${instance} server (new script).`,
+                    const values = Array.isArray(args.scriptNumber)
+                        ? args.scriptNumber
+                        : [args.scriptNumber];
+                    if (values.length === 0) {
+                        throw new Error(
+                            "scriptNumber must contain at least one script number.",
                         );
                     }
-                    const filename = `S${String(scriptNumber).padStart(5, "0")}.${instance}.mcp.gsl`;
-                    const dir = orchestrator.downloadLocation;
-                    fs.mkdirSync(dir, { recursive: true });
-                    const filePath = path.join(dir, filename);
-                    await fs.promises.writeFile(filePath, content, "utf8");
-                    return textResult(
-                        `Script ${scriptNumber} downloaded from ${instance} to: ${filePath}`,
+                    const scriptNumbers = values.map((value) =>
+                        parseRequiredPositiveInt(value, "scriptNumber"),
                     );
+                    const instance = parseInstance(args.instance, "dev");
+                    const result: McpToolResult = { content: [] };
+                    for (const scriptNumber of scriptNumbers) {
+                        try {
+                            const { content, isNew } =
+                                await orchestrator.fetchScript(
+                                    scriptNumber,
+                                    instance,
+                                );
+                            if (isNew) {
+                                result.content.push({
+                                    type: "text",
+                                    text: `Script ${scriptNumber}: Not found on ${instance} server (new script).`,
+                                });
+                                continue;
+                            }
+                            const filename = `S${String(scriptNumber).padStart(5, "0")}.${instance}.mcp.gsl`;
+                            const dir = orchestrator.downloadLocation;
+                            fs.mkdirSync(dir, { recursive: true });
+                            const filePath = path.join(dir, filename);
+                            await fs.promises.writeFile(
+                                filePath,
+                                content,
+                                "utf8",
+                            );
+                            result.content.push({
+                                type: "text",
+                                text: `Script ${scriptNumber} downloaded from ${instance} to: ${filePath}`,
+                            });
+                        } catch (e) {
+                            result.isError = true;
+                            result.content.push({
+                                type: "text",
+                                text: `Failed to download script ${scriptNumber}: ${e instanceof Error ? e.message : String(e)}`,
+                            });
+                        }
+                    }
+                    return result;
                 } catch (e) {
                     return errorResult(
                         `Failed to download script: ${e instanceof Error ? e.message : String(e)}`,

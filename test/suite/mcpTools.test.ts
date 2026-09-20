@@ -1,4 +1,7 @@
 import * as assert from "assert";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 import { TOOL_DEFINITIONS, createMcpToolHandler } from "../../gsl/mcp/mcpTools";
 import {
     AgentToolOrchestrator,
@@ -190,5 +193,113 @@ suite("MCP Tool Handlers", () => {
         const result = await handler({});
         assert.ok(result.isError);
         assert.ok(result.content[0].text.includes("tableId"));
+    });
+});
+
+suite("MCP Script Downloads", () => {
+    let dir: string;
+    let orch: AgentToolOrchestrator;
+    let calls: Array<[number, GameInstance | undefined]>;
+
+    setup(() => {
+        dir = fs.mkdtempSync(path.join(os.tmpdir(), "gsl-download-test-"));
+        orch = new AgentToolOrchestrator(makeDeps({ downloadLocation: dir }));
+        calls = [];
+        orch.fetchScript = async (script, instance) => {
+            calls.push([script, instance]);
+            return { content: `script ${script}`, isNew: false };
+        };
+    });
+
+    teardown(() => {
+        fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    test("single script retains its file name, default instance, and response", async () => {
+        const result = await createMcpToolHandler(
+            "gsl_download_script",
+            orch,
+        )({ scriptNumber: 123 });
+        const filePath = path.join(dir, "S00123.dev.mcp.gsl");
+        assert.deepStrictEqual(calls, [[123, "dev"]]);
+        assert.strictEqual(fs.readFileSync(filePath, "utf8"), "script 123");
+        assert.deepStrictEqual(result, {
+            content: [
+                {
+                    type: "text",
+                    text: `Script 123 downloaded from dev to: ${filePath}`,
+                },
+            ],
+        });
+    });
+
+    test("batch downloads each script from the requested instance", async () => {
+        const result = await createMcpToolHandler(
+            "gsl_download_script",
+            orch,
+        )({ scriptNumber: [123, 456], instance: "prime" });
+        assert.ok(!result.isError);
+        assert.deepStrictEqual(calls, [
+            [123, "prime"],
+            [456, "prime"],
+        ]);
+        assert.strictEqual(result.content.length, 2);
+        for (const script of [123, 456]) {
+            const filePath = path.join(
+                dir,
+                `S${String(script).padStart(5, "0")}.prime.mcp.gsl`,
+            );
+            assert.strictEqual(
+                fs.readFileSync(filePath, "utf8"),
+                `script ${script}`,
+            );
+            assert.ok(
+                result.content.some((item) => item.text.includes(filePath)),
+            );
+        }
+    });
+
+    test("invalid batches are rejected before any downloads", async () => {
+        const handler = createMcpToolHandler("gsl_download_script", orch);
+        for (const scriptNumber of [
+            undefined,
+            [],
+            [123, 0],
+            [123, 1000000],
+            [123, 1.5],
+            [123, "456"],
+            [[123]],
+        ]) {
+            const result = await handler({ scriptNumber });
+            assert.ok(result.isError);
+        }
+        assert.deepStrictEqual(calls, []);
+        assert.deepStrictEqual(fs.readdirSync(dir), []);
+    });
+
+    test("batch continues after missing scripts and download errors", async () => {
+        orch.fetchScript = async (script) => {
+            if (script === 123) return { content: "", isNew: true };
+            if (script === 456) throw new Error("Download failed");
+            return { content: "last script", isNew: false };
+        };
+        const result = await createMcpToolHandler(
+            "gsl_download_script",
+            orch,
+        )({ scriptNumber: [123, 456, 789] });
+        assert.ok(result.isError);
+        assert.strictEqual(result.content.length, 3);
+        assert.ok(result.content[0].text.includes("Script 123: Not found"));
+        assert.ok(
+            result.content[1].text.includes(
+                "Failed to download script 456: Download failed",
+            ),
+        );
+        assert.ok(result.content[2].text.includes("Script 789 downloaded"));
+        assert.deepStrictEqual(fs.readdirSync(dir), ["S00789.dev.mcp.gsl"]);
+        assert.strictEqual(
+            fs.readFileSync(path.join(dir, "S00789.dev.mcp.gsl"), "utf8"),
+            "last script",
+        );
     });
 });
