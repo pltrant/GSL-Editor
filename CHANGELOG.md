@@ -2,6 +2,20 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.21.4] - 2026-09-20
+
+### Added
+
+- Added `GSL: Deploy and Rollin Scripts` to deploy scripts and verbs, then
+  roll them into selected instances in sequence, stopping on failures or
+  cancellation and checking script status on Dev after success.
+- MCP script download and cross-instance diff tools now accept batches of
+  script numbers and return individual results, continuing after failures.
+
+### Internal
+
+- Updated brace-expansion from 5.0.8 to 5.0.12 to address a security vulnerability.
+
 ## [1.21.3] - 2026-09-12
 
 ### Added
