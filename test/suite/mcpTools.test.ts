@@ -303,3 +303,126 @@ suite("MCP Script Downloads", () => {
         );
     });
 });
+
+suite("MCP Script Diffs", () => {
+    let orch: AgentToolOrchestrator;
+    let calls: Array<[number, GameInstance | undefined]>;
+
+    setup(() => {
+        orch = new AgentToolOrchestrator(makeDeps());
+        calls = [];
+        orch.fetchScript = async (script, instance) => {
+            calls.push([script, instance]);
+            return { content: `${instance}\n`, isNew: false };
+        };
+    });
+
+    function diff(args: Record<string, unknown>) {
+        return createMcpToolHandler(
+            "gsl_diff_script_across_instances",
+            orch,
+        )(args);
+    }
+
+    test("scalar and singleton batch preserve default diff output", async () => {
+        const scalar = await diff({ scriptNumber: 123 });
+        assert.deepStrictEqual(await diff({ scriptNumber: [123] }), scalar);
+        assert.ok(!scalar.isError);
+        assert.strictEqual(scalar.content.length, 1);
+        assert.ok(scalar.content[0].text.includes("--- S123.gsl (prime)"));
+        assert.ok(scalar.content[0].text.includes("+++ S123.gsl (dev)"));
+        assert.ok(scalar.content[0].text.includes("-prime\n+dev"));
+    });
+
+    test("batch preserves order and shares instances and context", async () => {
+        const result = await diff({
+            scriptNumber: [456, 123],
+            baseInstance: "dev",
+            compareInstance: "prime",
+            context: 0,
+        });
+        assert.ok(!result.isError);
+        assert.deepStrictEqual(calls, [
+            [456, "dev"],
+            [456, "prime"],
+            [123, "dev"],
+            [123, "prime"],
+        ]);
+        assert.strictEqual(result.content.length, 2);
+        assert.ok(result.content[0].text.includes("Script 456:"));
+        assert.ok(result.content[1].text.includes("Script 123:"));
+        assert.ok(
+            result.content.every((item) => item.text.includes("-dev\n+prime")),
+        );
+    });
+
+    test("invalid batches fail before fetching", async () => {
+        for (const scriptNumber of [
+            [],
+            [123, 0],
+            [123, 1000000],
+            [123, 1.5],
+            [123, "456"],
+            [[123]],
+        ]) {
+            assert.ok((await diff({ scriptNumber })).isError);
+        }
+        assert.deepStrictEqual(calls, []);
+    });
+
+    test("batch continues through missing scripts and fetch failures", async () => {
+        orch.fetchScript = async (script, instance) => {
+            if (script === 4) throw new Error("Fetch failed");
+            const isNew =
+                script === 1 ||
+                (script === 2 && instance === "prime") ||
+                (script === 3 && instance === "dev");
+            return { content: "same\n", isNew };
+        };
+        const result = await diff({ scriptNumber: [1, 2, 3, 4, 5] });
+        assert.ok(result.isError);
+        assert.deepStrictEqual(
+            result.content.map((item) => item.text),
+            [
+                "Script 1: Not found on either prime or dev.",
+                "Script 2: Not found on prime (exists only on dev).",
+                "Script 3: Not found on dev (exists only on prime).",
+                "Failed to diff script 4: Fetch failed",
+                "Script 5: No differences between prime and dev.",
+            ],
+        );
+    });
+
+    test("context and whitespace options apply to every diff", async () => {
+        orch.fetchScript = async (_script, instance) => ({
+            content:
+                instance === "prime"
+                    ? "before\nold\nafter\n"
+                    : "before\nnew\nafter\n",
+            isNew: false,
+        });
+        const result = await diff({ scriptNumber: [1, 2], context: 0 });
+        assert.ok(
+            result.content.every(
+                (item) =>
+                    item.text.includes("@@ -2,1 +2,1 @@\n-old\n+new") &&
+                    !item.text.includes(" before"),
+            ),
+        );
+        orch.fetchScript = async (_script, instance) => ({
+            content: instance === "prime" ? "same\n" : "  same  \n",
+            isNew: false,
+        });
+        const whitespace = await diff({
+            scriptNumber: [1, 2],
+            ignoreWhitespace: true,
+        });
+        assert.ok(
+            whitespace.content.every(
+                (item) =>
+                    item.text.includes("No differences") &&
+                    item.text.includes("ignoring whitespace"),
+            ),
+        );
+    });
+});
