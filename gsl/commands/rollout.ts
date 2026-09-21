@@ -269,18 +269,6 @@ async function runRollout(
         if (start !== "Start rollout") return;
         check();
         started = true;
-        // Native terminals have no reliable visibility event. Reveal each one
-        // before dispatch, and stop if the user leaves VS Code or closes a pane.
-        subscriptions.push(
-            window.onDidChangeWindowState(({ focused }) => {
-                if (!focused)
-                    abort.abort(
-                        new Error(
-                            "VS Code lost focus. Inspect the terminals before retrying.",
-                        ),
-                    );
-            }),
-        );
         await window.withProgress(
             {
                 location: ProgressLocation.Notification,
@@ -298,10 +286,6 @@ async function runRollout(
                             instance === origin.instance ? "deploy" : "rollin";
                         for (const item of items) {
                             check();
-                            if (!window.state.focused)
-                                throw new Error(
-                                    "VS Code lost focus. Inspect the terminals before starting another rollout.",
-                                );
                             const pane = panes.get(instance)!;
                             pane.show();
                             progress.report({

@@ -2,10 +2,11 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
-## [1.21.4] - 2026-09-20
+## [1.21.4] - 2026-09-21
 
 ### Added
 
+- Added development server to `GSL: Diff with Live Server` command.
 - Added `GSL: Deploy and Rollin Scripts` to deploy scripts and verbs, then
   roll them into selected instances in sequence, stopping on failures or
   cancellation and checking script status on Dev after success.

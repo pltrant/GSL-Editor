@@ -1374,11 +1374,12 @@ export class VSCodeIntegration {
             );
         }
 
-        const NON_DEV_INSTANCES: GameInstance[] = [
+        const TARGET_INSTANCES: GameInstance[] = [
             "prime",
             "shattered",
             "platinum",
             "test",
+            "dev",
         ];
 
         interface InstancePickItem extends QuickPickItem {
@@ -1386,7 +1387,7 @@ export class VSCodeIntegration {
             configured: boolean;
         }
 
-        const items: InstancePickItem[] = NON_DEV_INSTANCES.map((inst) => {
+        const items: InstancePickItem[] = TARGET_INSTANCES.map((inst) => {
             const configured = !!GSLExtension.readLoginConfigForInstance(inst);
             const label =
                 inst.charAt(0).toUpperCase() + inst.slice(1) + " Server";
