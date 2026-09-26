@@ -23,5 +23,11 @@
         "increaseIndentPattern": "^\\s*(:|(if|ifnot|else|else_if|else_ifnot|loop|when|is|default|fastpush|push)\\b).*$",
         "decreaseIndentPattern": "^\\s*(\\.|(fastpop|pop)\\b).*$"
     },
+    "folding": {
+        "markers": {
+            "start": "^\\s*!\\s*#?region\\b",
+            "end": "^\\s*!\\s*#?endregion\\b"
+        }
+    },
     "wordPattern": "[\\S]+"
 }

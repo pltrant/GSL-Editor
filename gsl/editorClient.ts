@@ -1,4 +1,6 @@
 import * as path from "path";
+import { CommandTimeoutDiagnostics } from "./commandTimeoutDiagnostics";
+import { executeRolloutCommand, RolloutItem } from "./rollout";
 
 import { BaseGameClient, GameClientOptions } from "./gameClients";
 import { EAccessClient } from "./eaccessClient";
@@ -129,7 +131,7 @@ export const withEditorClient = async <T>(
     initOptions: InitOptions,
     task: ClientTask<T>,
 ): Promise<T> => {
-    return processorSingleton.enqueueTask(initOptions, task);
+    return withClientForInstance("dev", initOptions, task);
 };
 
 /**
@@ -141,7 +143,7 @@ export const withPrimeEditorClient = async <T>(
     initOptions: InitOptions,
     task: ClientTask<T>,
 ): Promise<T> => {
-    return primeProcessorSingleton.enqueueTask(initOptions, task);
+    return withClientForInstance("prime", initOptions, task);
 };
 
 type TaskController<T> = {
@@ -183,6 +185,8 @@ const NON_RESETTABLE_ERROR_NAMES = new Set([
     "QuickLoginCancelledError",
     "EditorClientMissingVerbError",
     "EditorClientMissingScriptError",
+    // Definitive server failures can keep the connection; unknown outcomes reset.
+    "RolloutCommandError",
 ]);
 
 function getErrorCode(error: Error): string | undefined {
@@ -418,18 +422,50 @@ class TaskQueueProcessor {
         }
 
         const { login, onCreate } = options;
-        const createdClient = this.createEditorClient(options);
-        this.pendingClient = createdClient;
-        this.attachClientInvalidationHandlers(createdClient);
+        const attemptLogin = async () => {
+            const client = this.createEditorClient(options);
+            this.pendingClient = client;
+            this.attachClientInvalidationHandlers(client);
+            try {
+                await client.login(login, taskExecution.abortController.signal);
+                this.assertTaskActive(taskExecution);
+            } catch (e) {
+                this.disposeClient(client);
+                throw e;
+            }
+            return client;
+        };
+
+        let createdClient: EditorClient;
         try {
-            await createdClient.login(
-                login,
-                taskExecution.abortController.signal,
+            createdClient = await attemptLogin();
+        } catch (e) {
+            const error = e instanceof Error ? e : new Error(String(e));
+            if (!shouldResetClient(error)) {
+                throw e;
+            }
+            options.console.log(
+                `[editorClient] Login failed (${error.message}), retrying once...`,
             );
             this.assertTaskActive(taskExecution);
-        } catch (e) {
-            this.disposeClient(createdClient);
-            throw e;
+            const { signal } = taskExecution.abortController;
+            await new Promise<void>((resolve, reject) => {
+                if (signal.aborted) {
+                    reject(signal.reason);
+                    return;
+                }
+                const onAbort = () => {
+                    clearTimeout(timer);
+                    reject(signal.reason);
+                };
+                const timer = setTimeout(() => {
+                    signal.removeEventListener("abort", onAbort);
+                    resolve();
+                }, 500);
+                signal.addEventListener("abort", onAbort, { once: true });
+            });
+            this.assertTaskActive(taskExecution);
+            createdClient = await attemptLogin();
         }
         this.clearClientRefs(createdClient);
         this.client = createdClient;
@@ -440,6 +476,29 @@ class TaskQueueProcessor {
 const processorSingleton = new TaskQueueProcessor();
 const primeProcessorSingleton = new TaskQueueProcessor();
 
+const processorRegistry = new Map<string, TaskQueueProcessor>([
+    ["dev", processorSingleton],
+    ["prime", primeProcessorSingleton],
+]);
+
+/**
+ * Provides an `EditorClient` for a named instance, using a per-instance
+ * task queue. Creates a new queue on first use for instances beyond
+ * the built-in "dev" and "prime".
+ */
+export const withClientForInstance = async <T>(
+    instanceKey: string,
+    initOptions: InitOptions,
+    task: ClientTask<T>,
+): Promise<T> => {
+    let processor = processorRegistry.get(instanceKey);
+    if (!processor) {
+        processor = new TaskQueueProcessor();
+        processorRegistry.set(instanceKey, processor);
+    }
+    return processor.enqueueTask(initOptions, task);
+};
+
 /**
  * The interface of an `EditorClient` instance. This layer of indirection
  * is necessary in order to prevent export of `EditorClient`. We want
@@ -449,6 +508,36 @@ const primeProcessorSingleton = new TaskQueueProcessor();
 export type EditorClientInterface = InstanceType<typeof EditorClient>;
 
 class EditorClient extends BaseGameClient {
+    private rolloutInProgress = false;
+
+    matchesLogin(login: InitOptions["login"]): boolean {
+        return ["account", "instance", "character"].every(
+            (key) =>
+                String(this.loginDetails?.[key]).toLowerCase() ===
+                String(login[key as keyof typeof login]).toLowerCase(),
+        );
+    }
+
+    async executeRollout(
+        action: "deploy" | "rollin",
+        item: RolloutItem,
+        scriptId: number | undefined,
+        signal: AbortSignal,
+    ): Promise<number> {
+        this.retryCommand = "";
+        this.rolloutInProgress = true;
+        try {
+            return await executeRolloutCommand(
+                this,
+                action,
+                item,
+                scriptId,
+                signal,
+            );
+        } finally {
+            this.rolloutInProgress = false;
+        }
+    }
     private interactive: boolean;
     private loginDetails: any;
     private retryCommand: string;
@@ -515,15 +604,25 @@ class EditorClient extends BaseGameClient {
     }
 
     protected serverError(error: any): void {
-        // attempt to reconnet on reset connections
+        if (this.rolloutInProgress) {
+            super.serverError(error);
+            return;
+        }
+        // attempt to reconnect on reset connections
         if (error.code === "ECONNRESET") {
             this.cleanupServer();
-            this.reconnect().then(() => {
-                if (this.retryCommand.length > 0) {
-                    this.send(this.retryCommand);
-                    this.retryCommand = "";
-                }
-            });
+            this.reconnect()
+                .then(() => {
+                    if (this.retryCommand.length > 0) {
+                        this.send(this.retryCommand);
+                        this.retryCommand = "";
+                    }
+                })
+                .catch(() => {
+                    // Reconnect failed; emit error so the task queue
+                    // resets the client on the next operation.
+                    this.emit("error", error);
+                });
         } else {
             super.serverError(error);
         }
@@ -673,7 +772,16 @@ class EditorClient extends BaseGameClient {
                 }
                 if (done) {
                     clearTimeout(timeout);
-                    if (!keepalive) await this.exitModifyScript();
+                    if (!keepalive) {
+                        try {
+                            await this.exitModifyScript();
+                        } catch (e) {
+                            reject(
+                                e instanceof Error ? e : new Error(String(e)),
+                            );
+                            return;
+                        }
+                    }
                     resolve(scriptProperties as ScriptProperties);
                 }
             };
@@ -688,7 +796,7 @@ class EditorClient extends BaseGameClient {
         return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
                 this.off("text", processText);
-                reject("Modification exit timed out.");
+                reject(new Error("Modification exit timed out."));
             }, clientTimeout);
             const processText = (text: string) => output.accumulate(text);
             const output = new OutputProcessor((line: string) => {
@@ -724,7 +832,12 @@ class EditorClient extends BaseGameClient {
                 if (output.peek(4) === "Edt:") {
                     clearTimeout(timeout);
                     this.off("text", processText);
-                    await this.exitModifyScript();
+                    try {
+                        await this.exitModifyScript();
+                    } catch (e) {
+                        reject(e instanceof Error ? e : new Error(String(e)));
+                        return;
+                    }
                     resolve(scriptLines.join("\r\n"));
                 }
             };
@@ -748,9 +861,19 @@ class EditorClient extends BaseGameClient {
                 errorList: [],
                 status: ScriptCompileStatus.Unknown,
             };
+            const sendFailed = (reason: string) => {
+                clearTimeout(timeout);
+                this.off("text", processText);
+                reject(new Error(reason));
+            };
+            const timeout = setTimeout(
+                () => sendFailed("Script upload timed out."),
+                clientTimeout,
+            );
             const output = new OutputProcessor((line: string) => {
                 let match: RegExpMatchArray | null;
                 if (rx_aborted.test(line) || rx_compiled.test(line)) {
+                    clearTimeout(timeout);
                     this.off("text", processText);
                     resolve(compileResults);
                     return;
@@ -803,13 +926,20 @@ class EditorClient extends BaseGameClient {
                     ) {
                         this.send("G");
                     } else if (
-                        compileResults.status === ScriptCompileStatus.Compiled
-                    ) {
-                        await this.exitModifyScript();
-                    } else if (
+                        compileResults.status ===
+                            ScriptCompileStatus.Compiled ||
                         compileResults.status === ScriptCompileStatus.Failed
                     ) {
-                        await this.exitModifyScript();
+                        try {
+                            await this.exitModifyScript();
+                        } catch (e) {
+                            clearTimeout(timeout);
+                            this.off("text", processText);
+                            reject(
+                                e instanceof Error ? e : new Error(String(e)),
+                            );
+                            return;
+                        }
                     }
                     output.flush();
                 }
@@ -856,26 +986,45 @@ class EditorClient extends BaseGameClient {
         {
             captureStart,
             captureEnd,
+            abortPattern,
             timeoutMillis,
             includeStartLine,
             includeEndLine,
         }: {
             captureStart: RegExp;
             captureEnd: RegExp;
+            /** If matched before captureStart, resolves immediately with that line. */
+            abortPattern?: RegExp;
             timeoutMillis: number;
             includeStartLine?: boolean;
             includeEndLine?: boolean;
         },
     ): Promise<string[]> {
         const lines: string[] = [];
+        const {
+            account = "",
+            password = "",
+            instance = "unknown",
+            character = "unknown",
+        } = this.loginDetails ?? {};
+        const diagnostics = new CommandTimeoutDiagnostics([account, password]);
 
         return new Promise((resolve, reject) => {
             let seenStart = false;
 
             // Process game output between `start` and `end`
             const output = new OutputProcessor((line: string) => {
+                diagnostics.record(line);
+                line = stripGamePrompt(line);
                 // Check capture start
                 if (!seenStart) {
+                    // Check abort pattern before start marker
+                    if (abortPattern && line.match(abortPattern)) {
+                        this.off("text", processText);
+                        clearTimeout(timeout);
+                        resolve([line]);
+                        return;
+                    }
                     if (line.match(captureStart)) {
                         seenStart = true;
                         if (includeStartLine) {
@@ -905,7 +1054,14 @@ class EditorClient extends BaseGameClient {
             // Handle timeout
             const timeout = setTimeout(() => {
                 this.off("text", processText);
-                reject(new Error(`Command timed out: ${command}`));
+                reject(
+                    diagnostics.timeoutError({
+                        command,
+                        worker: `${instance}/${character}`,
+                        seenStart,
+                        pending: output.peek(),
+                    }),
+                );
             }, timeoutMillis);
 
             // Send command
@@ -914,7 +1070,20 @@ class EditorClient extends BaseGameClient {
     }
 }
 
-class OutputProcessor {
+// Matches ANSI escape sequences — CSI (e.g. "\x1b[0m"), OSC (e.g.
+// "\x1b]0;title\x07"), and other ECMA-48 escapes (e.g. "\x1b=",
+// "\x1b(B") — so they can be stripped before lines reach
+// pattern-matching handlers.
+const rx_ansi =
+    /\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)?|[ -/]*[0-~])/g;
+
+// Game prompts have no newline and can prefix the next command response.
+// Keep this out of script downloads and preserve raw timeout diagnostics.
+export function stripGamePrompt(line: string): string {
+    return line.replace(/^(?:GN?>|>)+/, "");
+}
+
+export class OutputProcessor {
     private buffer: string;
     private handler: (text: string) => void;
     constructor(handler: (text: string) => void) {
@@ -927,7 +1096,7 @@ class OutputProcessor {
             nl = this.buffer.indexOf("\r\n");
         while (nl > -1) {
             let line = this.buffer.substring(last + 2, nl);
-            this.handler(line);
+            this.handler(line.replace(rx_ansi, ""));
             last = nl;
             nl = this.buffer.indexOf("\r\n", nl + 2);
         }

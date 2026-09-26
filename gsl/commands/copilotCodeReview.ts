@@ -3,16 +3,9 @@ import * as path from "path";
 
 import { commands, ExtensionContext, window, workspace } from "vscode";
 
-import {
-    GSLX_CURRENT_AUTHOR,
-    GSLX_DEV_ACCOUNT,
-    GSLX_DEV_PASSWORD,
-    GSLX_PRIME_CHARACTER,
-    GSLX_PRIME_INSTANCE,
-} from "../const";
+import { GSLExtension } from "../../extension";
 import {
     GSL_AGENT_COMMANDS_MANAGED_DIR,
-    GSL_AGENT_PROMPTS_MANAGED_DIR,
     GSL_AGENT_PROMPTS_VERSION_FILE,
 } from "./syncAgentPrompts";
 
@@ -23,37 +16,12 @@ const NEW_CHAT_COMMAND_CANDIDATES = [
     "vscode.editorChat.start",
 ];
 
-function hasManagedPromptFiles(rootPath: string): boolean {
-    if (!fs.existsSync(rootPath) || !fs.statSync(rootPath).isDirectory()) {
-        return false;
-    }
-
-    const entries = fs.readdirSync(rootPath, { withFileTypes: true });
-    for (const entry of entries) {
-        const fullPath = path.join(rootPath, entry.name);
-        if (entry.isDirectory()) {
-            if (hasManagedPromptFiles(fullPath)) {
-                return true;
-            }
-            continue;
-        }
-        if (entry.isFile() && entry.name.toLowerCase().endsWith(".prompt.md")) {
-            return true;
-        }
-    }
-    return false;
-}
-
 async function verifyPrimeUserSetupPrecondition(
     context: ExtensionContext,
 ): Promise<boolean> {
-    const account = context.globalState.get<string>(GSLX_DEV_ACCOUNT);
-    const password = await context.secrets.get(GSLX_DEV_PASSWORD);
-    const primeInstance = context.globalState.get<string>(GSLX_PRIME_INSTANCE);
-    const primeCharacter =
-        context.globalState.get<string>(GSLX_PRIME_CHARACTER);
-    const author = context.globalState.get<string>(GSLX_CURRENT_AUTHOR)?.trim();
-    if (account && password && primeInstance && primeCharacter && author) {
+    const primeCreds = GSLExtension.readLoginConfigForInstance("prime");
+    const author = GSLExtension.getCurrentAuthor()?.trim();
+    if (primeCreds && author) {
         return true;
     }
 
@@ -99,38 +67,44 @@ async function verifyManagedPromptSyncPrecondition(): Promise<
         return undefined;
     }
 
-    const managedPromptDirPath = path.join(
-        rootFolderPath,
-        GSL_AGENT_PROMPTS_MANAGED_DIR,
-    );
     const versionFilePath = path.join(
         rootFolderPath,
         GSL_AGENT_PROMPTS_VERSION_FILE,
     );
+    const promptsAreSynced = fs.existsSync(versionFilePath);
+
+    if (!promptsAreSynced) {
+        const syncPromptsAction = "Run Sync Agent Prompts";
+        const choice = await window.showErrorMessage(
+            "Copilot Code Review requires synced GSL-managed prompts. Run 'GSL: Sync Agent Prompts' and try again.",
+            { modal: true },
+            syncPromptsAction,
+        );
+        if (choice === syncPromptsAction) {
+            void commands.executeCommand("gsl.syncAgentPrompts");
+        }
+        return undefined;
+    }
+
     const commandPromptFilePath = path.join(
         rootFolderPath,
         GSL_AGENT_COMMANDS_MANAGED_DIR,
         COPILOT_CODE_REVIEW_COMMAND_FILE,
     );
-    const promptsAreSynced =
-        hasManagedPromptFiles(managedPromptDirPath) &&
-        fs.existsSync(versionFilePath) &&
-        fs.existsSync(commandPromptFilePath);
-
-    if (promptsAreSynced) {
-        return rootFolderPath;
+    if (!fs.existsSync(commandPromptFilePath)) {
+        const syncPromptsAction = "Run Sync Agent Prompts";
+        const choice = await window.showErrorMessage(
+            "Copilot Code Review command prompt file is missing. Run 'GSL: Sync Agent Prompts' to update, or check the source repository.",
+            { modal: true },
+            syncPromptsAction,
+        );
+        if (choice === syncPromptsAction) {
+            void commands.executeCommand("gsl.syncAgentPrompts");
+        }
+        return undefined;
     }
 
-    const syncPromptsAction = "Run Sync Agent Prompts";
-    const choice = await window.showErrorMessage(
-        "Copilot Code Review requires synced GSL-managed prompts. Run 'GSL: Sync Agent Prompts' and try again.",
-        { modal: true },
-        syncPromptsAction,
-    );
-    if (choice === syncPromptsAction) {
-        void commands.executeCommand("gsl.syncAgentPrompts");
-    }
-    return undefined;
+    return rootFolderPath;
 }
 
 async function openCopilotChatWithPrompt(prompt: string): Promise<boolean> {

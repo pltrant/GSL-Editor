@@ -172,3 +172,13 @@ This avoids leaving stale wrappers behind after incremental refactors.
 - Keep entries consistent with existing headings and tone.
 - Mark internal-only changes clearly when they do not affect extension
   consumers.
+
+## Generated Sections in package.json
+
+- `contributes.languageModelTools` is **auto-generated** — do not edit
+  it by hand. Changes will be silently overwritten on the next build.
+- Source of truth: `gsl/mcp/toolDefinitions.ts`
+- Sync script: `scripts/syncToolsToPackageJson.js`
+- The sync runs automatically as part of `npm run compile`.
+- To add or modify a tool: edit `toolDefinitions.ts`, then run
+  `npm run compile`.
