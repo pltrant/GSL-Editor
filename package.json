@@ -2,7 +2,7 @@
   "name": "gsl",
   "displayName": "GSL",
   "description": "GSL Editor",
-  "version": "1.18.0",
+  "version": "1.18.0-scriptfilename",
   "publisher": "patricktrant",
   "author": {
     "name": "Patrick Trant",
@@ -40,6 +40,7 @@
     "@types/vscode": "^1.109.0",
     "@typescript-eslint/parser": "^8.28.0",
     "@vscode/test-electron": "^2.3.3",
+    "@vscode/vsce": "^3.7.1",
     "esbuild": "^0.27.2",
     "eslint": "^9.22.0",
     "glob": "^11.1.0",
