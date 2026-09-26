@@ -2,6 +2,119 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.21.4] - 2026-09-21
+
+### Added
+
+- Added development server to `GSL: Diff with Live Server` command.
+- Added `GSL: Deploy and Rollin Scripts` to deploy scripts and verbs, then
+  roll them into selected instances in sequence, stopping on failures or
+  cancellation and checking script status on Dev after success.
+- MCP script download and cross-instance diff tools now accept batches of
+  script numbers and return individual results, continuing after failures.
+
+### Internal
+
+- Updated brace-expansion from 5.0.8 to 5.0.12 to address a security vulnerability.
+
+## [1.21.3] - 2026-09-12
+
+### Added
+
+- Added folding markers for GSL regions.
+- External MCP agents can use multiple configured characters to run requests in
+  parallel.
+- Added bounded command timeout diagnostics for MCP operations.
+
+### Fixed
+
+- MCP clients now reconnect after the shared daemon restarts.
+- Game prompts received before command responses no longer disrupt MCP
+  operations.
+
+### Internal
+
+- Updated csv-parse, fast-uri, Hono, humanfs, ip-address, js-yaml, and qs
+  dependencies.
+
+## [1.21.2] - 2026-07-26
+
+### Added
+
+- Added `GSL: Install MCP Server` to install the bundled MCP server at a
+  remembered user-selected path.
+
+### Changed
+
+- The external MCP server bundle is no longer copied automatically during
+  extension startup. Rerun `GSL: Install MCP Server` after extension updates.
+
+### Fixed
+
+- DR compile checks now use the correct game-specific safety script.
+- Fixed `GSL: Diff with Live Server` in DR.
+
+### Internal
+
+- Updated esbuild and transitive Hono, body-parser, and fast-uri dependencies.
+- Patched known vulnerabilities in `@hono/node-server`, `brace-expansion`,
+  `js-yaml`, and `serialize-javascript`.
+
+## [1.21.1] - 2026-06-11
+
+### Fixed
+
+- Multiline XML tags no longer break syntax highlighting.
+- Room data lookups now load the target room's segment before running `/sr`.
+- Internal bug fixes / cleanup.
+
+## [1.21.0] - 2026-05-27
+
+### Added
+
+- `Diff with Prime Server` is now `Diff with Live Server` and can compare the active Dev script against Prime, Shattered, Platinum, or Test.
+- Bundled `/setup-gsl-agents` chat prompt for bootstrapping agentic development.
+- Documented MCP setup for external agents.
+
+### Fixed
+
+- Hardened game login and connection handling.
+- Copilot Code Review command now functions properly.
+- Fixed `gsl_compile_check` so relative file paths resolve from the configured download directory.
+- Improved MCP stability.
+
+## [1.20.1] - 2026-05-23
+
+### Fixed
+
+- Resolve git binary via VS Code's bundled extension instead of assuming git is on PATH. Fixes ENOENT errors for users without git installed or not in PATH.
+
+## [1.20.0] - 2026-05-20
+
+### Added
+
+- MCP Server with 11 tools for external AI agents (Copilot, Claude, etc.):
+  - `gsl_download_script` — Download a script to a local file from any instance.
+  - `gsl_diff_script_across_instances` — Unified diff between two server instances.
+  - `gsl_compile_check` — Compile a local .gsl file and return errors/warnings.
+  - `gsl_get_current_author` — Return the configured author identity.
+  - `gsl_get_room_data` — Retrieve full room data via `/sr`.
+  - `gsl_get_existence_data` — Retrieve full existence data via `/se`.
+  - `gsl_get_player_varfields` — Retrieve player varfields/flags via `/svf`.
+  - `gsl_slash_agent_command` — Run `/agent` subcommands on the game server.
+  - `gsl_get_script_ss_metadata` — Retrieve script metadata via `/ss`.
+  - `gsl_get_verb_data` — Retrieve verb metadata via `/sv`.
+  - `gsl_get_table_metadata` — Retrieve global table metadata via `/sl`.
+- MCP requires env variables `GSL_LOGIN_CONFIG_FILE` and `GSL_PASSWORD`. Former is created on `GSL: User Setup`.
+- Internal Extension Development Usage: Added headless CLI game client for non-interactive tool use.
+
+## [1.19.0] - 2026-04-20
+
+### Added
+
+- Added Copilot tool `gsl_get_room_data` to retrieve full room data via `/sr`, including Prime/Dev targeting.
+- Added Copilot tool `gsl_get_existence_data` to retrieve full existence data via `/se`, including Prime/Dev targeting.
+
 ## [1.18.0] - 2026-03-01
 
 **Important:** To fully benefit from this release, rerun `GSL: User Setup` so your stored Development and Prime configuration is refreshed.

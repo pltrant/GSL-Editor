@@ -10,6 +10,7 @@
 **/tsconfig.tsbuildinfo
 compile.txt
 gsl/
+!gsl/mcp/mcpServer.bundle.js
 gsl-language-server/src/*
 gsl-language-server/node_modules/
 node_modules/

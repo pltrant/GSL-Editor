@@ -5,6 +5,9 @@ const NO_BUFFERING = 0;
 const LINE_BUFFERING = 1;
 
 const DEFAULT_BUFFER_SIZE = 8192;
+// DR Prime embeds the GAME mode tag at the start of its settings XML line,
+// while other instances may send the tag on a line by itself.
+const rx_connection_mode = /<mode\s+id=(["'])(?<mode>GAME|CMGR)\1\s*\/>/;
 
 export enum ServerConnectionMode {
     None,
@@ -187,9 +190,10 @@ export class ServerConnection extends EventEmitter {
     // }
 
     private processLine(line: string) {
-        if (line === '<mode id="GAME"/>') {
+        const mode = line.match(rx_connection_mode)?.groups?.mode;
+        if (mode === "GAME") {
             this.setConnectionMode(this.gameMode);
-        } else if (line === '<mode id="CMGR"/>') {
+        } else if (mode === "CMGR") {
             this.setConnectionMode(ServerConnectionMode.Unbuffered);
         } else {
             this.emit("line", line);

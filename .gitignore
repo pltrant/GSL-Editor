@@ -1,9 +1,12 @@
+.claude/
+.vscode-test/
 *.gsl
-scripts/
+*.vsix
 **/*.js
 **/*.js.map
-*.vsix
-node_modules
 compile.txt
-.vscode-test/
+node_modules
+scripts/*
+!scripts/syncToolsToPackageJson.js
+tools/credentials.json
 tsconfig.tsbuildinfo

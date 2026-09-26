@@ -125,14 +125,15 @@ export class FrozenScriptWarningManager {
                 });
                 this.latestData = this.readCsvTable(lines);
                 this.render();
-                this.pendingDataRefresh = setTimeout(
-                    this.refreshData.bind(this),
-                    POLLING_FREQUENCY,
-                );
             } catch (e) {
                 console.error(e);
             }
-        });
+        }).catch((e) => console.error(e));
+
+        this.pendingDataRefresh = setTimeout(
+            this.refreshData.bind(this),
+            POLLING_FREQUENCY,
+        );
     }
 
     private readCsvTable(lines: string[]): ResourceEntryMap {

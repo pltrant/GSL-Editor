@@ -1,14 +1,75 @@
-import { Pseudoterminal, EventEmitter, window, Terminal } from "vscode";
+import {
+    Pseudoterminal,
+    EventEmitter,
+    window,
+    Terminal,
+    ExtensionTerminalOptions,
+} from "vscode";
 
 import { BaseGameClient } from "./gameClients";
 
 export class GameTerminal {
-    private terminal: Terminal;
+    readonly terminal: Terminal;
+    private allowInput = true;
+
+    get inputEnabled() {
+        return this.allowInput;
+    }
+
+    set inputEnabled(enabled: boolean) {
+        if (this.allowInput === enabled) return;
+        this.allowInput = enabled;
+        if (this.isConnected) this.reportInputState();
+    }
+
+    get isConnected() {
+        return !!this.gameClient;
+    }
+
+    private reportInputState() {
+        this.write(
+            this.inputEnabled
+                ? "[Ready for input.]\r\n"
+                : "[Connected. Input locked while rollout is in progress.]\r\n",
+        );
+    }
+
+    connecting() {
+        this.write(
+            "[Waiting for a game connection: signing in or reusing an existing session...]\r\n",
+        );
+    }
+
+    connectionFailed(message: string) {
+        this.write(`[Connection unavailable: ${message}]\r\n`);
+    }
+    isClosed = false;
+    private opened = false;
+    private pendingOutput = "";
+    private markReady!: () => void;
+    readonly ready = new Promise<void>((resolve) => {
+        this.markReady = resolve;
+    });
+
+    write(text: string) {
+        if (this.isClosed) return;
+        if (this.opened) this.writeEmitter.fire(text);
+        else this.pendingOutput += text;
+    }
+
+    dispose() {
+        this.terminal.dispose();
+    }
+
+    get onDidClose() {
+        return this.closeEmitter.event;
+    }
 
     private closeEmitter: EventEmitter<number>;
     private writeEmitter: EventEmitter<string>;
 
     private gameClient?: BaseGameClient;
+    private unbindCurrentClient?: () => void;
 
     private ptyInputBuffer: string;
     private ptyInputIndex: number;
@@ -106,7 +167,12 @@ export class GameTerminal {
         }
     }
 
-    constructor(closed: () => void) {
+    constructor(
+        closed: () => void,
+        options: Partial<
+            Pick<ExtensionTerminalOptions, "name" | "location">
+        > = {},
+    ) {
         this.closeEmitter = new EventEmitter<number>();
         this.writeEmitter = new EventEmitter<string>();
 
@@ -119,14 +185,22 @@ export class GameTerminal {
             onDidClose: this.closeEmitter.event,
             onDidWrite: this.writeEmitter.event,
             open: () => {
+                this.opened = true;
                 this.writeEmitter.fire(
-                    "[Terminal is ready for development server connections.]\r\n",
+                    "[Initializing GSL terminal...]\r\n" + this.pendingOutput,
                 );
+                this.pendingOutput = "";
+                this.markReady();
             },
             close: () => {
+                this.isClosed = true;
+                this.markReady();
                 this.closeEmitter.fire(0);
+                this.closeEmitter.dispose();
+                this.writeEmitter.dispose();
             },
             handleInput: (data: string) => {
+                if (!this.inputEnabled || !this.isConnected) return;
                 const buffer = Buffer.from(data, "binary");
                 switch (buffer[0]) {
                     // case 0x09: // tab
@@ -153,7 +227,11 @@ export class GameTerminal {
 
         this.closeEmitter.event(() => closed());
 
-        this.terminal = window.createTerminal({ name: "GSL Development", pty });
+        this.terminal = window.createTerminal({
+            name: "GSL Development",
+            ...options,
+            pty,
+        });
     }
 
     show(preserveFocus?: boolean) {
@@ -165,9 +243,10 @@ export class GameTerminal {
     }
 
     bindClient(client: BaseGameClient) {
+        if (this.isClosed) return;
         if (this.gameClient === client) return;
         if (this.gameClient) {
-            throw new Error("Game client is already bound?");
+            this.unbindCurrentClient?.();
         }
 
         const unbindClient = () => {
@@ -178,45 +257,49 @@ export class GameTerminal {
             client.off("echo", handleClientEcho);
             closeEvent.dispose();
             this.gameClient = undefined;
+            this.unbindCurrentClient = undefined;
         };
 
         const handleClientError = (error: Error) => {
-            window.showErrorMessage(error.message);
+            this.connectionFailed(error.message);
+            void window.showErrorMessage(error.message);
             unbindClient();
         };
 
         const handleClientHello = () => {
-            this.writeEmitter.fire("[ *** Connected To Server *** ]\r\n");
+            this.write("[Game server connected.]\r\n");
         };
 
         const handleClientQuit = () => {
-            this.writeEmitter.fire("[ *** Disconnected from Server *** ]\r\n");
+            this.write(
+                "[Disconnected. Reconnect before entering commands.]\r\n",
+            );
             unbindClient();
         };
 
         const handleClientText = (text: string) => {
             if (this.ptyInputBuffer.length > 0) {
-                this.writeEmitter.fire(
+                this.write(
                     "\u001b[" + this.ptyInputBuffer.length + "D\u001b[K",
                 );
-                this.writeEmitter.fire(text);
-                this.writeEmitter.fire(this.ptyInputBuffer);
+                this.write(text);
+                this.write(this.ptyInputBuffer);
             } else {
-                this.writeEmitter.fire(text);
+                this.write(text);
             }
         };
 
         const handleClientEcho = (text: string) => {
             if (this.ptyInputBuffer.length > 0) {
-                this.writeEmitter.fire(
+                this.write(
                     "\u001b[" + this.ptyInputBuffer.length + "D\u001b[K",
                 );
-                this.writeEmitter.fire(text);
-                this.writeEmitter.fire("\r\n");
-                this.writeEmitter.fire(this.ptyInputBuffer);
+                this.write(text);
+                this.write("\r\n");
+                this.write(this.ptyInputBuffer);
             } else {
-                this.writeEmitter.fire(text);
-                this.writeEmitter.fire("\r\n");
+                this.write(text);
+                this.write("\r\n");
             }
         };
 
@@ -229,5 +312,8 @@ export class GameTerminal {
         client.on("echo", handleClientEcho);
 
         this.gameClient = client;
+        this.unbindCurrentClient = unbindClient;
+        this.write("[Game session attached. Terminal initialized.]\r\n");
+        this.reportInputState();
     }
 }
