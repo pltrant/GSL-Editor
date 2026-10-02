@@ -32,7 +32,7 @@ export async function runDiffWithLiveServerCommand({
 
         if (isNewOnRemote) {
             window.showWarningMessage(
-                `Script ${script}: Not found on ${label} server (appears to be new in Dev).`,
+                `Script ${script}: Not found on ${label} server.`,
                 { modal: true },
             );
             return;
@@ -40,7 +40,7 @@ export async function runDiffWithLiveServerCommand({
 
         if (remoteContent === localContent) {
             window.showWarningMessage(
-                `Script ${script}: No differences found between ${label} and Dev.`,
+                `Script ${script}: This file matches ${label} server.`,
                 { modal: true },
             );
             return;
@@ -77,7 +77,7 @@ export async function runDiffWithLiveServerCommand({
                 "vscode.diff",
                 remoteUri,
                 localUri,
-                `s${script} (${label} \u2194 Dev)`,
+                `s${script} (${label} \u2194 Local file)`,
             );
             diffOpened = true;
         } finally {
