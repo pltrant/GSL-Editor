@@ -129,7 +129,7 @@
             },
             {
                 "command": "gsl.diffWithLiveServer",
-                "title": "Diff with Live Server",
+                "title": "Compare Active File with Server",
                 "category": "GSL"
             },
             {

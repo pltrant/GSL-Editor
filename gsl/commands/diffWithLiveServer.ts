@@ -38,6 +38,12 @@ export async function runDiffWithLiveServerCommand({
             return;
         }
 
+        if (document.isDirty) {
+            void window.showWarningMessage(
+                "Warning: This file has unsaved changes.",
+            );
+        }
+
         if (remoteContent === localContent) {
             window.showWarningMessage(
                 `Script ${script}: This file matches ${label} server.`,
