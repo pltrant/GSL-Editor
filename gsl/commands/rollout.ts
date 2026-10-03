@@ -165,7 +165,7 @@ async function runRollout(
             subscriptions.push(pane.onDidClose(() => abort.abort()));
             pane.show(true);
         }
-        panes.get(origin.instance)!.show();
+        panes.get(origin.instance)!.show(true);
         for (const pane of panes.values()) await pane.ready;
         const clients = new Map<GameInstance, EditorClientInterface>();
         function options(instance: GameInstance): InitOptions {
@@ -268,7 +268,7 @@ async function runRollout(
                         for (const item of items) {
                             check();
                             const pane = panes.get(instance)!;
-                            pane.show();
+                            pane.show(true);
                             progress.report({
                                 message: `${instance}: ${rolloutCommand(action, item)} (${completed}/${total})`,
                             });
@@ -282,7 +282,7 @@ async function runRollout(
                                         throw new Error(
                                             `${instance} reconnected. Inspect the terminal before retrying.`,
                                         );
-                                    pane.show();
+                                    pane.show(true);
                                     return client.executeRollout(
                                         action,
                                         item,
@@ -298,7 +298,7 @@ async function runRollout(
                     }
                     check();
                     const devPane = panes.get("dev")!;
-                    devPane.show();
+                    devPane.show(true);
                     await withClientForInstance(
                         "dev",
                         options("dev"),
