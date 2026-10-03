@@ -2,7 +2,7 @@
     "name": "gsl",
     "displayName": "GSL",
     "description": "GSL Editor",
-    "version": "1.21.3",
+    "version": "1.21.4",
     "publisher": "patricktrant",
     "author": {
         "name": "Patrick Trant",
@@ -129,7 +129,7 @@
             },
             {
                 "command": "gsl.diffWithLiveServer",
-                "title": "Diff with Live Server",
+                "title": "Compare Active File with Server",
                 "category": "GSL"
             },
             {

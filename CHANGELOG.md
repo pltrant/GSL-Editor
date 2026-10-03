@@ -2,6 +2,20 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [1.21.5] - 2026-10-03
+
+### Changed
+
+- Renamed `GSL: Diff with Live Server` to `GSL: Compare Active File with Server`.
+- File comparisons now warn when you have unsaved changes.
+
+### Fixed
+
+- File comparisons now clearly label your file and the selected server.
+- Fixed terminals opening in separate groups when rerunning
+  `GSL: Deploy and Rollin Scripts`.
+- Deploy and rollin no longer moves keyboard focus to a terminal.
+
 ## [1.21.4] - 2026-09-21
 
 ### Added

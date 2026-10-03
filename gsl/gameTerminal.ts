@@ -4,6 +4,7 @@ import {
     window,
     Terminal,
     ExtensionTerminalOptions,
+    Disposable,
 } from "vscode";
 
 import { BaseGameClient } from "./gameClients";
@@ -58,8 +59,23 @@ export class GameTerminal {
     }
 
     dispose() {
+        if (this.isClosed) return;
+        this.close();
         this.terminal.dispose();
     }
+
+    private close() {
+        if (this.isClosed) return;
+        this.isClosed = true;
+        this.markReady();
+        this.terminalCloseSubscription?.dispose();
+        this.closeEmitter.fire(0);
+        this.closeEmitter.dispose();
+        this.writeEmitter.dispose();
+        this.pendingOutput = "";
+    }
+
+    private terminalCloseSubscription?: Disposable;
 
     get onDidClose() {
         return this.closeEmitter.event;
@@ -185,6 +201,7 @@ export class GameTerminal {
             onDidClose: this.closeEmitter.event,
             onDidWrite: this.writeEmitter.event,
             open: () => {
+                if (this.isClosed) return;
                 this.opened = true;
                 this.writeEmitter.fire(
                     "[Initializing GSL terminal...]\r\n" + this.pendingOutput,
@@ -192,13 +209,7 @@ export class GameTerminal {
                 this.pendingOutput = "";
                 this.markReady();
             },
-            close: () => {
-                this.isClosed = true;
-                this.markReady();
-                this.closeEmitter.fire(0);
-                this.closeEmitter.dispose();
-                this.writeEmitter.dispose();
-            },
+            close: () => this.close(),
             handleInput: (data: string) => {
                 if (!this.inputEnabled || !this.isConnected) return;
                 const buffer = Buffer.from(data, "binary");
@@ -232,6 +243,11 @@ export class GameTerminal {
             ...options,
             pty,
         });
+        this.terminalCloseSubscription = window.onDidCloseTerminal(
+            (terminal) => {
+                if (terminal === this.terminal) this.close();
+            },
+        );
     }
 
     show(preserveFocus?: boolean) {

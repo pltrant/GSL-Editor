@@ -2,7 +2,6 @@ import {
     commands,
     ExtensionContext,
     ProgressLocation,
-    TerminalLocation,
     window,
     workspace,
 } from "vscode";
@@ -16,6 +15,7 @@ import {
 } from "../editorClient";
 import { GameTerminal } from "../gameTerminal";
 import { parseRolloutInput, rolloutCommand } from "../rollout";
+import { createRolloutTerminals } from "./rolloutTerminals";
 
 const instances: GameInstance[] = [
     "dev",
@@ -145,46 +145,27 @@ async function runRollout(
     }
 
     const abort = new AbortController();
-    const panes = new Map<GameInstance, GameTerminal>();
+    const panes = createRolloutTerminals(
+        terminals,
+        participants.map(({ instance }) => ({
+            instance,
+            character: logins.get(instance)!.character,
+        })),
+    );
     const subscriptions: { dispose(): void }[] = [];
     let started = false;
     let completed = 0;
     try {
-        let originPane = terminals.get(origin.instance);
-        if (originPane?.isClosed) originPane = undefined;
-        for (const { instance } of participants) {
+        for (const [instance, pane] of panes) {
             const login = logins.get(instance)!;
-            let pane = instance === origin.instance ? originPane : undefined;
-            if (!pane) {
-                // Recreate only the target view to join the split. The cached
-                // connection is reused and its character remains logged in.
-                terminals.get(instance)?.dispose();
-                const newPane = new GameTerminal(
-                    () => {
-                        if (terminals.get(instance) === newPane)
-                            terminals.delete(instance);
-                    },
-                    {
-                        name: `GSL ${instance} · ${login.character}`,
-                        location: originPane
-                            ? { parentTerminal: originPane.terminal }
-                            : TerminalLocation.Panel,
-                    },
-                );
-                pane = newPane;
-                terminals.set(instance, pane);
-                context.subscriptions.push(pane);
-            }
-            originPane ??= pane;
-            panes.set(instance, pane);
-            pane.inputEnabled = false;
+            context.subscriptions.push(pane);
             pane.write(
                 `[${instance} · ${login.character}: waiting for connection setup.]\r\n`,
             );
             subscriptions.push(pane.onDidClose(() => abort.abort()));
             pane.show(true);
         }
-        originPane!.show();
+        panes.get(origin.instance)!.show(true);
         for (const pane of panes.values()) await pane.ready;
         const clients = new Map<GameInstance, EditorClientInterface>();
         function options(instance: GameInstance): InitOptions {
@@ -287,7 +268,7 @@ async function runRollout(
                         for (const item of items) {
                             check();
                             const pane = panes.get(instance)!;
-                            pane.show();
+                            pane.show(true);
                             progress.report({
                                 message: `${instance}: ${rolloutCommand(action, item)} (${completed}/${total})`,
                             });
@@ -301,7 +282,7 @@ async function runRollout(
                                         throw new Error(
                                             `${instance} reconnected. Inspect the terminal before retrying.`,
                                         );
-                                    pane.show();
+                                    pane.show(true);
                                     return client.executeRollout(
                                         action,
                                         item,
@@ -317,7 +298,7 @@ async function runRollout(
                     }
                     check();
                     const devPane = panes.get("dev")!;
-                    devPane.show();
+                    devPane.show(true);
                     await withClientForInstance(
                         "dev",
                         options("dev"),

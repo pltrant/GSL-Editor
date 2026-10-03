@@ -516,7 +516,10 @@ export class VSCodeIntegration {
                 label: "Format Document Indentation",
                 name: "gsl.formatIndentation",
             },
-            { label: "Diff with Live Server", name: "gsl.diffWithLiveServer" },
+            {
+                label: "Compare Active File with Server",
+                name: "gsl.diffWithLiveServer",
+            },
             { label: "Sync Agent Prompts", name: "gsl.syncAgentPrompts" },
             { label: "Copilot Code Review", name: "gsl.copilotCodeReview" },
             {
