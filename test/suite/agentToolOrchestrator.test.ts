@@ -169,7 +169,7 @@ suite("ToolOrchestrator", () => {
 
     test("getScriptData throws when dev credentials missing", async () => {
         const orch = new AgentToolOrchestrator(makeDeps(depsWithout("dev")));
-        await assert.rejects(() => orch.getScriptData(123, "GS4D"), {
+        await assert.rejects(() => orch.getScriptData(123, "dev"), {
             message: /dev server not configured/,
         });
     });

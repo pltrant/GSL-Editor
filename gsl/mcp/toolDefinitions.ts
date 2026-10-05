@@ -367,8 +367,10 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
                     enum: ["dev", "prime", "shattered", "platinum", "test"],
                     default: "dev",
                     description:
-                        "Which game instance to query script data for. Maps to game codes: " +
-                        "dev=GS4D, prime=GS4, shattered=GSF, platinum=GS4X, test=GST. Defaults to 'dev'.",
+                        "Which game instance to query through the configured Dev connection. " +
+                        "Game codes follow the Dev login: GemStone dev=GS4D, prime=GS4, " +
+                        "platinum=GS4X, test=GST, shattered=GSF; DragonRealms dev=DRD, " +
+                        "prime=DR, platinum=DRX, test=DRT, shattered=DRF. Defaults to 'dev'.",
                 },
             },
         },
