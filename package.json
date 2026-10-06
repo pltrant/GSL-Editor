@@ -29,7 +29,7 @@
         "vscode": "^1.109.0"
     },
     "dependencies": {
-        "@modelcontextprotocol/sdk": "^1.29.0",
+        "@modelcontextprotocol/sdk": "^1.31.0",
         "csv-parse": "^7.0.2",
         "diff": "^8.0.3"
     },
