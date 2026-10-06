@@ -270,17 +270,47 @@ export class AgentToolOrchestrator {
         );
     }
 
-    async getScriptData(scriptId: number, gameCode: string): Promise<string> {
-        throwOnControlCharacters(gameCode);
-        return this.withClient("dev", (client) =>
-            this.executeShowCommand(
+    async getScriptData(
+        scriptId: number,
+        instance: GameInstance = "dev",
+    ): Promise<string> {
+        // /ss queries every instance through Dev, using that worker's game.
+        return this.withClient("dev", async (client, credentials) => {
+            const gameCodes: Record<GameInstance, string> = credentials.instance
+                .trim()
+                .toUpperCase()
+                .startsWith("DR")
+                ? {
+                      dev: "DRD",
+                      prime: "DR",
+                      platinum: "DRX",
+                      test: "DRT",
+                      shattered: "DRF",
+                  }
+                : {
+                      dev: "GS4D",
+                      prime: "GS4",
+                      platinum: "GS4X",
+                      test: "GST",
+                      shattered: "GSF",
+                  };
+            // DR reports missing scripts after the Game header; GS can report
+            // them before it. Recognize the error on either side of the header.
+            const output = await this.executeShowCommand(
                 client,
-                `/ss ${scriptId} ${gameCode} raw`,
+                `/ss ${scriptId} ${gameCodes[instance]} raw`,
                 /^Game: /,
-                /^On |^Unspecified Date/,
-                /^Invalid script/,
-            ),
-        );
+                /^On |^Unspecified Date|^Invalid script|^Script \d+ does not exist\./,
+                /^Invalid script|^Script \d+ does not exist\./,
+            );
+            const error = output
+                .split("\n")
+                .find((line) =>
+                    /^Invalid script|^Script \d+ does not exist\./.test(line),
+                );
+            if (error) throw new Error(error);
+            return output;
+        });
     }
 
     async getGlobalTableData(

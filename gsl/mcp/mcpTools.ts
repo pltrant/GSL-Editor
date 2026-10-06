@@ -106,14 +106,6 @@ function parseInstance(
     return value as GameInstance;
 }
 
-const SCRIPT_DATA_GAME_CODES: Record<GameInstance, string> = {
-    dev: "GS4D",
-    shattered: "GSF",
-    prime: "GS4",
-    test: "GST",
-    platinum: "GS4X",
-};
-
 // ---------------------------------------------------------------------------
 // Tool handler factory
 // ---------------------------------------------------------------------------
@@ -310,14 +302,13 @@ export function createMcpToolHandler(
                         "scriptId",
                     );
                     const instance = parseInstance(args.instance, "dev");
-                    const gameCode = SCRIPT_DATA_GAME_CODES[instance];
                     const output = await orchestrator.getScriptData(
                         scriptId,
-                        gameCode,
+                        instance,
                     );
                     if (!output || output.trim().length === 0) {
                         return textResult(
-                            `Script ${scriptId}: No data returned for ${instance} (${gameCode}).`,
+                            `Script ${scriptId}: No data returned for ${instance}.`,
                         );
                     }
                     return textResult(output);

@@ -2,6 +2,11 @@ import * as assert from "assert";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+import {
+    ClientTask,
+    EditorClientInterface,
+    InitOptions,
+} from "../../gsl/editorClient";
 import { TOOL_DEFINITIONS, createMcpToolHandler } from "../../gsl/mcp/mcpTools";
 import {
     AgentToolOrchestrator,
@@ -77,6 +82,135 @@ suite("MCP Tool Definitions", () => {
             assert.ok(tool.inputSchema, `${tool.name} missing inputSchema`);
         }
     });
+});
+
+suite("MCP Script Metadata", () => {
+    for (const [loginInstance, response] of [
+        ["DRD", ["Game: DRD", "Script 999999 does not exist."]],
+        ["GS4D", ["Invalid script number: 999999"]],
+    ] as const) {
+        test(`${loginInstance} missing script returns a tool error without waiting for a date`, async () => {
+            const client = {
+                executeCommand: async (_command: string, options: any) => {
+                    const error = response[response.length - 1];
+                    if (response.length > 1) {
+                        assert.ok(options.captureStart.test(response[0]));
+                        assert.ok(
+                            options.captureEnd.test(error),
+                            "Missing-script response must end capture after Game:",
+                        );
+                        assert.strictEqual(options.includeEndLine, true);
+                    } else {
+                        assert.ok(options.abortPattern.test(error));
+                    }
+                    assert.ok(
+                        !options.captureEnd.test(
+                            "Name: Script 999999 does not exist.",
+                        ),
+                    );
+                    return [...response];
+                },
+            } as unknown as EditorClientInterface;
+            const orch = new AgentToolOrchestrator(
+                makeDeps({
+                    getCredentials: async () => ({
+                        ...DEV_CREDS,
+                        instance: loginInstance,
+                    }),
+                }),
+                async <T>(
+                    _key: string,
+                    _options: InitOptions,
+                    task: ClientTask<T>,
+                ): Promise<T> => task(client),
+            );
+            const result = await createMcpToolHandler(
+                "gsl_get_script_ss_metadata",
+                orch,
+            )({ scriptId: 999999 });
+            assert.strictEqual(result.isError, true);
+            assert.strictEqual(
+                result.content[0].text,
+                response[response.length - 1],
+            );
+        });
+    }
+
+    for (const [loginInstance, codes] of [
+        ["GS4D", ["GS4D", "GS4", "GS4X", "GST", "GSF"]],
+        ["DRD", ["DRD", "DR", "DRX", "DRT", "DRF"]],
+    ] as const) {
+        for (const pooled of [false, true]) {
+            test(`${loginInstance} metadata uses the correct game codes (${pooled ? "pool" : "single worker"})`, async () => {
+                const instances: GameInstance[] = [
+                    "dev",
+                    "prime",
+                    "platinum",
+                    "test",
+                    "shattered",
+                ];
+                const commands: string[] = [];
+                const response = [
+                    "Game: " + loginInstance,
+                    "Name: Example",
+                    "Last modified by: Tester",
+                    "On Mon Oct 05 12:00:00 2026",
+                ];
+                const client = {
+                    executeCommand: async (command: string, options: any) => {
+                        commands.push(command);
+                        assert.ok(options.captureStart.test(response[0]));
+                        assert.ok(
+                            !options.captureStart.test("prefix " + response[0]),
+                        );
+                        assert.ok(options.captureEnd.test(response[3]));
+                        assert.ok(
+                            options.captureEnd.test(
+                                "Unspecified Date (Dec 1969)",
+                            ),
+                        );
+                        return response;
+                    },
+                } as unknown as EditorClientInterface;
+                const creds = { ...DEV_CREDS, instance: loginInstance };
+                const orch = new AgentToolOrchestrator(
+                    makeDeps({
+                        getCredentials: async (instance) => {
+                            assert.strictEqual(instance, "dev");
+                            return pooled ? [creds] : creds;
+                        },
+                    }),
+                    async <T>(
+                        _key: string,
+                        options: InitOptions,
+                        task: ClientTask<T>,
+                    ): Promise<T> => {
+                        assert.strictEqual(
+                            options.login.instance,
+                            loginInstance,
+                        );
+                        return task(client);
+                    },
+                );
+                const handler = createMcpToolHandler(
+                    "gsl_get_script_ss_metadata",
+                    orch,
+                );
+                for (const instance of [undefined, ...instances]) {
+                    const result = await handler({ scriptId: 123, instance });
+                    assert.ok(!result.isError);
+                    assert.strictEqual(
+                        result.content[0].text,
+                        response.join("\n"),
+                    );
+                }
+                assert.deepStrictEqual(
+                    commands,
+                    [codes[0], ...codes].map((code) => `/ss 123 ${code} raw`),
+                );
+            });
+        }
+    }
 });
 
 suite("MCP Tool Handlers", () => {
