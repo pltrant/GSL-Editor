@@ -11,6 +11,8 @@ All notable changes to the GSL Editor extension will be documented in this file.
   when an id is missing.
 - MCP `/agent` commands now fail immediately with the script traceback when
   the `/agent` script errors, instead of waiting for the command timeout.
+- A game login that stalls now fails after 20 seconds instead of blocking
+  every later login until the extension restarts.
 
 ## [1.21.5] - 2026-10-03
 
