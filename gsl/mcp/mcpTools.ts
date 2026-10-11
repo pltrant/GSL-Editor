@@ -19,20 +19,77 @@ export interface McpToolResult {
 // Validation helpers
 // ---------------------------------------------------------------------------
 
-function parseRequiredPositiveInt(value: unknown, label: string): number {
-    if (
-        value === undefined ||
-        value === null ||
-        typeof value !== "number" ||
-        !Number.isInteger(value) ||
-        value < 1 ||
-        value > 999999
-    ) {
-        throw new Error(
-            `Missing or invalid ${label}. Expected an integer between 1 and 999999.`,
+/**
+ * Reads an id argument as an integer. Agents often send ids as numeric
+ * strings (e.g. "24262"), so trimmed decimal strings are accepted alongside
+ * integers. With `allowScriptPrefix`, a leading S/s is also accepted
+ * ("S24262"). Returns undefined for anything else.
+ */
+export function coerceInteger(
+    value: unknown,
+    { allowScriptPrefix = false }: { allowScriptPrefix?: boolean } = {},
+): number | undefined {
+    if (typeof value === "number") {
+        return Number.isInteger(value) ? value : undefined;
+    }
+    if (typeof value !== "string") return undefined;
+    const trimmed = value.trim();
+    const text = allowScriptPrefix ? trimmed.replace(/^s(?=\d)/i, "") : trimmed;
+    if (!/^-?\d+$/.test(text)) return undefined;
+    const parsed = Number(text);
+    return Number.isSafeInteger(parsed) ? parsed : undefined;
+}
+
+/**
+ * Builds the invalid-id error. When the parameter is absent entirely, the
+ * received keys are listed so a misnamed parameter (e.g. tableNumber instead
+ * of tableId) is obvious to the caller.
+ */
+function invalidIdError(
+    label: string,
+    args: Record<string, unknown>,
+    expectation: string,
+): Error {
+    const receivedKeys =
+        args[label] === undefined
+            ? ` (received keys: ${Object.keys(args).join(", ") || "none"})`
+            : "";
+    return new Error(
+        `Missing or invalid ${label}${receivedKeys}. ${expectation}`,
+    );
+}
+
+function parseRequiredPositiveInt(
+    value: unknown,
+    label: string,
+    args: Record<string, unknown>,
+    options?: { allowScriptPrefix?: boolean },
+): number {
+    const parsed = coerceInteger(value, options);
+    if (parsed === undefined || parsed < 1 || parsed > 999999) {
+        throw invalidIdError(
+            label,
+            args,
+            "Expected an integer between 1 and 999999.",
         );
     }
-    return value;
+    return parsed;
+}
+
+function parseScriptNumbers(args: Record<string, unknown>): number[] {
+    const values = Array.isArray(args.scriptNumber)
+        ? args.scriptNumber
+        : [args.scriptNumber];
+    if (values.length === 0) {
+        throw new Error(
+            "scriptNumber must contain at least one script number.",
+        );
+    }
+    return values.map((value) =>
+        parseRequiredPositiveInt(value, "scriptNumber", args, {
+            allowScriptPrefix: true,
+        }),
+    );
 }
 
 function parseDiffContext(value: unknown): number {
@@ -50,34 +107,24 @@ function parseDiffContext(value: unknown): number {
     return value;
 }
 
-function parseRequiredRoomId(value: unknown): number {
-    if (
-        value === undefined ||
-        value === null ||
-        typeof value !== "number" ||
-        !Number.isInteger(value) ||
-        value < 1
-    ) {
-        throw new Error(
-            "Missing or invalid roomId. Provide a positive integer.",
-        );
+function parseRequiredRoomId(args: Record<string, unknown>): number {
+    const roomId = coerceInteger(args.roomId);
+    if (roomId === undefined || roomId < 1) {
+        throw invalidIdError("roomId", args, "Provide a positive integer.");
     }
-    return value;
+    return roomId;
 }
 
-function parseRequiredExistenceId(value: unknown): number {
-    if (
-        value === undefined ||
-        value === null ||
-        typeof value !== "number" ||
-        !Number.isInteger(value) ||
-        value === 0
-    ) {
-        throw new Error(
-            "Missing or invalid existenceId. Provide a non-zero integer.",
+function parseRequiredExistenceId(args: Record<string, unknown>): number {
+    const existenceId = coerceInteger(args.existenceId);
+    if (existenceId === undefined || existenceId === 0) {
+        throw invalidIdError(
+            "existenceId",
+            args,
+            "Provide a non-zero integer.",
         );
     }
-    return value;
+    return existenceId;
 }
 
 const VALID_SVF_VERBOSITIES = new Set(["Full", "NoTables", "SkipDefaults"]);
@@ -187,7 +234,7 @@ export function createMcpToolHandler(
         case "gsl_get_room_data":
             return async (args) => {
                 try {
-                    const roomId = parseRequiredRoomId(args.roomId);
+                    const roomId = parseRequiredRoomId(args);
                     const instance = parseInstance(args.instance, "dev");
                     const output = await orchestrator.getRoomData(
                         roomId,
@@ -209,9 +256,7 @@ export function createMcpToolHandler(
         case "gsl_get_existence_data":
             return async (args) => {
                 try {
-                    const existenceId = parseRequiredExistenceId(
-                        args.existenceId,
-                    );
+                    const existenceId = parseRequiredExistenceId(args);
                     const instance = parseInstance(args.instance, "dev");
                     const output = await orchestrator.getExistenceData(
                         existenceId,
@@ -300,6 +345,8 @@ export function createMcpToolHandler(
                     const scriptId = parseRequiredPositiveInt(
                         args.scriptId,
                         "scriptId",
+                        args,
+                        { allowScriptPrefix: true },
                     );
                     const instance = parseInstance(args.instance, "dev");
                     const output = await orchestrator.getScriptData(
@@ -352,6 +399,7 @@ export function createMcpToolHandler(
                     const tableId = parseRequiredPositiveInt(
                         args.tableId,
                         "tableId",
+                        args,
                     );
                     const instance = parseInstance(args.instance, "dev");
                     const output = await orchestrator.getGlobalTableData(
@@ -374,17 +422,7 @@ export function createMcpToolHandler(
         case "gsl_diff_script_across_instances":
             return async (args) => {
                 try {
-                    const values = Array.isArray(args.scriptNumber)
-                        ? args.scriptNumber
-                        : [args.scriptNumber];
-                    if (values.length === 0) {
-                        throw new Error(
-                            "scriptNumber must contain at least one script number.",
-                        );
-                    }
-                    const scriptNumbers = values.map((value) =>
-                        parseRequiredPositiveInt(value, "scriptNumber"),
-                    );
+                    const scriptNumbers = parseScriptNumbers(args);
                     const baseInstance = parseInstance(
                         args.baseInstance,
                         "prime",
@@ -481,17 +519,7 @@ export function createMcpToolHandler(
         case "gsl_download_script":
             return async (args) => {
                 try {
-                    const values = Array.isArray(args.scriptNumber)
-                        ? args.scriptNumber
-                        : [args.scriptNumber];
-                    if (values.length === 0) {
-                        throw new Error(
-                            "scriptNumber must contain at least one script number.",
-                        );
-                    }
-                    const scriptNumbers = values.map((value) =>
-                        parseRequiredPositiveInt(value, "scriptNumber"),
-                    );
+                    const scriptNumbers = parseScriptNumbers(args);
                     const instance = parseInstance(args.instance, "dev");
                     const result: McpToolResult = { content: [] };
                     for (const scriptNumber of scriptNumbers) {

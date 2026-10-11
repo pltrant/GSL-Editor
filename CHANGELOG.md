@@ -2,6 +2,14 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- MCP tools now accept ids passed as numeric strings (such as `"24262"`
+  or `"S24262"` for scripts), and report the received parameter names
+  when an id is missing.
+
 ## [1.21.5] - 2026-10-03
 
 ### Changed

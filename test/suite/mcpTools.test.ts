@@ -7,7 +7,11 @@ import {
     EditorClientInterface,
     InitOptions,
 } from "../../gsl/editorClient";
-import { TOOL_DEFINITIONS, createMcpToolHandler } from "../../gsl/mcp/mcpTools";
+import {
+    TOOL_DEFINITIONS,
+    coerceInteger,
+    createMcpToolHandler,
+} from "../../gsl/mcp/mcpTools";
 import {
     AgentToolOrchestrator,
     AgentToolOrchestratorDeps,
@@ -54,6 +58,55 @@ function makeDeps(
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+suite("MCP Id Coercion", () => {
+    test("coerceInteger accepts integers and numeric strings", () => {
+        for (const [value, expected] of [
+            [24262, 24262],
+            [-516105, -516105],
+            ["24262", 24262],
+            ["  24262\t", 24262],
+            ["-516105", -516105],
+            ["00123", 123],
+        ] as const) {
+            assert.strictEqual(coerceInteger(value), expected, String(value));
+        }
+    });
+
+    test("coerceInteger rejects non-integer input", () => {
+        for (const value of [
+            undefined,
+            null,
+            1.5,
+            NaN,
+            "",
+            "  ",
+            "1.5",
+            "1e3",
+            "0x10",
+            "+5",
+            "12 34",
+            "abc",
+            "S24262",
+            "99999999999999999999",
+            true,
+            [123],
+            { value: 123 },
+        ]) {
+            assert.strictEqual(coerceInteger(value), undefined, String(value));
+        }
+    });
+
+    test("coerceInteger accepts an S prefix only for script numbers", () => {
+        const options = { allowScriptPrefix: true };
+        assert.strictEqual(coerceInteger("S24262", options), 24262);
+        assert.strictEqual(coerceInteger(" s24262 ", options), 24262);
+        assert.strictEqual(coerceInteger("24262", options), 24262);
+        for (const value of ["S", "S-5", "SS24262", "S 24262", "T24262"]) {
+            assert.strictEqual(coerceInteger(value, options), undefined, value);
+        }
+    });
+});
 
 suite("MCP Tool Definitions", () => {
     test("all expected tools are defined", () => {
@@ -328,6 +381,97 @@ suite("MCP Tool Handlers", () => {
         assert.ok(result.isError);
         assert.ok(result.content[0].text.includes("tableId"));
     });
+
+    test("gsl_get_table_metadata accepts a numeric string tableId", async () => {
+        const orch = new AgentToolOrchestrator(makeDeps());
+        const calls: Array<[number, GameInstance | undefined]> = [];
+        orch.getGlobalTableData = async (tableId, instance) => {
+            calls.push([tableId, instance]);
+            return `Table ${tableId}`;
+        };
+        const result = await createMcpToolHandler(
+            "gsl_get_table_metadata",
+            orch,
+        )({ tableId: "11424" });
+        assert.ok(!result.isError);
+        assert.deepStrictEqual(calls, [[11424, "dev"]]);
+    });
+
+    test("gsl_get_table_metadata error lists received keys when tableId is absent", async () => {
+        const orch = new AgentToolOrchestrator(makeDeps());
+        orch.getGlobalTableData = async () => {
+            throw new Error("must not be called");
+        };
+        const handler = createMcpToolHandler("gsl_get_table_metadata", orch);
+        assert.deepStrictEqual(await handler({ tableNumber: "11424" }), {
+            content: [
+                {
+                    type: "text",
+                    text: "Missing or invalid tableId (received keys: tableNumber). Expected an integer between 1 and 999999.",
+                },
+            ],
+            isError: true,
+        });
+        assert.strictEqual(
+            (await handler({})).content[0].text,
+            "Missing or invalid tableId (received keys: none). Expected an integer between 1 and 999999.",
+        );
+    });
+
+    test("gsl_get_table_metadata rejects invalid tableId values without listing keys", async () => {
+        const orch = new AgentToolOrchestrator(makeDeps());
+        const handler = createMcpToolHandler("gsl_get_table_metadata", orch);
+        for (const tableId of ["abc", "1000000"]) {
+            const result = await handler({ tableId });
+            assert.ok(result.isError, String(tableId));
+            assert.strictEqual(
+                result.content[0].text,
+                "Missing or invalid tableId. Expected an integer between 1 and 999999.",
+            );
+        }
+    });
+
+    test("room, existence, and script metadata ids accept numeric strings", async () => {
+        const orch = new AgentToolOrchestrator(makeDeps());
+        const calls: Array<[string, number]> = [];
+        orch.getRoomData = async (id) => {
+            calls.push(["room", id]);
+            return "room";
+        };
+        orch.getExistenceData = async (id) => {
+            calls.push(["existence", id]);
+            return "existence";
+        };
+        orch.getScriptData = async (id) => {
+            calls.push(["script", id]);
+            return "ss";
+        };
+        for (const [tool, args] of [
+            ["gsl_get_room_data", { roomId: "123" }],
+            ["gsl_get_existence_data", { existenceId: "-516105" }],
+            ["gsl_get_script_ss_metadata", { scriptId: "S24262" }],
+        ] as const) {
+            const result = await createMcpToolHandler(tool, orch)(args);
+            assert.ok(!result.isError, tool);
+        }
+        assert.deepStrictEqual(calls, [
+            ["room", 123],
+            ["existence", -516105],
+            ["script", 24262],
+        ]);
+    });
+
+    test("room error lists received keys when roomId is absent", async () => {
+        const orch = new AgentToolOrchestrator(makeDeps());
+        const room = await createMcpToolHandler(
+            "gsl_get_room_data",
+            orch,
+        )({ room: 123, instance: "dev" });
+        assert.strictEqual(
+            room.content[0].text,
+            "Missing or invalid roomId (received keys: room, instance). Provide a positive integer.",
+        );
+    });
 });
 
 suite("MCP Script Downloads", () => {
@@ -393,6 +537,22 @@ suite("MCP Script Downloads", () => {
         }
     });
 
+    test("numeric string script numbers are coerced", async () => {
+        const result = await createMcpToolHandler(
+            "gsl_download_script",
+            orch,
+        )({ scriptNumber: ["123", " S456 "] });
+        assert.ok(!result.isError);
+        assert.deepStrictEqual(calls, [
+            [123, "dev"],
+            [456, "dev"],
+        ]);
+        assert.deepStrictEqual(fs.readdirSync(dir).sort(), [
+            "S00123.dev.mcp.gsl",
+            "S00456.dev.mcp.gsl",
+        ]);
+    });
+
     test("invalid batches are rejected before any downloads", async () => {
         const handler = createMcpToolHandler("gsl_download_script", orch);
         for (const scriptNumber of [
@@ -401,7 +561,9 @@ suite("MCP Script Downloads", () => {
             [123, 0],
             [123, 1000000],
             [123, 1.5],
-            [123, "456"],
+            [123, "abc"],
+            [123, "4 56"],
+            [123, "T456"],
             [[123]],
         ]) {
             const result = await handler({ scriptNumber });
@@ -468,6 +630,29 @@ suite("MCP Script Diffs", () => {
         assert.ok(scalar.content[0].text.includes("-prime\n+dev"));
     });
 
+    test("numeric string script numbers match integer output", async () => {
+        const expected = await diff({
+            scriptNumber: 24262,
+            baseInstance: "prime",
+            compareInstance: "dev",
+        });
+        assert.ok(!expected.isError);
+        assert.deepStrictEqual(
+            await diff({
+                scriptNumber: "S24262",
+                baseInstance: "prime",
+                compareInstance: "dev",
+            }),
+            expected,
+        );
+    });
+
+    test("missing scriptNumber lists received keys", async () => {
+        const result = await diff({ scriptId: 123 });
+        assert.ok(result.isError);
+        assert.ok(result.content[0].text.includes("(received keys: scriptId)"));
+    });
+
     test("batch preserves order and shares instances and context", async () => {
         const result = await diff({
             scriptNumber: [456, 123],
@@ -496,7 +681,9 @@ suite("MCP Script Diffs", () => {
             [123, 0],
             [123, 1000000],
             [123, 1.5],
-            [123, "456"],
+            [123, "abc"],
+            [123, "4 56"],
+            [123, "T456"],
             [[123]],
         ]) {
             assert.ok((await diff({ scriptNumber })).isError);
