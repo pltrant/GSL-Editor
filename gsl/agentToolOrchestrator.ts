@@ -1,4 +1,8 @@
 import {
+    ScriptErrorPatterns,
+    agentScriptErrorPatterns,
+} from "./commandScriptError";
+import {
     EditorClientInterface,
     InitOptions,
     ScriptCompileResults,
@@ -144,13 +148,22 @@ export class AgentToolOrchestrator {
         captureStart: RegExp,
         captureEnd: RegExp,
         abortPattern: RegExp,
-        { includeStartLine = true, includeEndLine = true } = {},
+        {
+            includeStartLine = true,
+            includeEndLine = true,
+            scriptError,
+        }: {
+            includeStartLine?: boolean;
+            includeEndLine?: boolean;
+            scriptError?: ScriptErrorPatterns;
+        } = {},
     ): Promise<string> {
         const TIMEOUT_MS = 15000;
         const lines = await client.executeCommand(command, {
             captureStart,
             captureEnd,
             abortPattern,
+            scriptError,
             timeoutMillis: TIMEOUT_MS,
             includeStartLine,
             includeEndLine,
@@ -250,7 +263,12 @@ export class AgentToolOrchestrator {
             /^<<<beginning of output>>>/,
             /^<<<end of output>>>/,
             /(?!)/,
-            { includeStartLine: false, includeEndLine: false },
+            {
+                includeStartLine: false,
+                includeEndLine: false,
+                // A runtime error never prints the end marker.
+                scriptError: agentScriptErrorPatterns(fullCommand),
+            },
         );
     }
 

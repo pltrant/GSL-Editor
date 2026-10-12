@@ -1,4 +1,5 @@
 import * as assert from "assert";
+import { agentScriptErrorPatterns } from "../../gsl/commandScriptError";
 import {
     ClientTask,
     EditorClientInterface,
@@ -143,6 +144,33 @@ suite("ToolOrchestrator", () => {
         const result = await orch.executeAgentCommand("/example", "dev");
 
         assert.strictEqual(result, "example rows");
+    });
+
+    test("executeAgentCommand passes script-error patterns and rethrows", async () => {
+        const client = {
+            executeCommand: async (_command: string, options: any) => {
+                assert.deepStrictEqual(
+                    options.scriptError,
+                    agentScriptErrorPatterns("/agent /staff list"),
+                );
+                const error = new Error("script error");
+                error.name = "CommandScriptError";
+                throw error;
+            },
+        } as unknown as EditorClientInterface;
+        const runWithClient = async <T>(
+            _instance: string,
+            _options: InitOptions,
+            task: ClientTask<T>,
+        ): Promise<T> => task(client);
+        const orch = new AgentToolOrchestrator(makeDeps(), runWithClient);
+
+        await assert.rejects(
+            () => orch.executeAgentCommand("/staff list", "dev"),
+            {
+                name: "CommandScriptError",
+            },
+        );
     });
 
     test("getExistenceData throws when dev credentials missing", async () => {
