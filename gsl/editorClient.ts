@@ -1,6 +1,11 @@
 import * as path from "path";
+import {
+    CommandScriptErrorDetector,
+    ScriptErrorPatterns,
+    commandScriptError,
+} from "./commandScriptError";
 import { CommandTimeoutDiagnostics } from "./commandTimeoutDiagnostics";
-import { executeRolloutCommand, RolloutItem } from "./rollout";
+import { executeRolloutCommand, probeSession, RolloutItem } from "./rollout";
 
 import { BaseGameClient, GameClientOptions } from "./gameClients";
 import { EAccessClient } from "./eaccessClient";
@@ -187,6 +192,7 @@ const NON_RESETTABLE_ERROR_NAMES = new Set([
     "EditorClientMissingScriptError",
     // Definitive server failures can keep the connection; unknown outcomes reset.
     "RolloutCommandError",
+    "CommandScriptError",
 ]);
 
 function getErrorCode(error: Error): string | undefined {
@@ -194,7 +200,7 @@ function getErrorCode(error: Error): string | undefined {
     return typeof code === "string" ? code : undefined;
 }
 
-function shouldResetClient(error: Error): boolean {
+export function shouldResetClient(error: Error): boolean {
     if (NON_RESETTABLE_ERROR_NAMES.has(error.name)) {
         return false;
     }
@@ -508,7 +514,7 @@ export const withClientForInstance = async <T>(
 export type EditorClientInterface = InstanceType<typeof EditorClient>;
 
 class EditorClient extends BaseGameClient {
-    private rolloutInProgress = false;
+    private autoReconnectSuspended = false;
 
     matchesLogin(login: InitOptions["login"]): boolean {
         return ["account", "instance", "character"].every(
@@ -518,24 +524,35 @@ class EditorClient extends BaseGameClient {
         );
     }
 
-    async executeRollout(
+    executeRollout(
         action: "deploy" | "rollin",
         item: RolloutItem,
         scriptId: number | undefined,
         signal: AbortSignal,
     ): Promise<number> {
+        return this.withAutoReconnectSuspended(() =>
+            executeRolloutCommand(this, action, item, scriptId, signal),
+        );
+    }
+
+    /** Rejects with a StaleSessionError if the session no longer responds. */
+    verifySession(signal: AbortSignal): Promise<void> {
+        return this.withAutoReconnectSuspended(() =>
+            probeSession(this, signal),
+        );
+    }
+
+    /** No auto-reconnect or command retry: a reconnect would log in a
+     * session nobody owns, and a mutation's outcome would be unknown. */
+    private async withAutoReconnectSuspended<T>(
+        operation: () => Promise<T>,
+    ): Promise<T> {
         this.retryCommand = "";
-        this.rolloutInProgress = true;
+        this.autoReconnectSuspended = true;
         try {
-            return await executeRolloutCommand(
-                this,
-                action,
-                item,
-                scriptId,
-                signal,
-            );
+            return await operation();
         } finally {
-            this.rolloutInProgress = false;
+            this.autoReconnectSuspended = false;
         }
     }
     private interactive: boolean;
@@ -604,7 +621,7 @@ class EditorClient extends BaseGameClient {
     }
 
     protected serverError(error: any): void {
-        if (this.rolloutInProgress) {
+        if (this.autoReconnectSuspended) {
             super.serverError(error);
             return;
         }
@@ -987,6 +1004,7 @@ class EditorClient extends BaseGameClient {
             captureStart,
             captureEnd,
             abortPattern,
+            scriptError,
             timeoutMillis,
             includeStartLine,
             includeEndLine,
@@ -995,6 +1013,8 @@ class EditorClient extends BaseGameClient {
             captureEnd: RegExp;
             /** If matched before captureStart, resolves immediately with that line. */
             abortPattern?: RegExp;
+            /** Rejects with a traceback that ends with `end` and contains `owner`. */
+            scriptError?: ScriptErrorPatterns;
             timeoutMillis: number;
             includeStartLine?: boolean;
             includeEndLine?: boolean;
@@ -1008,6 +1028,8 @@ class EditorClient extends BaseGameClient {
             character = "unknown",
         } = this.loginDetails ?? {};
         const diagnostics = new CommandTimeoutDiagnostics([account, password]);
+        const scriptErrors =
+            scriptError && new CommandScriptErrorDetector(scriptError);
 
         return new Promise((resolve, reject) => {
             let seenStart = false;
@@ -1016,6 +1038,14 @@ class EditorClient extends BaseGameClient {
             const output = new OutputProcessor((line: string) => {
                 diagnostics.record(line);
                 line = stripGamePrompt(line);
+                // Script errors can arrive before or after the start marker
+                const report = scriptErrors?.record(line);
+                if (report) {
+                    this.off("text", processText);
+                    clearTimeout(timeout);
+                    reject(commandScriptError(command, report, { seenStart }));
+                    return;
+                }
                 // Check capture start
                 if (!seenStart) {
                     // Check abort pattern before start marker

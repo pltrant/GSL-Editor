@@ -33,6 +33,9 @@ export interface ServerConnectionOptions {
 }
 
 export class ServerConnection extends EventEmitter {
+    /** How long close() waits for the server to close the socket before destroying it. */
+    static closeGraceMillis: number = 2_000;
+
     private socket: Socket;
 
     private options: any;
@@ -156,6 +159,12 @@ export class ServerConnection extends EventEmitter {
             this.console.log("Connection#close");
         }
         this.socketEnd();
+        // Ending only half-closes the socket. If the server never closes its
+        // side, the connection (and game session) would stay open, so force it.
+        setTimeout(
+            () => this.socket.destroy(),
+            ServerConnection.closeGraceMillis,
+        ).unref();
     }
 
     /* private */

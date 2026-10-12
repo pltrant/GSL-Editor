@@ -168,13 +168,18 @@ async function runRollout(
         panes.get(origin.instance)!.show(true);
         for (const pane of panes.values()) await pane.ready;
         const clients = new Map<GameInstance, EditorClientInterface>();
+        // Sessions logged in during this rollout are alive by construction.
+        const createdClients = new WeakSet<EditorClientInterface>();
         function options(instance: GameInstance): InitOptions {
             return {
                 login: logins.get(instance)!,
                 downloadLocation: GSLExtension.getDownloadLocation(),
                 loggingEnabled: false,
                 console,
-                onCreate: (client) => panes.get(instance)!.bindClient(client),
+                onCreate: (client) => {
+                    createdClients.add(client);
+                    panes.get(instance)!.bindClient(client);
+                },
             };
         }
         function check() {
@@ -191,37 +196,62 @@ async function runRollout(
             )
                 throw new Error("Game login is disabled.");
         }
-        // Connect every participant before any deployment is sent.
+        // Connect every participant before any deployment is sent. A cached
+        // session can be silently half-open or use other credentials, so
+        // sign in again once if it no longer answers or does not match.
         for (const { instance } of participants) {
-            check();
-            panes.get(instance)!.connecting();
-            await withClientForInstance(
-                instance,
-                options(instance),
-                (client) => {
-                    check();
-                    if (!client.matchesLogin(logins.get(instance)!))
-                        throw new Error(
-                            `${instance} is connected with different credentials. Reload the extension before rolling out.`,
-                        );
-                    clients.set(instance, client);
-                    panes.get(instance)!.bindClient(client);
-                    const disconnected = () =>
-                        abort.abort(
-                            new Error(
-                                `${instance} disconnected. Inspect the terminals before retrying.`,
-                            ),
-                        );
-                    client.on("quit", disconnected);
-                    client.on("error", disconnected);
-                    subscriptions.push({
-                        dispose() {
-                            client.off("quit", disconnected);
-                            client.off("error", disconnected);
+            const pane = panes.get(instance)!;
+            for (let attempt = 1; ; attempt++) {
+                check();
+                pane.connecting();
+                try {
+                    await withClientForInstance(
+                        instance,
+                        options(instance),
+                        async (client) => {
+                            check();
+                            if (!client.matchesLogin(logins.get(instance)!)) {
+                                const error = new Error(
+                                    `${instance} session does not match the configured credentials for ${logins.get(instance)!.character}.`,
+                                );
+                                error.name = "SessionCredentialsMismatchError";
+                                throw error;
+                            }
+                            if (!createdClients.has(client))
+                                await client.verifySession(abort.signal);
+                            clients.set(instance, client);
+                            pane.bindClient(client);
+                            const disconnected = () =>
+                                abort.abort(
+                                    new Error(
+                                        `${instance} disconnected. Inspect the terminals before retrying.`,
+                                    ),
+                                );
+                            client.on("quit", disconnected);
+                            client.on("error", disconnected);
+                            subscriptions.push({
+                                dispose() {
+                                    client.off("quit", disconnected);
+                                    client.off("error", disconnected);
+                                },
+                            });
                         },
-                    });
-                },
-            );
+                    );
+                    break;
+                } catch (error) {
+                    // The task queue has already disposed the cached client.
+                    if (attempt > 1 || !(error instanceof Error)) throw error;
+                    if (error.name === "StaleSessionError")
+                        pane.write(
+                            "[Cached game session is no longer responding; signing in again.]\r\n",
+                        );
+                    else if (error.name === "SessionCredentialsMismatchError")
+                        pane.write(
+                            `[Cached game session uses different credentials; signing in as ${logins.get(instance)!.character}.]\r\n`,
+                        );
+                    else throw error;
+                }
+            }
         }
         const total = items.length * (targets.length + 1);
         const summary = `${items.map(({ kind, id }) => `${kind} ${id}`).join(", ")}\r\n`;

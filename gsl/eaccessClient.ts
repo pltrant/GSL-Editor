@@ -475,6 +475,13 @@ export class EAccessClient extends EventEmitter {
      */
     private static loginQueue: Promise<any> = Promise.resolve();
 
+    /**
+     * Upper bound on a single quick login. Logins are serialized, so one
+     * that never settles would block every later login for the life of
+     * the process.
+     */
+    static quickLoginTimeoutMillis: number = 20_000;
+
     static quickLogin(
         account: string,
         password: string,
@@ -527,9 +534,20 @@ export class EAccessClient extends EventEmitter {
             const settle = (next: () => void) => {
                 if (settled) return;
                 settled = true;
+                clearTimeout(timeout);
                 abortSignal?.removeEventListener("abort", onAbort);
                 next();
             };
+            const timeout = setTimeout(() => {
+                client.close();
+                rejectOnce(
+                    createQuickLoginError(
+                        "QuickLoginError",
+                        `Quick login timed out after ${this.quickLoginTimeoutMillis}ms.`,
+                        "TIMEOUT",
+                    ),
+                );
+            }, this.quickLoginTimeoutMillis);
             const rejectOnce = (error: Error) => settle(() => reject(error));
             const resolveOnce = (sal: SAL) => settle(() => resolve(sal));
             const onAbort = () => {
@@ -561,6 +579,16 @@ export class EAccessClient extends EventEmitter {
                 );
             });
             client.once(EVENT_ERROR, (error: Error) => rejectOnce(error));
+            // A successful login settles on EVENT_LAUNCH before the socket
+            // finishes closing, so a close here means the login was cut short.
+            client.once(EVENT_CLOSE, () =>
+                rejectOnce(
+                    createQuickLoginError(
+                        "QuickLoginError",
+                        "EAccess connection closed before login completed.",
+                    ),
+                ),
+            );
             client.once(EVENT_READY, () => client.authorize(account, password));
             client.once(EVENT_GAMES, () => client.selectGame(game));
             client.once(

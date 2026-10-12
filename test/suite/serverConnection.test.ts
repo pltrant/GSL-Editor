@@ -1,4 +1,5 @@
 import * as assert from "assert";
+import { AddressInfo, createServer, Socket } from "net";
 
 import {
     ServerConnection,
@@ -62,5 +63,42 @@ suite("ServerConnection", () => {
 
         assert.deepStrictEqual(modes, [ServerConnectionMode.Unbuffered]);
         assert.deepStrictEqual(text, ["ready>"]);
+    });
+
+    test("close destroys the socket if the server never closes its side", async () => {
+        const originalGrace = ServerConnection.closeGraceMillis;
+        ServerConnection.closeGraceMillis = 20;
+        const received: string[] = [];
+        const serverSockets: Socket[] = [];
+        // allowHalfOpen: the server never closes its side of the connection
+        const server = createServer({ allowHalfOpen: true }, (socket) => {
+            serverSockets.push(socket);
+            socket.on("data", (data) => received.push(data.toString()));
+        });
+        try {
+            await new Promise<void>((resolve) => server.listen(0, resolve));
+            const { port } = server.address() as AddressInfo;
+            const connection = new ServerConnection({
+                key: "key",
+                host: "127.0.0.1",
+                port,
+            });
+            const closed = new Promise<void>((resolve) =>
+                connection.once("close", resolve),
+            );
+            await new Promise<void>((resolve) => {
+                connection.once("connect", resolve);
+                connection.connect();
+            });
+
+            connection.close("quit\n");
+            await closed;
+
+            assert.ok(received.join("").includes("quit\n"));
+        } finally {
+            ServerConnection.closeGraceMillis = originalGrace;
+            serverSockets.forEach((socket) => socket.destroy());
+            await new Promise((resolve) => server.close(resolve));
+        }
     });
 });

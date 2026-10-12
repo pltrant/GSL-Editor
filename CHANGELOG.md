@@ -2,6 +2,25 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- MCP tools now accept ids passed as numeric strings (such as `"24262"`
+  or `"S24262"` for scripts), and report the received parameter names
+  when an id is missing.
+- MCP `/agent` commands now fail immediately with the script traceback when
+  the `/agent` script errors, instead of waiting for the command timeout.
+- A game login that stalls now fails after 20 seconds instead of blocking
+  every later login until the extension restarts.
+- `GSL: Deploy and Rollin Scripts` now checks that each cached game session
+  still responds before starting, and signs in again when one has gone
+  stale, instead of failing with a disconnect on each stale instance in
+  turn.
+- `GSL: Deploy and Rollin Scripts` now signs in again when a cached game
+  session uses different credentials, instead of asking you to reload the
+  extension.
+
 ## [1.21.5] - 2026-10-03
 
 ### Changed
