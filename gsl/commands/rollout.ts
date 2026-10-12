@@ -197,8 +197,8 @@ async function runRollout(
                 throw new Error("Game login is disabled.");
         }
         // Connect every participant before any deployment is sent. A cached
-        // session can be silently half-open, so probe it and sign in again
-        // once if it no longer answers.
+        // session can be silently half-open or use other credentials, so
+        // sign in again once if it no longer answers or does not match.
         for (const { instance } of participants) {
             const pane = panes.get(instance)!;
             for (let attempt = 1; ; attempt++) {
@@ -210,10 +210,13 @@ async function runRollout(
                         options(instance),
                         async (client) => {
                             check();
-                            if (!client.matchesLogin(logins.get(instance)!))
-                                throw new Error(
-                                    `${instance} is connected with different credentials. Reload the extension before rolling out.`,
+                            if (!client.matchesLogin(logins.get(instance)!)) {
+                                const error = new Error(
+                                    `${instance} session does not match the configured credentials for ${logins.get(instance)!.character}.`,
                                 );
+                                error.name = "SessionCredentialsMismatchError";
+                                throw error;
+                            }
                             if (!createdClients.has(client))
                                 await client.verifySession(abort.signal);
                             clients.set(instance, client);
@@ -236,16 +239,17 @@ async function runRollout(
                     );
                     break;
                 } catch (error) {
-                    // The task queue has already disposed the stale client.
-                    if (
-                        attempt > 1 ||
-                        !(error instanceof Error) ||
-                        error.name !== "StaleSessionError"
-                    )
-                        throw error;
-                    pane.write(
-                        "[Cached game session is no longer responding; signing in again.]\r\n",
-                    );
+                    // The task queue has already disposed the cached client.
+                    if (attempt > 1 || !(error instanceof Error)) throw error;
+                    if (error.name === "StaleSessionError")
+                        pane.write(
+                            "[Cached game session is no longer responding; signing in again.]\r\n",
+                        );
+                    else if (error.name === "SessionCredentialsMismatchError")
+                        pane.write(
+                            `[Cached game session uses different credentials; signing in as ${logins.get(instance)!.character}.]\r\n`,
+                        );
+                    else throw error;
                 }
             }
         }

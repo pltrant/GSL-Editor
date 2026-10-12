@@ -17,6 +17,9 @@ All notable changes to the GSL Editor extension will be documented in this file.
   still responds before starting, and signs in again when one has gone
   stale, instead of failing with a disconnect on each stale instance in
   turn.
+- `GSL: Deploy and Rollin Scripts` now signs in again when a cached game
+  session uses different credentials, instead of asking you to reload the
+  extension.
 
 ## [1.21.5] - 2026-10-03
 
