@@ -185,3 +185,70 @@ export function executeRolloutCommand(
         }
     });
 }
+
+/** Read-only command that answers with text and a prompt on every server. */
+export const SESSION_PROBE_COMMAND = "/ss 1";
+
+/** Confirm a cached session still answers before any mutation is sent.
+ * Any output ending in a game prompt proves the socket is alive, so the
+ * response itself is not inspected.
+ */
+export function probeSession(
+    client: BaseGameClient,
+    signal: AbortSignal,
+    timeoutMillis = 5000,
+): Promise<void> {
+    return new Promise((resolve, reject) => {
+        let settled = false;
+        const cleanup = () => {
+            clearTimeout(timer);
+            client.off("text", onText);
+            client.off("error", onError);
+            client.off("quit", onQuit);
+            signal.removeEventListener("abort", onAbort);
+        };
+        const settle = (error?: Error) => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            if (error) reject(error);
+            else resolve();
+        };
+        const stale = (message: string) => {
+            const error = new Error(`Cached game session ${message}`);
+            error.name = "StaleSessionError";
+            settle(error);
+        };
+        // The prompt is not newline-terminated, so peek at the buffer tail.
+        const output = new OutputProcessor(() => {});
+        const onText = (text: string) => {
+            output.accumulate(text);
+            if (output.peek(1) === ">") settle();
+        };
+        const onError = (error: Error) =>
+            stale(`lost its connection: ${error.message}`);
+        const onQuit = () => stale("disconnected.");
+        const onAbort = () => {
+            if (signal.reason instanceof Error) return settle(signal.reason);
+            const error = new Error("Session check cancelled.");
+            error.name = "AbortError";
+            settle(error);
+        };
+        const timer = setTimeout(
+            () => stale(`did not respond within ${timeoutMillis}ms.`),
+            timeoutMillis,
+        );
+        client.on("text", onText);
+        client.on("error", onError);
+        client.on("quit", onQuit);
+        signal.addEventListener("abort", onAbort, { once: true });
+        if (signal.aborted) return onAbort();
+        try {
+            client.send(SESSION_PROBE_COMMAND, true);
+        } catch (error) {
+            stale(
+                `could not send: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
+    });
+}

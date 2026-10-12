@@ -5,7 +5,7 @@ import {
     commandScriptError,
 } from "./commandScriptError";
 import { CommandTimeoutDiagnostics } from "./commandTimeoutDiagnostics";
-import { executeRolloutCommand, RolloutItem } from "./rollout";
+import { executeRolloutCommand, probeSession, RolloutItem } from "./rollout";
 
 import { BaseGameClient, GameClientOptions } from "./gameClients";
 import { EAccessClient } from "./eaccessClient";
@@ -514,7 +514,7 @@ export const withClientForInstance = async <T>(
 export type EditorClientInterface = InstanceType<typeof EditorClient>;
 
 class EditorClient extends BaseGameClient {
-    private rolloutInProgress = false;
+    private autoReconnectSuspended = false;
 
     matchesLogin(login: InitOptions["login"]): boolean {
         return ["account", "instance", "character"].every(
@@ -524,24 +524,35 @@ class EditorClient extends BaseGameClient {
         );
     }
 
-    async executeRollout(
+    executeRollout(
         action: "deploy" | "rollin",
         item: RolloutItem,
         scriptId: number | undefined,
         signal: AbortSignal,
     ): Promise<number> {
+        return this.withAutoReconnectSuspended(() =>
+            executeRolloutCommand(this, action, item, scriptId, signal),
+        );
+    }
+
+    /** Rejects with a StaleSessionError if the session no longer responds. */
+    verifySession(signal: AbortSignal): Promise<void> {
+        return this.withAutoReconnectSuspended(() =>
+            probeSession(this, signal),
+        );
+    }
+
+    /** No auto-reconnect or command retry: a reconnect would log in a
+     * session nobody owns, and a mutation's outcome would be unknown. */
+    private async withAutoReconnectSuspended<T>(
+        operation: () => Promise<T>,
+    ): Promise<T> {
         this.retryCommand = "";
-        this.rolloutInProgress = true;
+        this.autoReconnectSuspended = true;
         try {
-            return await executeRolloutCommand(
-                this,
-                action,
-                item,
-                scriptId,
-                signal,
-            );
+            return await operation();
         } finally {
-            this.rolloutInProgress = false;
+            this.autoReconnectSuspended = false;
         }
     }
     private interactive: boolean;
@@ -610,7 +621,7 @@ class EditorClient extends BaseGameClient {
     }
 
     protected serverError(error: any): void {
-        if (this.rolloutInProgress) {
+        if (this.autoReconnectSuspended) {
             super.serverError(error);
             return;
         }

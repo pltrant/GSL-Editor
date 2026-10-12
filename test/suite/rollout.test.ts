@@ -3,7 +3,9 @@ import { BaseGameClient } from "../../gsl/gameClients";
 import {
     executeRolloutCommand,
     parseRolloutInput,
+    probeSession,
     rolloutCommand,
+    SESSION_PROBE_COMMAND,
 } from "../../gsl/rollout";
 
 class FakeClient extends BaseGameClient {
@@ -206,5 +208,76 @@ suite("Rollout", () => {
             assert.strictEqual(client.listenerCount("text"), 0);
             assert.strictEqual(client.listenerCount("error"), 0);
         }
+    });
+
+    test("session probe resolves on a prompt, even when fragmented", async () => {
+        const client = new FakeClient();
+        let done = false;
+        const probe = probeSession(client, new AbortController().signal).then(
+            () => {
+                done = true;
+            },
+        );
+        assert.deepStrictEqual(client.sent, [SESSION_PROBE_COMMAND]);
+        client.output("Someone waves.\r\n");
+        client.output("Script #1: not ");
+        await Promise.resolve();
+        assert.strictEqual(done, false);
+        client.output("found\r\n");
+        await Promise.resolve();
+        assert.strictEqual(done, false);
+        client.output(">");
+        await probe;
+        assert.deepStrictEqual(client.sent, [SESSION_PROBE_COMMAND]);
+        assert.strictEqual(client.listenerCount("text"), 0);
+        assert.strictEqual(client.listenerCount("error"), 0);
+        assert.strictEqual(client.listenerCount("quit"), 0);
+    });
+
+    test("session probe ignores text that does not end in a prompt", async () => {
+        const client = new FakeClient();
+        const probe = probeSession(client, new AbortController().signal, 20);
+        client.output("GN>Script #1 is fine\r\n");
+        client.output("> still talking\r\n");
+        await assert.rejects(probe, { name: "StaleSessionError" });
+    });
+
+    test("session probe reports stale sessions on timeout, error, and quit", async () => {
+        for (const reason of ["timeout", "error", "quit"]) {
+            const client = new FakeClient();
+            const probe = probeSession(
+                client,
+                new AbortController().signal,
+                10,
+            );
+            if (reason === "error")
+                client.emit("error", new Error("read ECONNRESET"));
+            if (reason === "quit") client.emit("quit");
+            await assert.rejects(probe, { name: "StaleSessionError" }, reason);
+            assert.deepStrictEqual(client.sent, [SESSION_PROBE_COMMAND]);
+            assert.strictEqual(client.listenerCount("text"), 0);
+            assert.strictEqual(client.listenerCount("error"), 0);
+            assert.strictEqual(client.listenerCount("quit"), 0);
+        }
+    });
+
+    test("session probe cancellation is not a stale session", async () => {
+        const client = new FakeClient();
+        const abort = new AbortController();
+        const probe = probeSession(client, abort.signal);
+        abort.abort();
+        await assert.rejects(probe, (error: Error) => {
+            assert.notStrictEqual(error.name, "StaleSessionError");
+            return true;
+        });
+        assert.strictEqual(client.listenerCount("text"), 0);
+
+        const aborted = new AbortController();
+        aborted.abort();
+        const skipped = new FakeClient();
+        await assert.rejects(probeSession(skipped, aborted.signal), {
+            name: "AbortError",
+        });
+        assert.deepStrictEqual(skipped.sent, []);
     });
 });

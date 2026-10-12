@@ -13,6 +13,10 @@ All notable changes to the GSL Editor extension will be documented in this file.
   the `/agent` script errors, instead of waiting for the command timeout.
 - A game login that stalls now fails after 20 seconds instead of blocking
   every later login until the extension restarts.
+- `GSL: Deploy and Rollin Scripts` now checks that each cached game session
+  still responds before starting, and signs in again when one has gone
+  stale, instead of failing with a disconnect on each stale instance in
+  turn.
 
 ## [1.21.5] - 2026-10-03
 
