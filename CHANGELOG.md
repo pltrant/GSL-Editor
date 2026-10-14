@@ -4,6 +4,28 @@ All notable changes to the GSL Editor extension will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- `GSL: Sync Agent Prompts` is now `GSL: Install AGENTS.md and Skills`. It
+  asks which folder to install `AGENTS.md` into and which folder to install
+  skills into (for example `.claude/skills`), and asks before overwriting
+  files you have changed.
+- The extension no longer updates `AGENTS.md` and skills on startup. In a
+  workspace where you have installed them, or synced them before, it shows a
+  notification when updates are available instead. Turn this off with the
+  `gsl.notifyAgentFileUpdates` setting.
+- The first install in a workspace you synced before may list files the old
+  sync wrote, such as `AGENTS.md`, and ask whether to overwrite them. Choose
+  `Overwrite` unless you have changed them.
+
+### Removed
+
+- `GSL: Copilot Code Review`.
+- Installing Copilot prompts, custom agents, and instructions into
+  `.github/gsl-managed`, and adding those folders to the `chat.*` settings.
+  You can delete an existing `.github/gsl-managed` folder, and remove its
+  entries from the `chat.*Locations` settings in `.vscode/settings.json`.
+
 ### Fixed
 
 - MCP tools now accept ids passed as numeric strings (such as `"24262"`

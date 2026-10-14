@@ -63,6 +63,22 @@ Run the following to create a custom build of the extension:
 
 This will create a VSIX file that you can install via `Ctrl+Shift+P` -> `Extensions: Install from VSIX...` in VSCode.
 
+## GSL Agent Files (AGENTS.md and Skills)
+
+`GSL: Install AGENTS.md and Skills` installs the GSL language reference
+(`AGENTS.md`) and GSL skills for AI agents such as Claude Code and Codex CLI.
+It needs the agent files deploy key; ask the GSL development team for it.
+
+The command asks for a folder to install `AGENTS.md` into (usually the
+workspace root) and a folder to install skills into (the folder your agent
+reads skills from, such as `.claude/skills`). It asks before overwriting files
+you have changed or that it did not install, and it only removes files it
+installed.
+
+When a workspace has installed the files and newer versions are available, the
+extension shows a notification on startup. Turn this off with the
+`gsl.notifyAgentFileUpdates` setting.
+
 ## MCP Server (External AI Agents)
 
 The extension ships an MCP server that exposes GSL tools to external agents

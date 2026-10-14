@@ -1,6 +1,6 @@
 ---
 agent: agent
-description: Set up GSL agent prompts for this workspace
+description: Set up GSL AGENTS.md and skills for this workspace
 ---
 
 You are walking a user through setting up the GSL agent customization
@@ -18,18 +18,20 @@ them to switch before continuing.
 
 ## Step 1: Check current state
 
-Look in the workspace for a `.github/gsl-managed/` directory. Check
-whether it exists and whether it contains files.
+Check whether the workspace root has an `AGENTS.md` titled "GSL
+Language Reference", and whether a skills folder that your agent reads
+(such as `.claude/skills`, `.agents/skills`, or `.github/skills`)
+contains GSL skills such as `write-gsl`.
 
-- If it exists and has content: tell the user their agent prompts are
-  already set up, then skip to Step 5.
-- If it does not exist or is empty: tell the user you'll help them get
-  set up, then proceed to Step 2.
+- If both are present: tell the user their GSL agent files are already
+  installed, then skip to Step 5.
+- If either is missing: tell the user you'll help them get set up, then
+  proceed to Step 2.
 
 ## Step 2: Deployment key
 
-The sync requires an SSH private key. Ask the user if they already have
-the GSL agent prompts deployment key.
+The install requires an SSH private key. Ask the user if they already
+have the GSL agent files deploy key.
 
 - If yes: proceed to Step 3.
 - If no: tell them to ask the GSL development team for it. It's pinned
@@ -38,26 +40,27 @@ the GSL agent prompts deployment key.
   Then stop and tell them to come back and run this prompt again once
   they have it.
 
-## Step 3: Run the sync
+## Step 3: Run the install
 
-Tell the user you're going to run the sync command now. Execute the
-VS Code command `gsl.syncAgentPrompts`. The command will handle
-everything: prompting for the key (if not already stored), cloning the
-repository, installing files, and registering paths with Copilot.
+Tell the user you're going to run the install command now. Execute the
+VS Code command `gsl.installAgentFiles`. It prompts for the key (if not
+already stored), then asks the user to choose a folder for `AGENTS.md`
+(usually the workspace root) and a folder for skills (the folder their
+agent reads skills from, such as `.claude/skills`).
 
 Wait for it to complete, then proceed to Step 4.
 
 ## Step 4: Verify
 
-Check that `.github/gsl-managed/` now exists and contains
-subdirectories (prompts, agents, instructions, skills). Also check for
-an `AGENTS.md` at the workspace root.
+Check that `AGENTS.md` and the GSL skills are now in the folders the
+user chose.
 
-- If everything looks good: tell the user agent prompts setup is
-  complete. Mention that updates happen automatically on workspace open
-  going forward. Then proceed to Step 5.
+- If everything looks good: tell the user setup is complete. Mention
+  that the extension shows a notification on startup when updates are
+  available, and that running `GSL: Install AGENTS.md and Skills` again
+  installs them. Then proceed to Step 5.
 - If something is missing: report what's missing and suggest running
-  the sync again.
+  the install again.
 
 ## Step 5: Check User Setup / login config
 

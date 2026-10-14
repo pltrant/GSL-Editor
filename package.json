@@ -133,13 +133,8 @@
                 "category": "GSL"
             },
             {
-                "command": "gsl.syncAgentPrompts",
-                "title": "Sync Agent Prompts",
-                "category": "GSL"
-            },
-            {
-                "command": "gsl.copilotCodeReview",
-                "title": "Copilot Code Review",
+                "command": "gsl.installAgentFiles",
+                "title": "Install AGENTS.md and Skills",
                 "category": "GSL"
             },
             {
@@ -629,6 +624,11 @@
                     "type": "string",
                     "default": "",
                     "description": "Path to the JSON login config file for game server instances. Defaults to ~/.gsl/loginConfig.json if not set. Run 'GSL: User Setup' to create."
+                },
+                "gsl.notifyAgentFileUpdates": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Show a notification on startup when updated GSL AGENTS.md and skills are available. Only applies once the agent files deploy key is stored. Run 'GSL: Install AGENTS.md and Skills' to install them."
                 }
             }
         },
