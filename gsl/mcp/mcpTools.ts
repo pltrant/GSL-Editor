@@ -3,6 +3,10 @@ import * as path from "path";
 import { createTwoFilesPatch } from "diff";
 import { AgentToolOrchestrator, GameInstance } from "../agentToolOrchestrator";
 import { TOOL_DEFINITIONS } from "./toolDefinitions";
+import {
+    resolveDefaultLineEnding,
+    writeScriptFile,
+} from "../util/lineEndingUtil";
 
 export { TOOL_DEFINITIONS };
 
@@ -540,11 +544,12 @@ export function createMcpToolHandler(
                             const dir = orchestrator.downloadLocation;
                             fs.mkdirSync(dir, { recursive: true });
                             const filePath = path.join(dir, filename);
-                            await fs.promises.writeFile(
+                            writeScriptFile({
                                 filePath,
                                 content,
-                                "utf8",
-                            );
+                                fallbackEol:
+                                    resolveDefaultLineEnding(undefined),
+                            });
                             result.content.push({
                                 type: "text",
                                 text: `Script ${scriptNumber} downloaded from ${instance} to: ${filePath}`,

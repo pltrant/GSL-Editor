@@ -58,6 +58,10 @@ import {
 } from "./gsl/codeActionProvider";
 import { subscribeToDocumentChanges } from "./gsl/diagnostics";
 import { formatIndentation } from "./gsl/util/formattingUtil";
+import {
+    resolveDefaultLineEnding,
+    writeScriptFile,
+} from "./gsl/util/lineEndingUtil";
 import { runDiffWithLiveServerCommand } from "./gsl/commands/diffWithLiveServer";
 import {
     runInstallAgentFilesCommand,
@@ -153,7 +157,13 @@ export class GSLExtension {
                     if (content.slice(-2) !== "\r\n") {
                         content += "\r\n";
                     }
-                    fs.writeFileSync(destinationPath, content);
+                    writeScriptFile({
+                        filePath: destinationPath,
+                        content,
+                        fallbackEol: resolveDefaultLineEnding(
+                            workspace.getConfiguration("files").get("eol"),
+                        ),
+                    });
                 }
             }
             // Record script modification info
