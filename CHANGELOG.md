@@ -2,7 +2,31 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
-## [Unreleased]
+## [1.21.6] - 2026-10-18
+
+### Changed
+
+- `GSL: Sync Agent Prompts` is now `GSL: Install AGENTS.md and Skills`. It
+  asks which folder to install `AGENTS.md` into and which folder to install
+  skills into (for example `.claude/skills`), and asks before overwriting
+  files you have changed.
+- The extension no longer updates `AGENTS.md` and skills on startup. In a
+  workspace where you have installed them, or synced them before, it shows a
+  notification when updates are available instead. Turn this off with the
+  `gsl.notifyAgentFileUpdates` setting.
+- The first install in a workspace you synced before may list files the old
+  sync wrote, such as `AGENTS.md`, and ask whether to overwrite them. Choose
+  `Overwrite` unless you have changed them.
+
+### Removed
+
+- `GSL: Copilot Code Review`.
+- Installing Copilot prompts, custom agents, and instructions into
+  `.github/gsl-managed`, and adding those folders to the `chat.*` settings.
+  You can delete an existing `.github/gsl-managed` folder, and remove its
+  entries from the `chat.*Locations` settings in `.vscode/settings.json`.
+- The `/setup-gsl-agents` chat prompt. Use
+  `GSL: Install AGENTS.md and Skills` instead.
 
 ### Fixed
 
@@ -20,6 +44,19 @@ All notable changes to the GSL Editor extension will be documented in this file.
 - `GSL: Deploy and Rollin Scripts` now signs in again when a cached game
   session uses different credentials, instead of asking you to reload the
   extension.
+- After you change your login config, the extension now reconnects with the
+  new login instead of sending uploads and other commands to the previous
+  login's game until the connection drops.
+- `GSL: Download Script` and the MCP `gsl_download_script` tool no longer
+  always write CRLF line endings. They keep the existing file's line endings,
+  or follow the repository's git settings, falling back to `files.eol` or the
+  OS default. Downloading again no longer shows line-ending-only changes.
+- The MCP `gsl_get_script_ss_metadata` tool now works when your Dev login is
+  a DragonRealms instance, and reports a missing script as an error.
+
+### Internal
+
+- Updated `@modelcontextprotocol/sdk`, fast-uri, and proxy-addr dependencies.
 
 ## [1.21.5] - 2026-10-03
 

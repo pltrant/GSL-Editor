@@ -424,7 +424,15 @@ class TaskQueueProcessor {
         this.pruneDisconnectedClient();
         this.assertTaskActive(taskExecution);
         if (this.client) {
-            return this.client;
+            if (this.client.matchesLogin(options.login)) {
+                return this.client;
+            }
+            // The login config changed, e.g. to another game. Don't keep
+            // sending work to the previous login's session.
+            options.console.log(
+                "[editorClient] Login changed, reconnecting with the new login",
+            );
+            this.disposeClient(this.client);
         }
 
         const { login, onCreate } = options;

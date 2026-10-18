@@ -537,6 +537,24 @@ suite("MCP Script Downloads", () => {
         }
     });
 
+    test("download keeps the existing file's line endings", async () => {
+        orch.fetchScript = async () => ({
+            content: "line one\nline two\n",
+            isNew: false,
+        });
+        const filePath = path.join(dir, "S00123.dev.mcp.gsl");
+        fs.writeFileSync(filePath, "old\r\nscript\r\n");
+        const result = await createMcpToolHandler(
+            "gsl_download_script",
+            orch,
+        )({ scriptNumber: 123 });
+        assert.ok(!result.isError);
+        assert.strictEqual(
+            fs.readFileSync(filePath, "utf8"),
+            "line one\r\nline two\r\n",
+        );
+    });
+
     test("numeric string script numbers are coerced", async () => {
         const result = await createMcpToolHandler(
             "gsl_download_script",

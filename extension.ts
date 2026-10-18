@@ -58,12 +58,15 @@ import {
 } from "./gsl/codeActionProvider";
 import { subscribeToDocumentChanges } from "./gsl/diagnostics";
 import { formatIndentation } from "./gsl/util/formattingUtil";
+import {
+    resolveDefaultLineEnding,
+    writeScriptFile,
+} from "./gsl/util/lineEndingUtil";
 import { runDiffWithLiveServerCommand } from "./gsl/commands/diffWithLiveServer";
 import {
-    runStartupAgentPromptAutoUpdate,
-    runSyncAgentPromptsCommand,
-} from "./gsl/commands/syncAgentPrompts";
-import { runCopilotCodeReviewCommand } from "./gsl/commands/copilotCodeReview";
+    runInstallAgentFilesCommand,
+    runStartupAgentFilesUpdateCheck,
+} from "./gsl/commands/installAgentFiles";
 import * as primeService from "./gsl/prime/primeService";
 import { GameInstance, LoginCredentials } from "./gsl/agentToolOrchestrator";
 import { registerNativeTools } from "./gsl/commands/registerNativeTools";
@@ -154,7 +157,13 @@ export class GSLExtension {
                     if (content.slice(-2) !== "\r\n") {
                         content += "\r\n";
                     }
-                    fs.writeFileSync(destinationPath, content);
+                    writeScriptFile({
+                        filePath: destinationPath,
+                        content,
+                        fallbackEol: resolveDefaultLineEnding(
+                            workspace.getConfiguration("files").get("eol"),
+                        ),
+                    });
                 }
             }
             // Record script modification info
@@ -520,8 +529,10 @@ export class VSCodeIntegration {
                 label: "Compare Active File with Server",
                 name: "gsl.diffWithLiveServer",
             },
-            { label: "Sync Agent Prompts", name: "gsl.syncAgentPrompts" },
-            { label: "Copilot Code Review", name: "gsl.copilotCodeReview" },
+            {
+                label: "Install AGENTS.md and Skills",
+                name: "gsl.installAgentFiles",
+            },
             {
                 label: "Open Login Config File",
                 name: "gsl.openLoginConfigFile",
@@ -773,12 +784,8 @@ export class VSCodeIntegration {
         }
     }
 
-    private async commandSyncAgentPrompts() {
-        await runSyncAgentPromptsCommand({ context: this.context });
-    }
-
-    private async commandCopilotCodeReview() {
-        await runCopilotCodeReviewCommand({ context: this.context });
+    private async commandInstallAgentFiles() {
+        await runInstallAgentFilesCommand({ context: this.context });
     }
 
     private async commandOpenLoginConfigFile() {
@@ -1565,14 +1572,8 @@ export class VSCodeIntegration {
         );
         this.context.subscriptions.push(subscription);
         subscription = commands.registerCommand(
-            "gsl.syncAgentPrompts",
-            this.commandSyncAgentPrompts,
-            this,
-        );
-        this.context.subscriptions.push(subscription);
-        subscription = commands.registerCommand(
-            "gsl.copilotCodeReview",
-            this.commandCopilotCodeReview,
+            "gsl.installAgentFiles",
+            this.commandInstallAgentFiles,
             this,
         );
         this.context.subscriptions.push(subscription);
@@ -1865,7 +1866,7 @@ export async function activate(context: ExtensionContext) {
 
     vsc.checkForNewInstall();
     vsc.checkForUpdatedVersion();
-    void runStartupAgentPromptAutoUpdate({ context });
+    void runStartupAgentFilesUpdateCheck({ context });
 }
 
 export function deactivate() {

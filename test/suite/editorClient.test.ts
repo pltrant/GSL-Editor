@@ -1,5 +1,11 @@
 import * as assert from "assert";
-import { OutputProcessor, stripGamePrompt } from "../../gsl/editorClient";
+import * as os from "os";
+import {
+    OutputProcessor,
+    stripGamePrompt,
+    withClientForInstance,
+} from "../../gsl/editorClient";
+import { BaseGameClient } from "../../gsl/gameClients";
 
 suite("OutputProcessor", () => {
     function collect(): { lines: string[]; output: OutputProcessor } {
@@ -97,5 +103,51 @@ suite("Command response prompts", () => {
             "GN>Game: GS4D\r\n",
         );
         assert.deepStrictEqual(lines, ["GN>Game: GS4D"]);
+    });
+});
+
+suite("Editor client login changes", () => {
+    const originalOn = BaseGameClient.prototype.on;
+    teardown(() => {
+        BaseGameClient.prototype.on = originalOn;
+    });
+
+    const loginFor = (instance: string) => ({
+        account: "test",
+        instance,
+        character: "TestChar",
+        password: "testpass",
+    });
+
+    test("a cached client is replaced when the login changes", async () => {
+        const closed: unknown[] = [];
+        // Fake the network login on each new client before ensureClient calls it.
+        BaseGameClient.prototype.on = function (this: any, ...args: any[]) {
+            this.login = async (loginDetails: unknown) => {
+                this.loginDetails = loginDetails;
+                this.server = { close: () => closed.push(this) };
+            };
+            return originalOn.apply(this, args as any);
+        };
+        const run = (instance: string) =>
+            withClientForInstance(
+                "gameGuardLoginChangeTest",
+                {
+                    login: loginFor(instance),
+                    console: { log: () => {} },
+                    downloadLocation: os.tmpdir(),
+                    loggingEnabled: false,
+                    onCreate: () => {},
+                },
+                (client) => client,
+            );
+
+        const first = await run("GS4D");
+        assert.strictEqual(await run("GS4D"), first);
+        const second = await run("DRD");
+        assert.notStrictEqual(second, first);
+        assert.deepStrictEqual(closed, [first]);
+        assert.ok(second.matchesLogin(loginFor("DRD")));
+        second.destroy();
     });
 });
