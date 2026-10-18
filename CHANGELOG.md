@@ -2,7 +2,7 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
-## [Unreleased]
+## [1.21.6] - 2026-10-18
 
 ### Changed
 
@@ -25,6 +25,8 @@ All notable changes to the GSL Editor extension will be documented in this file.
   `.github/gsl-managed`, and adding those folders to the `chat.*` settings.
   You can delete an existing `.github/gsl-managed` folder, and remove its
   entries from the `chat.*Locations` settings in `.vscode/settings.json`.
+- The `/setup-gsl-agents` chat prompt. Use
+  `GSL: Install AGENTS.md and Skills` instead.
 
 ### Fixed
 
@@ -42,6 +44,19 @@ All notable changes to the GSL Editor extension will be documented in this file.
 - `GSL: Deploy and Rollin Scripts` now signs in again when a cached game
   session uses different credentials, instead of asking you to reload the
   extension.
+- After you change your login config, the extension now reconnects with the
+  new login instead of sending uploads and other commands to the previous
+  login's game until the connection drops.
+- `GSL: Download Script` and the MCP `gsl_download_script` tool no longer
+  always write CRLF line endings. They keep the existing file's line endings,
+  or follow the repository's git settings, falling back to `files.eol` or the
+  OS default. Downloading again no longer shows line-ending-only changes.
+- The MCP `gsl_get_script_ss_metadata` tool now works when your Dev login is
+  a DragonRealms instance, and reports a missing script as an error.
+
+### Internal
+
+- Updated `@modelcontextprotocol/sdk`, fast-uri, and proxy-addr dependencies.
 
 ## [1.21.5] - 2026-10-03
 
