@@ -8,6 +8,7 @@ import {
     withClientForInstance,
 } from "../../gsl/editorClient";
 import { BaseGameClient } from "../../gsl/gameClients";
+import { EAccessClient } from "../../gsl/eaccessClient";
 
 suite("OutputProcessor", () => {
     function collect(): { lines: string[]; output: OutputProcessor } {
@@ -159,6 +160,9 @@ suite("Editor client connections", () => {
     let gameServer: Server;
     let gamePort: number;
     const gameSockets: Socket[] = [];
+    let reconnects = 0;
+    /** False to keep the real in-place reconnect */
+    let stubReconnect = true;
 
     suiteSetup(async () => {
         gameServer = createServer((socket) => gameSockets.push(socket));
@@ -184,11 +188,17 @@ suite("Editor client connections", () => {
                 });
                 await hello;
             };
+            if (stubReconnect) {
+                this.reconnect = async () => {
+                    reconnects++;
+                };
+            }
             return originalOn.apply(this, args as any);
         };
     });
     teardown(() => {
         BaseGameClient.prototype.on = originalOn;
+        stubReconnect = true;
     });
 
     // Each test uses its own queue so failures do not carry over.
@@ -316,6 +326,60 @@ suite("Editor client connections", () => {
         assert.ok(firstWait >= 950, `first wait was ${firstWait}ms`);
         assert.ok(secondWait >= 1_950, `second wait was ${secondWait}ms`);
         third.destroy();
+    });
+
+    test("a destroyed client does not reconnect after a reset", async () => {
+        const client = await run("destroyedClientResetTest");
+        client.destroy();
+        const before = reconnects;
+        const error = Object.assign(new Error("read ECONNRESET"), {
+            code: "ECONNRESET",
+        });
+        assert.doesNotThrow(() =>
+            (client as any).server.socket.emit("error", error),
+        );
+        assert.strictEqual(reconnects, before);
+    });
+
+    test("a client destroyed mid-reconnect does not log in again", async () => {
+        const originalQuickLogin = EAccessClient.quickLogin;
+        let releaseLogin!: () => void;
+        const loginHeld = new Promise<void>((resolve) => {
+            releaseLogin = resolve;
+        });
+        EAccessClient.quickLogin = (async () => {
+            await loginHeld;
+            return { gamehost: "127.0.0.1", gameport: gamePort, key: "key" };
+        }) as any;
+        stubReconnect = false;
+        try {
+            const queue = "destroyedMidReconnectTest";
+            const first: any = await run(queue);
+            let reconnecting!: Promise<void>;
+            const { reconnect } = first;
+            first.reconnect = () => (reconnecting = reconnect.call(first));
+            // The replaced client must not open a game connection.
+            first.connect = () => {
+                throw new Error("Destroyed client connected");
+            };
+            const error = Object.assign(new Error("read ECONNRESET"), {
+                code: "ECONNRESET",
+            });
+            // Starts an in-place reconnect, held at the play.net login.
+            first.server.socket.emit("error", error);
+            assert.strictEqual(first.hasServerConnection(), false);
+
+            // A task in that window replaces the client.
+            const second = await run(queue);
+            assert.notStrictEqual(second, first);
+
+            releaseLogin();
+            await assert.rejects(reconnecting, /was destroyed/);
+            assert.strictEqual(first.hasServerConnection(), false);
+            second.destroy();
+        } finally {
+            EAccessClient.quickLogin = originalQuickLogin;
+        }
     });
 
     test("closing during the login backoff does not log in", async function () {

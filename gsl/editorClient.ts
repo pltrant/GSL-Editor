@@ -608,6 +608,7 @@ class EditorClient extends BaseGameClient {
     /** Minimum time between in-place reconnects on reset connections */
     private static AUTO_RECONNECT_INTERVAL_MILLIS = 60_000;
     private autoReconnectSuspended = false;
+    private destroyed = false;
     private lastAutoReconnectAt = 0;
 
     matchesLogin(login: InitOptions["login"]): boolean {
@@ -627,6 +628,11 @@ class EditorClient extends BaseGameClient {
         return this.withAutoReconnectSuspended(() =>
             executeRolloutCommand(this, action, item, scriptId, signal),
         );
+    }
+
+    destroy(): Promise<void> {
+        this.destroyed = true;
+        return super.destroy();
     }
 
     /** Rejects with a StaleSessionError if the session no longer responds. */
@@ -715,7 +721,8 @@ class EditorClient extends BaseGameClient {
     }
 
     protected serverError(error: any): void {
-        if (this.autoReconnectSuspended) {
+        // A destroyed client's reconnect would log in a session nobody owns.
+        if (this.autoReconnectSuspended || this.destroyed) {
             super.serverError(error);
             return;
         }
@@ -1087,6 +1094,11 @@ class EditorClient extends BaseGameClient {
             return Promise.reject(error.caught);
         }
         throwIfAborted(abortSignal, "Editor client login cancelled.");
+        // Destroyed during the play.net login, e.g. replaced by the task
+        // queue: connecting now would log in over its replacement.
+        if (this.destroyed) {
+            throw createAbortError("Editor client was destroyed.");
+        }
         this.interactive = false;
         this.connect(sal);
         return await this.isInteractive(abortSignal);
