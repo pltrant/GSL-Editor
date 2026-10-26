@@ -1,5 +1,6 @@
 import * as assert from "assert";
 import * as os from "os";
+import { AddressInfo, createServer, Server, Socket } from "net";
 import {
     OutputProcessor,
     stripGamePrompt,
@@ -148,6 +149,86 @@ suite("Editor client login changes", () => {
         assert.notStrictEqual(second, first);
         assert.deepStrictEqual(closed, [first]);
         assert.ok(second.matchesLogin(loginFor("DRD")));
+        second.destroy();
+    });
+});
+
+suite("Editor client connections", () => {
+    const originalOn = BaseGameClient.prototype.on;
+    let gameServer: Server;
+    let gamePort: number;
+    const gameSockets: Socket[] = [];
+
+    suiteSetup(async () => {
+        gameServer = createServer((socket) => gameSockets.push(socket));
+        await new Promise<void>((resolve) => gameServer.listen(0, resolve));
+        gamePort = (gameServer.address() as AddressInfo).port;
+    });
+    suiteTeardown(async () => {
+        gameSockets.forEach((socket) => socket.destroy());
+        await new Promise((resolve) => gameServer.close(resolve));
+    });
+    setup(() => {
+        // Fake the play.net login, but connect a real game socket.
+        BaseGameClient.prototype.on = function (this: any, ...args: any[]) {
+            this.login = async (loginDetails: unknown) => {
+                this.loginDetails = loginDetails;
+                const hello = new Promise((resolve) =>
+                    originalOn.call(this, "hello", resolve),
+                );
+                this.connect({
+                    gamehost: "127.0.0.1",
+                    gameport: gamePort,
+                    key: "key",
+                });
+                await hello;
+            };
+            return originalOn.apply(this, args as any);
+        };
+    });
+    teardown(() => {
+        BaseGameClient.prototype.on = originalOn;
+    });
+
+    // Each test uses its own queue so failures do not carry over.
+    const run = (queue: string) =>
+        withClientForInstance(
+            queue,
+            {
+                login: {
+                    account: "test",
+                    instance: "GS4D",
+                    character: "TestChar",
+                    password: "testpass",
+                },
+                console: { log: () => {} },
+                downloadLocation: os.tmpdir(),
+                loggingEnabled: false,
+                onCreate: () => {},
+            },
+            (client) => client,
+        );
+    const emitSocketTimeout = (client: unknown) => {
+        const error = Object.assign(new Error("read ETIMEDOUT"), {
+            code: "ETIMEDOUT",
+        });
+        (client as any).server.socket.emit("error", error);
+    };
+
+    test("a socket ETIMEDOUT on a reset client does not crash", async () => {
+        const client = await run("resetClientTimeoutTest");
+        // A reset client has no listeners but keeps its closing socket.
+        client.destroy();
+        assert.doesNotThrow(() => emitSocketTimeout(client));
+    });
+
+    test("a socket ETIMEDOUT marks the client dead and the next call logs in again", async () => {
+        const first = await run("liveClientTimeoutTest");
+        assert.doesNotThrow(() => emitSocketTimeout(first));
+        assert.strictEqual(first.hasServerConnection(), false);
+        const second = await run("liveClientTimeoutTest");
+        assert.notStrictEqual(second, first);
+        assert.ok(second.hasServerConnection());
         second.destroy();
     });
 });

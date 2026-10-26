@@ -84,8 +84,12 @@ export class BaseGameClient extends EventEmitter {
         if (this.console) {
             this.console.log("server socket errored", error);
         }
-        this.emit("error", error);
+        // The connection is dead either way. A destroyed client has no error
+        // listeners, and emitting without one would crash the process.
         this.cleanupServer();
+        if (this.listenerCount("error") > 0) {
+            this.emit("error", error);
+        }
     }
 
     protected serverText(text: string) {

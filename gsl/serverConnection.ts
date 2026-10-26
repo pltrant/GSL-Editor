@@ -227,6 +227,8 @@ export class ServerConnection extends EventEmitter {
         this.socket.removeAllListeners("close");
         this.socket.removeAllListeners("data");
         this.socket.removeAllListeners("end");
+        // A late error on a dead socket must not become an uncaught exception.
+        this.socket.on("error", () => {});
     }
     private socketError(error: Error) {
         if (this.debug === true) {
@@ -235,7 +237,9 @@ export class ServerConnection extends EventEmitter {
         this.socketCleanup();
         this.socket.destroy();
         this.state = ServerConnectionState.Error;
-        this.emit("error", error);
+        if (this.listenerCount("error") > 0) {
+            this.emit("error", error);
+        }
     }
     private socketClose() {
         if (this.debug === true) {

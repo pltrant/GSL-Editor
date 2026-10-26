@@ -646,7 +646,9 @@ class EditorClient extends BaseGameClient {
                 .catch(() => {
                     // Reconnect failed; emit error so the task queue
                     // resets the client on the next operation.
-                    this.emit("error", error);
+                    if (this.listenerCount("error") > 0) {
+                        this.emit("error", error);
+                    }
                 });
         } else {
             super.serverError(error);
