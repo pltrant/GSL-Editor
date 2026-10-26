@@ -118,9 +118,10 @@ export class BaseGameClient extends EventEmitter {
         this.initializeServer(options);
     }
 
-    quit() {
+    /** Logs out and resolves once the socket has closed. */
+    quit(): Promise<void> {
         if (!this.server) throw new Error("not connected");
-        this.server.close("quit");
+        return this.server.close("quit" + this.newLine);
     }
 
     send(command: string, echo: boolean = true) {
@@ -143,19 +144,22 @@ export class BaseGameClient extends EventEmitter {
         return true;
     }
 
-    destroy(): void {
+    /** Resolves once the socket has closed. */
+    destroy(): Promise<void> {
         if (this.logStream) {
             this.logStream.end();
             this.logStream = undefined;
         }
+        let closed = Promise.resolve();
         try {
-            this.quit();
+            closed = this.quit();
         } catch {
             // Ignore quit errors during forced reset.
         }
         // Notify attached terminals before removing listeners during a reset.
         this.emit("quit");
         this.removeAllListeners();
+        return closed;
     }
 }
 

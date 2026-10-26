@@ -244,6 +244,7 @@ class TaskQueueProcessor {
     private nextTaskLeaseId: number;
     private activeTaskLeaseId: number | undefined;
     private nextTick: NodeJS.Timeout | undefined;
+    private closed = false;
 
     constructor() {
         this.taskQueue = [];
@@ -299,7 +300,7 @@ class TaskQueueProcessor {
         } catch (e: unknown) {
             const error = e instanceof Error ? e : new Error(String(e));
             if (shouldResetClient(error)) {
-                this.resetClients();
+                void this.resetClients();
             }
             reject(error);
         } finally {
@@ -340,6 +341,8 @@ class TaskQueueProcessor {
     }
 
     private assertTaskActive(taskExecution: TaskExecution): void {
+        // Work that resumes after shutdown started must not log in again.
+        this.throwIfClosed();
         if (!this.isTaskLeaseActive(taskExecution.leaseId)) {
             throw new StaleEditorClientTaskError();
         }
@@ -358,23 +361,38 @@ class TaskQueueProcessor {
         }
     }
 
-    private disposeClient(client: EditorClient): void {
-        client.destroy();
+    private disposeClient(client: EditorClient): Promise<void> {
         this.clearClientRefs(client);
+        return client.destroy();
     }
 
-    private resetClients(): void {
+    /** Logs out for good: later tasks fail instead of logging in again. */
+    close(): Promise<void> {
+        this.closed = true;
+        return this.resetClients();
+    }
+
+    private throwIfClosed(): void {
+        if (this.closed) {
+            throw createAbortError("Editor clients are shutting down.");
+        }
+    }
+
+    /** Logs out the cached sessions; resolves once their sockets close. */
+    private async resetClients(): Promise<void> {
+        const closing: Promise<void>[] = [];
         if (this.pendingClient && this.pendingClient !== this.client) {
-            this.disposeClient(this.pendingClient);
+            closing.push(this.disposeClient(this.pendingClient));
         }
         if (this.client) {
-            this.disposeClient(this.client);
+            closing.push(this.disposeClient(this.client));
         }
+        await Promise.all(closing);
     }
 
     private pruneDisconnectedClient(): void {
         if (this.client && !this.client.hasServerConnection()) {
-            this.resetClients();
+            void this.resetClients();
         }
     }
 
@@ -432,7 +450,7 @@ class TaskQueueProcessor {
             options.console.log(
                 "[editorClient] Login changed, reconnecting with the new login",
             );
-            this.disposeClient(this.client);
+            void this.disposeClient(this.client);
         }
 
         const { login, onCreate } = options;
@@ -442,9 +460,10 @@ class TaskQueueProcessor {
             this.attachClientInvalidationHandlers(client);
             try {
                 await client.login(login, taskExecution.abortController.signal);
+                // A login that finishes after shutdown started is logged out.
                 this.assertTaskActive(taskExecution);
             } catch (e) {
-                this.disposeClient(client);
+                void this.disposeClient(client);
                 throw e;
             }
             return client;
@@ -511,6 +530,16 @@ export const withClientForInstance = async <T>(
         processorRegistry.set(instanceKey, processor);
     }
     return processor.enqueueTask(initOptions, task);
+};
+
+/**
+ * Logs out every cached game session for good and resolves once their
+ * sockets close. Only for process shutdown: later tasks fail.
+ */
+export const closeAllEditorClients = async (): Promise<void> => {
+    await Promise.all(
+        [...processorRegistry.values()].map((processor) => processor.close()),
+    );
 };
 
 /**

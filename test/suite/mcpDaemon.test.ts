@@ -150,22 +150,131 @@ suite("MCP daemon process isolation", function () {
             await newcomer.stop();
             // The daemon must exit after the last client disconnects, including
             // clients killed without closing stdin cleanly.
+            // It logs the idle timeout before shutting down, so also wait for
+            // the shutdown to remove its socket.
             const deadline = Date.now() + 35_000;
-            while (
-                !fs
-                    .readFileSync(logPath, "utf8")
-                    .includes("Idle timeout reached")
-            ) {
+            let idle = false;
+            let socketRemoved = process.platform === "win32";
+            while (!idle || !socketRemoved) {
                 assert.ok(
                     Date.now() < deadline,
-                    "daemon did not exit when idle",
+                    idle
+                        ? "daemon did not remove its socket when idle"
+                        : "daemon did not exit when idle",
                 );
                 await new Promise((resolve) => setTimeout(resolve, 100));
+                idle ||= fs
+                    .readFileSync(logPath, "utf8")
+                    .includes("Idle timeout reached");
+                socketRemoved ||= idle && !fs.existsSync(socketPath);
             }
-            if (process.platform !== "win32")
-                assert.ok(!fs.existsSync(socketPath));
         } finally {
             await Promise.all(clients.map((client) => client.stop("SIGKILL")));
+            fs.rmSync(home, { recursive: true, force: true });
+        }
+    });
+    test("SIGTERM logs out the daemon's game session before exiting", async function () {
+        // Windows has no signals: kill() terminates the process outright.
+        if (process.platform === "win32") this.skip();
+        const home = fs.mkdtempSync(path.join(os.tmpdir(), "gsl-shutdown-"));
+        const configPath = path.join(home, "login.json");
+        // The /agent enrichment logs in to dev at startup.
+        fs.writeFileSync(
+            configPath,
+            JSON.stringify({
+                account: "test",
+                author: "Test/Author",
+                devInstance: "GS4D",
+                devCharacter: "TestChar",
+            }),
+        );
+        const gameServer = net.createServer();
+        await new Promise<void>((resolve) =>
+            gameServer.listen(0, "127.0.0.1", resolve),
+        );
+        const connected = new Promise<net.Socket>((resolve) =>
+            gameServer.once("connection", resolve),
+        );
+        const daemon = spawn(
+            process.execPath,
+            [
+                "--require",
+                path.resolve(__dirname, "fakePlayNetPreload.js"),
+                path.resolve(__dirname, "../../gsl/mcp/mcpServer.bundle.js"),
+                "--daemon",
+            ],
+            {
+                env: {
+                    ...process.env,
+                    HOME: home,
+                    USERPROFILE: home,
+                    ELECTRON_RUN_AS_NODE: "1",
+                    GSL_LOGIN_CONFIG_FILE: configPath,
+                    GSL_PASSWORD: "test-only",
+                    GSL_MCP_DEBUG: "1",
+                    GSL_MCP_SOCKET_PATH: path.join(home, "daemon.sock"),
+                    FAKE_GAME_PORT: String(
+                        (gameServer.address() as net.AddressInfo).port,
+                    ),
+                },
+                stdio: ["ignore", "ignore", "pipe"],
+            },
+        );
+        // "close" waits for stderr to be read to the end.
+        const exited = new Promise<number | null>((resolve) =>
+            daemon.once("close", resolve),
+        );
+        // Fail at once, not at the test timeout, if the daemon dies early.
+        const exitedEarly = exited.then((code) => {
+            throw new Error(`daemon exited (${code}) before logging in`);
+        });
+        exitedEarly.catch(() => {});
+        const stderr: string[] = [];
+        createInterface({ input: daemon.stderr }).on("line", (line) => {
+            stderr.push(line);
+            // A prompt in the same read as the mode line is dropped, so send
+            // it once the daemon logs the mode switch.
+            if (line.includes("setConnectionMode")) {
+                void connected.then((gameSocket) => gameSocket.write(">"));
+            }
+        });
+        try {
+            const gameSocket = await Promise.race([connected, exitedEarly]);
+            gameSocket.write('<mode id="GAME"/>\n');
+            let received = "";
+            await Promise.race([
+                new Promise<void>((resolve) =>
+                    gameSocket.on("data", (data) => {
+                        received += data.toString();
+                        // Logged in: the enrichment sent its /agent command.
+                        if (received.includes("/agent")) resolve();
+                    }),
+                ),
+                exitedEarly,
+            ]);
+            const ended = new Promise((resolve) =>
+                gameSocket.once("end", resolve),
+            );
+
+            daemon.kill("SIGTERM");
+            await ended;
+
+            assert.ok(received.endsWith("quit\n"));
+            assert.strictEqual(await exited, 0);
+            // The exit hook also writes the quit, but only the awaited
+            // logout sees the socket close before the daemon exits.
+            const shutdownAt = stderr.findIndex((line) =>
+                line.includes("Shutting down"),
+            );
+            assert.ok(shutdownAt >= 0);
+            assert.ok(
+                stderr
+                    .slice(shutdownAt)
+                    .some((line) => line.includes("Connection#socketClose()")),
+            );
+        } finally {
+            daemon.kill("SIGKILL");
+            await new Promise((resolve) => gameServer.close(resolve));
             fs.rmSync(home, { recursive: true, force: true });
         }
     });

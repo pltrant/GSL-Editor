@@ -3,6 +3,7 @@ import * as os from "os";
 import { AddressInfo, createServer, Server, Socket } from "net";
 import {
     OutputProcessor,
+    closeAllEditorClients,
     stripGamePrompt,
     withClientForInstance,
 } from "../../gsl/editorClient";
@@ -191,7 +192,7 @@ suite("Editor client connections", () => {
     });
 
     // Each test uses its own queue so failures do not carry over.
-    const run = (queue: string) =>
+    const run = (queue: string, log: (message: string) => void = () => {}) =>
         withClientForInstance(
             queue,
             {
@@ -201,7 +202,7 @@ suite("Editor client connections", () => {
                     character: "TestChar",
                     password: "testpass",
                 },
-                console: { log: () => {} },
+                console: { log },
                 downloadLocation: os.tmpdir(),
                 loggingEnabled: false,
                 onCreate: () => {},
@@ -230,5 +231,52 @@ suite("Editor client connections", () => {
         assert.notStrictEqual(second, first);
         assert.ok(second.hasServerConnection());
         second.destroy();
+    });
+
+    test("closing all clients logs out and closes the game socket", async () => {
+        const connected = new Promise<Socket>((resolve) =>
+            gameServer.once("connection", resolve),
+        );
+        const client = await run("closeAllClientsTest");
+        const gameSocket = await connected;
+        let received = "";
+        gameSocket.on("data", (data) => (received += data.toString()));
+        const ended = new Promise((resolve) => gameSocket.once("end", resolve));
+
+        await closeAllEditorClients();
+        await ended;
+
+        assert.ok(received.endsWith("quit\n"));
+        assert.strictEqual(client.hasServerConnection(), false);
+        // Shutdown must not log in a session it will never log out.
+        await assert.rejects(run("closeAllClientsTest"), /shutting down/);
+    });
+
+    test("closing during the login retry delay does not log in", async () => {
+        const connectingOn = BaseGameClient.prototype.on;
+        let logins = 0;
+        BaseGameClient.prototype.on = function (this: any, ...args: any[]) {
+            const result = connectingOn.apply(this, args as any);
+            this.login = async () => {
+                logins++;
+                throw Object.assign(new Error("connect ECONNREFUSED"), {
+                    code: "ECONNREFUSED",
+                });
+            };
+            return result;
+        };
+        // Waits 500ms after the failed login before retrying once.
+        let retrying!: () => void;
+        const retryDelayStarted = new Promise<void>((resolve) => {
+            retrying = resolve;
+        });
+        const login = run("closeDuringRetryDelayTest", (message) => {
+            if (message.includes("retrying once")) retrying();
+        });
+        await retryDelayStarted;
+        await closeAllEditorClients();
+
+        await assert.rejects(login, /shutting down/);
+        assert.strictEqual(logins, 1);
     });
 });

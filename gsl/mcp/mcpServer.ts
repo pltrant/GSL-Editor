@@ -23,14 +23,15 @@ import { spawn } from "child_process";
 import {
     AgentToolOrchestrator,
     AgentToolOrchestratorDeps,
-} from "../agentToolOrchestrator.js";
-import { loadLoginConfig } from "./mcpConfig.js";
-import { TOOL_DEFINITIONS, createMcpToolHandler } from "./mcpTools.js";
+} from "../agentToolOrchestrator";
+import { closeAllEditorClients } from "../editorClient";
+import { loadLoginConfig } from "./mcpConfig";
+import { TOOL_DEFINITIONS, createMcpToolHandler } from "./mcpTools";
 import {
     tryConnectToDaemon,
     runAsProxy,
     startDaemonListener,
-} from "./mcpDaemon.js";
+} from "./mcpDaemon";
 
 // ---------------------------------------------------------------------------
 // Credential loading
@@ -182,14 +183,23 @@ async function main() {
             });
     }
 
-    // Graceful shutdown
-    const shutdown = () => {
+    // Graceful shutdown: log out the game sessions so the next daemon's
+    // login does not kick a session the server still holds.
+    let shuttingDown = false;
+    const shutdown = async () => {
+        // A second signal skips the logouts.
+        if (shuttingDown) process.exit(1);
+        shuttingDown = true;
         debugLog("Shutting down...");
         daemon.close();
+        await closeAllEditorClients();
         process.exit(0);
     };
-    process.on("SIGINT", shutdown);
-    process.on("SIGTERM", shutdown);
+    process.on("SIGINT", () => void shutdown());
+    process.on("SIGTERM", () => void shutdown());
+    void daemon.idle.then(shutdown);
+    // Best effort on any other exit: the logout is usually written at once.
+    process.on("exit", () => void closeAllEditorClients());
 }
 
 main().catch((err) => {
