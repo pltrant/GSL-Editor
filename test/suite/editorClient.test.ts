@@ -2,8 +2,10 @@ import * as assert from "assert";
 import * as os from "os";
 import { AddressInfo, createServer, Server, Socket } from "net";
 import {
+    DEFAULT_KEEPALIVE_INTERVAL_MILLIS,
     OutputProcessor,
     closeAllEditorClients,
+    setKeepAliveInterval,
     stripGamePrompt,
     withClientForInstance,
 } from "../../gsl/editorClient";
@@ -152,6 +154,234 @@ suite("Editor client login changes", () => {
         assert.deepStrictEqual(closed, [first]);
         assert.ok(second.matchesLogin(loginFor("DRD")));
         second.destroy();
+    });
+});
+
+suite("Editor client keepalive", () => {
+    const originalOn = BaseGameClient.prototype.on;
+    let gameServer: Server;
+    let gamePort: number;
+    const gameSockets: Socket[] = [];
+    /** Commands received by the fake game server, per connection */
+    let received: string[][] = [];
+    /** False to leave the keepalive unanswered */
+    let answerTime = true;
+
+    const wait = (millis: number) =>
+        new Promise((resolve) => setTimeout(resolve, millis));
+    const timeCount = () =>
+        received.flat().filter((command) => command === "time").length;
+    /** Pending waits for the fake game server to receive keepalives */
+    let timeWaiters: { count: number; resolve: () => void }[] = [];
+    const checkTimeWaiters = () => {
+        timeWaiters = timeWaiters.filter(({ count, resolve }) => {
+            if (timeCount() < count) return true;
+            resolve();
+            return false;
+        });
+    };
+    /** Resolves once the fake game server has received `count` keepalives */
+    const untilTimeCount = (count: number) =>
+        new Promise<void>((resolve) => {
+            timeWaiters.push({ count, resolve });
+            checkTimeWaiters();
+        });
+
+    suiteSetup(async () => {
+        gameServer = createServer((socket) => {
+            gameSockets.push(socket);
+            const commands: string[] = [];
+            received.push(commands);
+            socket.write('<mode id="GAME"/>\n');
+            setTimeout(() => socket.write("Welcome.\r\n>"), 20);
+            let buffer = "";
+            socket.on("data", (data) => {
+                buffer += data.toString();
+                let nl: number;
+                while ((nl = buffer.indexOf("\n")) > -1) {
+                    const command = buffer.slice(0, nl);
+                    buffer = buffer.slice(nl + 1);
+                    commands.push(command);
+                    checkTimeWaiters();
+                    if (command === "time" && answerTime) {
+                        socket.write("It is noon.\r\n>");
+                    } else if (command === "look") {
+                        socket.write("You see a room.\r\n>");
+                    } else if (command === "/ms 1") {
+                        // The script editor has its own prompt.
+                        socket.write("Edt:");
+                    } else if (command === "Q") {
+                        socket.write("Modification aborted.\r\n>");
+                    }
+                    // "hold" never answers, like a slow command.
+                }
+            });
+        });
+        await new Promise<void>((resolve) => gameServer.listen(0, resolve));
+        gamePort = (gameServer.address() as AddressInfo).port;
+    });
+    suiteTeardown(async () => {
+        gameSockets.forEach((socket) => socket.destroy());
+        await new Promise((resolve) => gameServer.close(resolve));
+    });
+    setup(() => {
+        received = [];
+        timeWaiters = [];
+        answerTime = true;
+        setKeepAliveInterval(100);
+        // Fake the play.net login, but connect a real game socket. Like the
+        // real login, wait for the first game prompt.
+        BaseGameClient.prototype.on = function (this: any, ...args: any[]) {
+            this.login = async (loginDetails: unknown) => {
+                this.loginDetails = loginDetails;
+                const hello = new Promise((resolve) =>
+                    originalOn.call(this, "text", (text: string) => {
+                        if (text.endsWith(">")) resolve(undefined);
+                    }),
+                );
+                this.connect({
+                    gamehost: "127.0.0.1",
+                    gameport: gamePort,
+                    key: "key",
+                });
+                await hello;
+            };
+            return originalOn.apply(this, args as any);
+        };
+    });
+    teardown(() => {
+        BaseGameClient.prototype.on = originalOn;
+        setKeepAliveInterval(DEFAULT_KEEPALIVE_INTERVAL_MILLIS);
+    });
+
+    const run = <T>(queue: string, task: (client: any) => T) =>
+        withClientForInstance(
+            queue,
+            {
+                login: {
+                    account: "test",
+                    instance: "GS4D",
+                    character: "TestChar",
+                    password: "testpass",
+                },
+                console: { log: () => {} },
+                downloadLocation: os.tmpdir(),
+                loggingEnabled: false,
+                onCreate: () => {},
+            },
+            task,
+        );
+
+    test("an idle connection sends time and hides its output", async () => {
+        const client = await run("keepAliveIdleTest", (client) => client);
+        let shown = "";
+        client.on("text", (text: string) => (shown += text));
+        // The second keepalive is sent only after the first one's answer.
+        await untilTimeCount(2);
+        assert.ok(!shown.includes("It is noon"), shown);
+
+        // Later commands still get their own responses.
+        const response = await run("keepAliveIdleTest", (client) => {
+            let text = "";
+            return new Promise<string>((resolve) => {
+                client.on("text", (chunk: string) => {
+                    text += chunk;
+                    if (text.endsWith(">")) resolve(text);
+                });
+                client.send("look");
+            });
+        });
+        assert.strictEqual(response, "You see a room.\r\n>");
+        client.destroy();
+    });
+
+    test("no keepalive while a task holds the connection", async () => {
+        const client = await run("keepAliveTaskTest", async (client) => {
+            await wait(400);
+            return client;
+        });
+        assert.strictEqual(timeCount(), 0);
+        client.destroy();
+    });
+
+    test("no keepalive while a command awaits its prompt", async () => {
+        const client = await run("keepAliveInFlightTest", (client) => {
+            client.send("hold");
+            return client;
+        });
+        await wait(400);
+        assert.strictEqual(timeCount(), 0);
+        client.destroy();
+    });
+
+    test("no keepalive inside the script editor", async () => {
+        const client = await run("keepAliveEditorTest", (client) => {
+            client.send("/ms 1");
+            return client;
+        });
+        await wait(400);
+        assert.strictEqual(timeCount(), 0);
+        // Back at the game prompt, the keepalive resumes.
+        client.send("Q");
+        await untilTimeCount(1);
+        client.destroy();
+    });
+
+    test("text ending in > mid-line is not a prompt", async () => {
+        const client = await run("keepAlivePartialLineTest", (client) => {
+            client.send("hold");
+            return client;
+        });
+        gameSockets[gameSockets.length - 1].write("x ->");
+        await wait(400);
+        assert.strictEqual(timeCount(), 0);
+        client.destroy();
+    });
+
+    test("keepalive stops when the connection closes", async () => {
+        const client = await run("keepAliveCloseTest", (client) => client);
+        await untilTimeCount(1);
+        const closed = new Promise((resolve) => client.once("quit", resolve));
+        gameSockets[gameSockets.length - 1].destroy();
+        await closed;
+        assert.strictEqual(client.hasServerConnection(), false);
+        const sent = timeCount();
+        await wait(400);
+        assert.strictEqual(timeCount(), sent);
+        // The keepalive must not log in again on its own.
+        assert.strictEqual(received.length, 1);
+    });
+
+    test("a socket error during a keepalive drops the client without reconnecting", async function () {
+        this.timeout(5_000);
+        const originalQuickLogin = EAccessClient.quickLogin;
+        let quickLogins = 0;
+        EAccessClient.quickLogin = (async () => {
+            quickLogins++;
+            throw new Error("no play.net in tests");
+        }) as any;
+        try {
+            answerTime = false;
+            const queue = "keepAliveErrorTest";
+            const client = await run(queue, (client) => client);
+            await untilTimeCount(1);
+            // The keepalive is still waiting for its answer.
+            assert.strictEqual(client.isIdle(), false);
+            const error = Object.assign(new Error("read ECONNRESET"), {
+                code: "ECONNRESET",
+            });
+            client.server.socket.emit("error", error);
+            assert.strictEqual(client.hasServerConnection(), false);
+            await wait(100);
+            // Not reconnected in place; the next task logs in again.
+            assert.strictEqual(quickLogins, 0);
+            assert.strictEqual(received.length, 1);
+            const next = await run(queue, (client) => client);
+            assert.notStrictEqual(next, client);
+            next.destroy();
+        } finally {
+            EAccessClient.quickLogin = originalQuickLogin;
+        }
     });
 });
 

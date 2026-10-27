@@ -105,6 +105,18 @@ const clientTimeout = 15000;
 const taskQueueTimeout = 30000;
 const ssCheckeditTimeout = 7500;
 
+/** Harmless command that answers with one line and a prompt */
+export const KEEPALIVE_COMMAND = "time";
+/**
+ * Idle game sockets can die silently (dev has dropped between 30-minute
+ * polls). Three minutes stays under the 4-minute idle timeout of the
+ * strictest common NATs and load balancers.
+ */
+export const DEFAULT_KEEPALIVE_INTERVAL_MILLIS = 180_000;
+let keepAliveIntervalMillis = DEFAULT_KEEPALIVE_INTERVAL_MILLIS;
+/** The current partial line is nothing but a game prompt */
+const rx_prompt_only = /^(?:GN?>|>)+$/;
+
 export type InitOptions = {
     login: {
         account: string;
@@ -268,6 +280,7 @@ class TaskQueueProcessor {
     private nextTaskLeaseId: number;
     private activeTaskLeaseId: number | undefined;
     private nextTick: NodeJS.Timeout | undefined;
+    private keepAliveTimer: NodeJS.Timeout | undefined;
     private connectionFailures = 0;
     private closed = false;
     private lastConnectionFailureAt = 0;
@@ -335,6 +348,58 @@ class TaskQueueProcessor {
             if (this.taskQueue.length > 0) {
                 this.scheduleTick(TaskQueueProcessor.FREQUENCY_MILLIS);
             }
+            this.scheduleKeepAlive();
+        }
+    }
+
+    /** Schedule a keepalive for when the client has been idle long enough */
+    scheduleKeepAlive(delayMillis?: number): void {
+        clearTimeout(this.keepAliveTimer);
+        this.keepAliveTimer = undefined;
+        const { client } = this;
+        if (!client || this.closed || keepAliveIntervalMillis <= 0) return;
+        const wait =
+            delayMillis ??
+            client.lastCommandAt + keepAliveIntervalMillis - Date.now();
+        this.keepAliveTimer = setTimeout(
+            () => void this.keepAlive(client),
+            Math.max(0, wait),
+        );
+        // Don't keep a process alive just to keep a session alive.
+        this.keepAliveTimer.unref();
+    }
+
+    /**
+     * Sends the keepalive while holding the queue, so no task interleaves
+     * with it. Skips a busy client: a task is running or queued, or the last
+     * command has not returned to the game prompt (e.g. the script editor).
+     */
+    private async keepAlive(client: EditorClient): Promise<void> {
+        this.keepAliveTimer = undefined;
+        if (client !== this.client || this.closed) return;
+        if (
+            this.isProcessingTask ||
+            this.taskQueue.length > 0 ||
+            !client.isIdle()
+        ) {
+            this.scheduleKeepAlive(keepAliveIntervalMillis);
+            return;
+        }
+        if (Date.now() - client.lastCommandAt < keepAliveIntervalMillis) {
+            this.scheduleKeepAlive();
+            return;
+        }
+        this.isProcessingTask = true;
+        try {
+            await client.keepAlive();
+        } catch {
+            // No answer: the session is dead. Log it out so the next task
+            // signs in again instead of writing to a dead socket.
+            if (this.client === client) void this.disposeClient(client);
+        } finally {
+            this.isProcessingTask = false;
+            if (this.taskQueue.length > 0) this.scheduleTick(0);
+            this.scheduleKeepAlive();
         }
     }
 
@@ -384,6 +449,8 @@ class TaskQueueProcessor {
         }
         if (this.client === client) {
             this.client = undefined;
+            clearTimeout(this.keepAliveTimer);
+            this.keepAliveTimer = undefined;
         }
     }
 
@@ -556,6 +623,7 @@ class TaskQueueProcessor {
         }
         this.clearClientRefs(createdClient);
         this.client = createdClient;
+        this.scheduleKeepAlive();
         onCreate(createdClient);
         return createdClient;
     }
@@ -586,6 +654,14 @@ export const withClientForInstance = async <T>(
     return processor.enqueueTask(initOptions, task);
 };
 
+/** Sets how long a game connection may sit idle before a keepalive; 0 disables. */
+export const setKeepAliveInterval = (millis: number): void => {
+    keepAliveIntervalMillis = millis;
+    for (const processor of processorRegistry.values()) {
+        processor.scheduleKeepAlive();
+    }
+};
+
 /**
  * Logs out every cached game session for good and resolves once their
  * sockets close. Only for process shutdown: later tasks fail.
@@ -610,6 +686,13 @@ class EditorClient extends BaseGameClient {
     private autoReconnectSuspended = false;
     private destroyed = false;
     private lastAutoReconnectAt = 0;
+    /** When the last command was sent; the server's idle clock */
+    lastCommandAt = Date.now();
+    /** A command was sent and the game prompt has not returned yet */
+    private awaitingPrompt = true;
+    private promptOutput = new OutputProcessor(() => {});
+    /** Set while a keepalive's output is being swallowed */
+    private endKeepAlive: (() => void) | undefined;
 
     matchesLogin(login: InitOptions["login"]): boolean {
         return ["account", "instance", "character"].every(
@@ -640,6 +723,81 @@ class EditorClient extends BaseGameClient {
         return this.withAutoReconnectSuspended(() =>
             probeSession(this, signal),
         );
+    }
+
+    /** True when connected, at the game prompt, and no keepalive is out. */
+    isIdle(): boolean {
+        return (
+            this.hasServerConnection() &&
+            !this.awaitingPrompt &&
+            !this.endKeepAlive
+        );
+    }
+
+    /**
+     * Sends the keepalive command and hides its output until the prompt
+     * returns. Rejects if the session does not answer.
+     */
+    keepAlive(timeoutMillis = clientTimeout): Promise<void> {
+        return this.withAutoReconnectSuspended(
+            () =>
+                new Promise<void>((resolve, reject) => {
+                    const settle = (error?: Error) => {
+                        clearTimeout(timeout);
+                        this.off("error", onError);
+                        this.off("quit", onQuit);
+                        this.endKeepAlive = undefined;
+                        if (error) reject(error);
+                        else resolve();
+                    };
+                    const onError = (error: Error) => settle(error);
+                    const onQuit = () =>
+                        settle(new Error("Disconnected during keepalive."));
+                    const timeout = setTimeout(
+                        () =>
+                            settle(
+                                new Error(
+                                    `Keepalive got no answer within ${timeoutMillis}ms.`,
+                                ),
+                            ),
+                        timeoutMillis,
+                    );
+                    this.on("error", onError);
+                    this.on("quit", onQuit);
+                    try {
+                        this.send(KEEPALIVE_COMMAND, false);
+                    } catch (e) {
+                        settle(e instanceof Error ? e : new Error(String(e)));
+                        return;
+                    }
+                    this.endKeepAlive = () => settle();
+                }),
+        );
+    }
+
+    send(command: string, echo: boolean = true): void {
+        super.send(command, echo);
+        this.lastCommandAt = Date.now();
+        this.awaitingPrompt = true;
+        this.promptOutput.flush();
+        // A command typed during a keepalive owns the output that follows.
+        this.endKeepAlive?.();
+    }
+
+    protected serverText(text: string): void {
+        this.promptOutput.accumulate(text);
+        // The prompt is not newline-terminated, so check the partial line.
+        // A bare prompt, not text that happens to end in ">".
+        const atPrompt = rx_prompt_only.test(
+            this.promptOutput.peek().replace(rx_ansi, ""),
+        );
+        if (atPrompt) this.awaitingPrompt = false;
+        if (this.endKeepAlive) {
+            // Hide the keepalive from terminals and response parsers.
+            if (atPrompt) this.endKeepAlive();
+            return;
+        }
+        super.serverText(text);
     }
 
     /** No auto-reconnect or command retry: a reconnect would log in a
