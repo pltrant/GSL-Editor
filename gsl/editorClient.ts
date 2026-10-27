@@ -231,6 +231,24 @@ function throwIfAborted(signal?: AbortSignal, message?: string): void {
     }
 }
 
+function delay(millis: number, signal: AbortSignal): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+        if (signal.aborted) {
+            reject(signal.reason);
+            return;
+        }
+        const onAbort = () => {
+            clearTimeout(timer);
+            reject(signal.reason);
+        };
+        const timer = setTimeout(() => {
+            signal.removeEventListener("abort", onAbort);
+            resolve();
+        }, millis);
+        signal.addEventListener("abort", onAbort, { once: true });
+    });
+}
+
 class TaskQueueProcessor {
     /** Frequency of queue processing */
     private static FREQUENCY_MILLIS = 250;
@@ -481,22 +499,7 @@ class TaskQueueProcessor {
                 `[editorClient] Login failed (${error.message}), retrying once...`,
             );
             this.assertTaskActive(taskExecution);
-            const { signal } = taskExecution.abortController;
-            await new Promise<void>((resolve, reject) => {
-                if (signal.aborted) {
-                    reject(signal.reason);
-                    return;
-                }
-                const onAbort = () => {
-                    clearTimeout(timer);
-                    reject(signal.reason);
-                };
-                const timer = setTimeout(() => {
-                    signal.removeEventListener("abort", onAbort);
-                    resolve();
-                }, 500);
-                signal.addEventListener("abort", onAbort, { once: true });
-            });
+            await delay(500, taskExecution.abortController.signal);
             this.assertTaskActive(taskExecution);
             createdClient = await attemptLogin();
         }
