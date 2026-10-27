@@ -254,6 +254,12 @@ class TaskQueueProcessor {
     private static FREQUENCY_MILLIS = 250;
     /** Max time a task may hold the editor client lock */
     private static TASK_TIMEOUT_MILLIS = taskQueueTimeout;
+    /** First wait before logging in again after a connection failure */
+    private static LOGIN_BACKOFF_MILLIS = 1_000;
+    /** Longest wait; leaves room for the login inside the task timeout */
+    private static MAX_LOGIN_BACKOFF_MILLIS = 8_000;
+    /** Drops further apart than this start the backoff over */
+    private static LOGIN_BACKOFF_RESET_MILLIS = 60_000;
 
     private client: EditorClient | undefined;
     private pendingClient: EditorClient | undefined;
@@ -262,7 +268,9 @@ class TaskQueueProcessor {
     private nextTaskLeaseId: number;
     private activeTaskLeaseId: number | undefined;
     private nextTick: NodeJS.Timeout | undefined;
+    private connectionFailures = 0;
     private closed = false;
+    private lastConnectionFailureAt = 0;
 
     constructor() {
         this.taskQueue = [];
@@ -380,6 +388,7 @@ class TaskQueueProcessor {
     }
 
     private disposeClient(client: EditorClient): Promise<void> {
+        // Clear refs first so the invalidation handlers see a deliberate close.
         this.clearClientRefs(client);
         return client.destroy();
     }
@@ -431,9 +440,42 @@ class TaskQueueProcessor {
     }
 
     private attachClientInvalidationHandlers(client: EditorClient): void {
-        const clearCreatedClientRefs = () => this.clearClientRefs(client);
-        client.on("error", clearCreatedClientRefs);
-        client.on("quit", clearCreatedClientRefs);
+        const invalidate = () => {
+            if (this.client === client || this.pendingClient === client) {
+                // The connection died; the server may still hold the session.
+                this.recordConnectionFailure();
+                this.clearClientRefs(client);
+            }
+        };
+        client.on("error", invalidate);
+        client.on("quit", invalidate);
+    }
+
+    /**
+     * Each new login can kick a session the server still holds, so
+     * connections that keep dropping double the wait before the next login.
+     * Deliberate resets log out first and are not counted.
+     */
+    private recordConnectionFailure(): void {
+        const now = Date.now();
+        if (
+            now - this.lastConnectionFailureAt >
+            TaskQueueProcessor.LOGIN_BACKOFF_RESET_MILLIS
+        ) {
+            this.connectionFailures = 0;
+        }
+        this.connectionFailures++;
+        this.lastConnectionFailureAt = now;
+    }
+
+    private loginBackoffMillis(): number {
+        if (this.connectionFailures === 0) return 0;
+        const backoff = Math.min(
+            TaskQueueProcessor.LOGIN_BACKOFF_MILLIS *
+                2 ** (this.connectionFailures - 1),
+            TaskQueueProcessor.MAX_LOGIN_BACKOFF_MILLIS,
+        );
+        return Math.max(0, this.lastConnectionFailureAt + backoff - Date.now());
     }
 
     private startTaskLease(): number {
@@ -486,6 +528,15 @@ class TaskQueueProcessor {
             }
             return client;
         };
+
+        const backoffMillis = this.loginBackoffMillis();
+        if (backoffMillis > 0) {
+            options.console.log(
+                `[editorClient] Waiting ${backoffMillis}ms before logging in again after a connection failure`,
+            );
+            await delay(backoffMillis, taskExecution.abortController.signal);
+            this.assertTaskActive(taskExecution);
+        }
 
         let createdClient: EditorClient;
         try {
@@ -554,7 +605,10 @@ export const closeAllEditorClients = async (): Promise<void> => {
 export type EditorClientInterface = InstanceType<typeof EditorClient>;
 
 class EditorClient extends BaseGameClient {
+    /** Minimum time between in-place reconnects on reset connections */
+    private static AUTO_RECONNECT_INTERVAL_MILLIS = 60_000;
     private autoReconnectSuspended = false;
+    private lastAutoReconnectAt = 0;
 
     matchesLogin(login: InitOptions["login"]): boolean {
         return ["account", "instance", "character"].every(
@@ -665,8 +719,15 @@ class EditorClient extends BaseGameClient {
             super.serverError(error);
             return;
         }
-        // attempt to reconnect on reset connections
-        if (error.code === "ECONNRESET") {
+        // Attempt to reconnect on reset connections. A repeat reset is left
+        // to the task queue, which backs off before logging in again.
+        const now = Date.now();
+        if (
+            error.code === "ECONNRESET" &&
+            now - this.lastAutoReconnectAt >=
+                EditorClient.AUTO_RECONNECT_INTERVAL_MILLIS
+        ) {
+            this.lastAutoReconnectAt = now;
             this.cleanupServer();
             this.reconnect()
                 .then(() => {

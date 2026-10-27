@@ -223,7 +223,8 @@ suite("Editor client connections", () => {
         assert.doesNotThrow(() => emitSocketTimeout(client));
     });
 
-    test("a socket ETIMEDOUT marks the client dead and the next call logs in again", async () => {
+    test("a socket ETIMEDOUT marks the client dead and the next call logs in again", async function () {
+        this.timeout(5_000);
         const first = await run("liveClientTimeoutTest");
         assert.doesNotThrow(() => emitSocketTimeout(first));
         assert.strictEqual(first.hasServerConnection(), false);
@@ -277,6 +278,74 @@ suite("Editor client connections", () => {
         await closeAllEditorClients();
 
         await assert.rejects(login, /shutting down/);
+        assert.strictEqual(logins, 1);
+    });
+
+    test("logins back off after repeated connection failures", async function () {
+        this.timeout(10_000);
+        const queue = "loginBackoffTest";
+        let failedAt = 0;
+        const backoffs: number[] = [];
+        // The logged wait is what is left of the backoff since the failure,
+        // so add back the time since: a slow machine must not change it.
+        const log = (message: string) => {
+            const match = /Waiting (\d+)ms/.exec(message);
+            if (match) backoffs.push(Number(match[1]) + Date.now() - failedAt);
+        };
+        const timeRelogin = async (client: unknown) => {
+            emitSocketTimeout(client);
+            failedAt = Date.now();
+            const next = await run(queue, log);
+            return { next, elapsed: Date.now() - failedAt };
+        };
+
+        const first = await run(queue);
+        const { next: second, elapsed: firstWait } = await timeRelogin(first);
+        const { next: third, elapsed: secondWait } = await timeRelogin(second);
+
+        // Each drop counts once: 1s, then 2s.
+        assert.strictEqual(backoffs.length, 2);
+        assert.ok(
+            Math.abs(backoffs[0] - 1_000) <= 50,
+            `first backoff was ${backoffs[0]}ms`,
+        );
+        assert.ok(
+            Math.abs(backoffs[1] - 2_000) <= 50,
+            `second backoff was ${backoffs[1]}ms`,
+        );
+        assert.ok(firstWait >= 950, `first wait was ${firstWait}ms`);
+        assert.ok(secondWait >= 1_950, `second wait was ${secondWait}ms`);
+        third.destroy();
+    });
+
+    test("closing during the login backoff does not log in", async function () {
+        this.timeout(5_000);
+        const connectingOn = BaseGameClient.prototype.on;
+        let logins = 0;
+        BaseGameClient.prototype.on = function (this: any, ...args: any[]) {
+            const result = connectingOn.apply(this, args as any);
+            const { login } = this;
+            this.login = (...loginArgs: unknown[]) => {
+                logins++;
+                return login.apply(this, loginArgs);
+            };
+            return result;
+        };
+        const queue = "closeDuringBackoffTest";
+        const first = await run(queue);
+        emitSocketTimeout(first);
+        // Waits out the 1s backoff before logging in again.
+        let backingOff!: () => void;
+        const backoffStarted = new Promise<void>((resolve) => {
+            backingOff = resolve;
+        });
+        const relogin = run(queue, (message) => {
+            if (message.includes("Waiting")) backingOff();
+        });
+        await backoffStarted;
+        await closeAllEditorClients();
+
+        await assert.rejects(relogin, /shutting down/);
         assert.strictEqual(logins, 1);
     });
 });
