@@ -290,6 +290,8 @@ suite("MCP daemon process isolation", function () {
         let initialized = 0;
         let calls = 0;
         let rejectInitialization = false;
+        /** Replies to initialize requests held while the proxies reconnect */
+        let heldInitializations: (() => void)[] | undefined;
         const fakeDaemon = net.createServer((socket) => {
             sockets.add(socket);
             socket.on("error", () => {});
@@ -298,29 +300,32 @@ suite("MCP daemon process isolation", function () {
             createInterface({ input: socket }).on("line", (line) => {
                 const message = JSON.parse(line);
                 if (message.method === "initialize") {
-                    socket.write(
-                        JSON.stringify({
-                            jsonrpc: "2.0",
-                            id: message.id,
-                            ...(rejectInitialization
-                                ? {
-                                      error: {
-                                          code: -32603,
-                                          message: "unavailable",
-                                      },
-                                  }
-                                : {
-                                      result: {
-                                          protocolVersion: "2024-11-05",
-                                          capabilities: {},
-                                          serverInfo: {
-                                              name: "test",
-                                              version: "1",
+                    const reply = () =>
+                        socket.write(
+                            JSON.stringify({
+                                jsonrpc: "2.0",
+                                id: message.id,
+                                ...(rejectInitialization
+                                    ? {
+                                          error: {
+                                              code: -32603,
+                                              message: "unavailable",
                                           },
-                                      },
-                                  }),
-                        }) + "\n",
-                    );
+                                      }
+                                    : {
+                                          result: {
+                                              protocolVersion: "2024-11-05",
+                                              capabilities: {},
+                                              serverInfo: {
+                                                  name: "test",
+                                                  version: "1",
+                                              },
+                                          },
+                                      }),
+                            }) + "\n",
+                        );
+                    if (heldInitializations) heldInitializations.push(reply);
+                    else reply();
                 } else if (message.method === "notifications/initialized") {
                     ready = true;
                     initialized++;
@@ -374,12 +379,17 @@ suite("MCP daemon process isolation", function () {
                 ),
             );
             await waitUntil(() => calls === 2);
+            // Hold the proxies mid-reconnect, however slow this host is.
+            heldInitializations = [];
             for (const socket of sockets) socket.destroy();
             await Promise.all(interrupted);
             await assert.rejects(
                 clients[0].author(),
                 /reconnecting; request was not sent/,
             );
+            const held = heldInitializations;
+            heldInitializations = undefined;
+            for (const reply of held) reply();
             await waitUntil(() => initialized === 4);
             await Promise.all(clients.map((client) => client.author()));
             assert.strictEqual(
