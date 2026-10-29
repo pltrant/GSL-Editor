@@ -131,7 +131,12 @@ suite("Local file diff labels", () => {
             commands.executeCommand = executeCommand;
             window.showErrorMessage = showErrorMessage;
             window.showWarningMessage = showWarningMessage;
-            await document.save();
+            // Discard the test edit. Saving would start a local-history copy
+            // of the file that races the removal below.
+            await window.showTextDocument(document);
+            await commands.executeCommand(
+                "workbench.action.revertAndCloseActiveEditor",
+            );
             await fs.rm(tmpDir, { recursive: true, force: true });
         }
     });
