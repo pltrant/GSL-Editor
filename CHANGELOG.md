@@ -2,6 +2,22 @@
 
 All notable changes to the GSL Editor extension will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- `gsl_compile_check` and `gsl_download_script` now refuse a path with a
+  symlink anywhere in it, or one that is not a regular file. Use the real
+  path instead. If your download location is reached through a symlink, point
+  it at the real directory. On macOS and Linux, root-owned system symlinks,
+  such as `/tmp` on macOS, are still allowed unless the server runs as root.
+  On Windows, every symlink or junction in the path is refused.
+- `gsl_download_script` no longer reads git settings for a new file's line
+  endings. It uses the OS default until the file exists.
+- `gsl_download_script` now replaces an existing file instead of writing into
+  it, so the file's mode isn't kept. On Windows, the download fails if another
+  program keeps the file open.
+
 ## [1.21.6] - 2026-10-18
 
 ### Changed

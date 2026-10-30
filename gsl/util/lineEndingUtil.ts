@@ -2,8 +2,15 @@ import { execFileSync } from "child_process";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+import { readFileNoSymlink, writeFileNoSymlink } from "./noSymlinkFile";
 
 export type LineEnding = "\n" | "\r\n";
+
+interface ScriptFileWrite {
+    filePath: string;
+    content: string;
+    fallbackEol: LineEnding;
+}
 
 /**
  * Determines the line ending a script written to `filePath` should use:
@@ -46,13 +53,29 @@ export function writeScriptFile({
     filePath,
     content,
     fallbackEol,
-}: {
-    filePath: string;
-    content: string;
-    fallbackEol: LineEnding;
-}): void {
+}: ScriptFileWrite): void {
     const eol = detectLineEnding({ filePath, fallback: fallbackEol });
     fs.writeFileSync(filePath, convertLineEndings(content, eol), "utf8");
+}
+
+/**
+ * `writeScriptFile` for MCP tools: refuses symlinks (see noSymlinkFile) and
+ * skips git, because an agent can plant a .git in the download directory whose
+ * config runs a program (core.fsmonitor) as the daemon.
+ */
+export function writeScriptFileNoSymlink({
+    filePath,
+    content,
+    fallbackEol,
+}: ScriptFileWrite): void {
+    let existingText = "";
+    try {
+        existingText = readFileNoSymlink(filePath);
+    } catch (e) {
+        if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+    }
+    const eol = textLineEnding(existingText) ?? fallbackEol;
+    writeFileNoSymlink(filePath, convertLineEndings(content, eol));
 }
 
 function existingFileLineEnding(filePath: string): LineEnding | undefined {
@@ -62,6 +85,10 @@ function existingFileLineEnding(filePath: string): LineEnding | undefined {
     } catch {
         return undefined;
     }
+    return textLineEnding(text);
+}
+
+function textLineEnding(text: string): LineEnding | undefined {
     const crlfCount = text.match(/\r\n/g)?.length ?? 0;
     const lfCount = (text.match(/\n/g)?.length ?? 0) - crlfCount;
     if (crlfCount === 0 && lfCount === 0) return undefined;

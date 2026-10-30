@@ -1,4 +1,5 @@
 import * as assert from "assert";
+import { execFileSync } from "child_process";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
@@ -8,6 +9,7 @@ import {
     InitOptions,
 } from "../../gsl/editorClient";
 import {
+    McpToolResult,
     TOOL_DEFINITIONS,
     coerceInteger,
     createMcpToolHandler,
@@ -615,6 +617,429 @@ suite("MCP Script Downloads", () => {
             fs.readFileSync(path.join(dir, "S00789.dev.mcp.gsl"), "utf8"),
             "last script",
         );
+    });
+});
+
+suite("MCP File Symlink Refusal", () => {
+    const SECRET = "API_TOKEN=do-not-leak";
+    let dir: string;
+    let orch: AgentToolOrchestrator;
+    let compiled: string[];
+
+    const compileCheck = (filename: string) =>
+        createMcpToolHandler("gsl_compile_check", orch)({ filename });
+    const download = (downloadLocation: string) => {
+        orch = new AgentToolOrchestrator(makeDeps({ downloadLocation }));
+        orch.fetchScript = async () => ({
+            content: "fetched\n",
+            isNew: false,
+        });
+        return createMcpToolHandler(
+            "gsl_download_script",
+            orch,
+        )({
+            scriptNumber: 123,
+        });
+    };
+    const scriptName = "S00123.dev.mcp.gsl";
+
+    function compilingOrchestrator(downloadLocation: string) {
+        const compiling = new AgentToolOrchestrator(
+            makeDeps({ downloadLocation }),
+        );
+        compiling.uploadAndCompileScript = async (content) => {
+            compiled.push(content);
+            return {
+                status: 0,
+                script: 24661,
+                path: "",
+                bytes: content.length,
+                maxBytes: 100,
+                errors: 0,
+                warnings: 0,
+                errorList: [],
+            };
+        };
+        return compiling;
+    }
+
+    function skipWithoutPosixFiles(context: Mocha.Context) {
+        if (process.platform === "win32") context.skip();
+    }
+
+    function assertRefused(result: McpToolResult) {
+        assert.ok(result.isError, result.content[0].text);
+        assert.deepStrictEqual(compiled, []);
+        assert.ok(!result.content[0].text.includes(SECRET));
+    }
+
+    /** Runs `action` with the pre-open symlink checks blind, as in a swap. */
+    async function withSwappedPath<T>(action: () => Promise<T>): Promise<T> {
+        const mutableFs = require("fs") as { lstatSync: unknown };
+        const { lstatSync } = mutableFs;
+        mutableFs.lstatSync = () => undefined;
+        try {
+            return await action();
+        } finally {
+            mutableFs.lstatSync = lstatSync;
+        }
+    }
+
+    /** `getuid` undefined is how Windows looks to the path check. */
+    async function compileThroughRootOwnedLink(uid: number | undefined) {
+        fs.mkdirSync(path.join(dir, "real"), { recursive: true });
+        fs.rmSync(path.join(dir, "system"), { force: true });
+        fs.symlinkSync(path.join(dir, "real"), path.join(dir, "system"));
+        fs.writeFileSync(path.join(dir, "real", "a.gsl"), SECRET);
+        const mutableFs = require("fs") as { lstatSync: typeof fs.lstatSync };
+        const { lstatSync } = mutableFs;
+        const { getuid } = process;
+        mutableFs.lstatSync = ((
+            target: string,
+            options: fs.StatSyncOptions,
+        ) => {
+            const stats = lstatSync(target, options) as fs.Stats | undefined;
+            if (stats?.isSymbolicLink()) stats.uid = 0;
+            return stats;
+        }) as typeof fs.lstatSync;
+        process.getuid = uid === undefined ? undefined : () => uid;
+        try {
+            return await compileCheck(path.join("system", "a.gsl"));
+        } finally {
+            mutableFs.lstatSync = lstatSync;
+            process.getuid = getuid;
+        }
+    }
+
+    /** Fails the first `failures` renames with EPERM, on `platform`. */
+    async function downloadWithRenameFailures({
+        failures,
+        platform,
+    }: {
+        failures: number;
+        platform: NodeJS.Platform;
+    }) {
+        const mutableFs = require("fs") as { renameSync: typeof fs.renameSync };
+        const { renameSync } = mutableFs;
+        const realPlatform = process.platform;
+        let attempts = 0;
+        mutableFs.renameSync = (from, to) => {
+            if (++attempts <= failures) {
+                throw Object.assign(new Error("EPERM"), { code: "EPERM" });
+            }
+            renameSync(from, to);
+        };
+        Object.defineProperty(process, "platform", { value: platform });
+        try {
+            return { result: await download(dir), attempts };
+        } finally {
+            mutableFs.renameSync = renameSync;
+            Object.defineProperty(process, "platform", { value: realPlatform });
+        }
+    }
+
+    setup(() => {
+        dir = fs.mkdtempSync(path.join(os.tmpdir(), "gsl-symlink-test-"));
+        compiled = [];
+        orch = compilingOrchestrator(dir);
+    });
+
+    teardown(() => {
+        fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    test("compiles a .gsl file by absolute and relative path", async () => {
+        const scriptPath = path.join(dir, "S02017.gsl");
+        fs.writeFileSync(scriptPath, "script body");
+
+        assert.ok(!(await compileCheck(scriptPath)).isError);
+        assert.ok(!(await compileCheck("S02017.gsl")).isError);
+        assert.deepStrictEqual(compiled, ["script body", "script body"]);
+    });
+
+    test("compiles a regular file in an arbitrary directory", async () => {
+        const scratch = path.join(dir, "tmp", "threads", "t1", "scratch");
+        fs.mkdirSync(scratch, { recursive: true });
+        fs.writeFileSync(path.join(scratch, "probe.gsl"), "script body");
+        orch = compilingOrchestrator("/nonexistent");
+
+        const result = await compileCheck(path.join(scratch, "probe.gsl"));
+
+        assert.ok(!result.isError, result.content[0].text);
+        assert.deepStrictEqual(compiled, ["script body"]);
+    });
+
+    test("compiles through a root-owned symlink in the path", async function () {
+        skipWithoutPosixFiles(this);
+        const result = await compileThroughRootOwnedLink(1000);
+
+        assert.ok(!result.isError, result.content[0].text);
+    });
+
+    test("trusts no symlink as root or on Windows", async function () {
+        skipWithoutPosixFiles(this);
+        assertRefused(await compileThroughRootOwnedLink(0));
+        assertRefused(await compileThroughRootOwnedLink(undefined));
+    });
+
+    test("compile refuses a .gsl symlink to a non-.gsl file", async function () {
+        skipWithoutPosixFiles(this);
+        fs.writeFileSync(path.join(dir, ".env"), SECRET);
+        fs.symlinkSync(path.join(dir, ".env"), path.join(dir, "evil.gsl"));
+
+        const result = await compileCheck("evil.gsl");
+
+        assertRefused(result);
+        assert.strictEqual(
+            result.content[0].text,
+            `${path.join(dir, "evil.gsl")} has a symlink in its path; use the real path.`,
+        );
+    });
+
+    test("compile refuses a .gsl symlink to a .gsl file", async function () {
+        skipWithoutPosixFiles(this);
+        fs.writeFileSync(path.join(dir, "real.gsl"), SECRET);
+        fs.symlinkSync(path.join(dir, "real.gsl"), path.join(dir, "link.gsl"));
+
+        assertRefused(await compileCheck("link.gsl"));
+    });
+
+    test("compile refuses a file behind a symlinked parent", async function () {
+        skipWithoutPosixFiles(this);
+        fs.mkdirSync(path.join(dir, "real"));
+        fs.writeFileSync(path.join(dir, "real", "a.gsl"), SECRET);
+        fs.symlinkSync(path.join(dir, "real"), path.join(dir, "link"));
+
+        assertRefused(await compileCheck(path.join("link", "a.gsl")));
+    });
+
+    test("compile refuses a path swapped for a symlink", async function () {
+        skipWithoutPosixFiles(this);
+        fs.writeFileSync(path.join(dir, ".env"), SECRET);
+        fs.symlinkSync(path.join(dir, ".env"), path.join(dir, "swap.gsl"));
+
+        assertRefused(await withSwappedPath(() => compileCheck("swap.gsl")));
+    });
+
+    test("compile refuses a non-.gsl path", async () => {
+        fs.writeFileSync(path.join(dir, "notes.txt"), SECRET);
+
+        assertRefused(await compileCheck("notes.txt"));
+    });
+
+    test("compile refuses a directory named like a .gsl file", async () => {
+        fs.mkdirSync(path.join(dir, "folder.gsl"));
+
+        assertRefused(await compileCheck("folder.gsl"));
+    });
+
+    test("compile refuses a FIFO without hanging", async function () {
+        skipWithoutPosixFiles(this);
+        execFileSync("mkfifo", [path.join(dir, "pipe.gsl")]);
+
+        const result = await compileCheck("pipe.gsl");
+
+        assertRefused(result);
+        assert.strictEqual(
+            result.content[0].text,
+            `${path.join(dir, "pipe.gsl")} is not a regular file.`,
+        );
+    });
+
+    test("download writes a new file and replaces a regular one", async () => {
+        const scriptPath = path.join(dir, scriptName);
+
+        assert.ok(!(await download(dir)).isError);
+        assert.strictEqual(
+            fs.readFileSync(scriptPath, "utf8"),
+            `fetched${os.EOL}`,
+        );
+
+        fs.writeFileSync(scriptPath, "much longer old\r\ncontent\r\n");
+        assert.ok(!(await download(dir)).isError);
+        assert.strictEqual(fs.readFileSync(scriptPath, "utf8"), "fetched\r\n");
+    });
+
+    test("download refuses a planted symlink and keeps its target", async function () {
+        skipWithoutPosixFiles(this);
+        const target = path.join(dir, "authorized_keys");
+        fs.writeFileSync(target, SECRET);
+        fs.symlinkSync(target, path.join(dir, scriptName));
+
+        const result = await download(dir);
+
+        assertRefused(result);
+        assert.strictEqual(fs.readFileSync(target, "utf8"), SECRET);
+    });
+
+    test("download refuses a dangling planted symlink", async function () {
+        skipWithoutPosixFiles(this);
+        const target = path.join(dir, "created-through-link");
+        fs.symlinkSync(target, path.join(dir, scriptName));
+
+        assertRefused(await download(dir));
+        assert.ok(!fs.existsSync(target));
+    });
+
+    test("download refuses a symlinked download directory", async function () {
+        skipWithoutPosixFiles(this);
+        fs.mkdirSync(path.join(dir, "real"));
+        fs.symlinkSync(path.join(dir, "real"), path.join(dir, "link"));
+
+        assertRefused(await download(path.join(dir, "link")));
+        assert.deepStrictEqual(fs.readdirSync(path.join(dir, "real")), []);
+    });
+
+    test("download creates no directory through a symlink", async function () {
+        skipWithoutPosixFiles(this);
+        fs.mkdirSync(path.join(dir, "real"));
+        fs.symlinkSync(path.join(dir, "real"), path.join(dir, "link"));
+
+        assertRefused(await download(path.join(dir, "link", "sub")));
+        assert.deepStrictEqual(fs.readdirSync(path.join(dir, "real")), []);
+    });
+
+    test("download runs no git hook planted in its directory", async function () {
+        skipWithoutPosixFiles(this);
+        const hook = path.join(dir, "hook.sh");
+        const marker = path.join(dir, "hook-ran");
+        fs.writeFileSync(hook, `#!/bin/sh\ntouch ${marker}\n`, { mode: 0o755 });
+        execFileSync("git", ["init", "-q", dir]);
+        fs.writeFileSync(path.join(dir, "tracked"), "x");
+        execFileSync("git", ["-C", dir, "add", "tracked"]);
+        execFileSync("git", ["-C", dir, "config", "core.fsmonitor", hook]);
+
+        assert.ok(!(await download(dir)).isError);
+        assert.ok(!fs.existsSync(marker));
+    });
+
+    test("download refuses a path swapped for a symlink", async function () {
+        skipWithoutPosixFiles(this);
+        const target = path.join(dir, "authorized_keys");
+        fs.writeFileSync(target, SECRET);
+        fs.symlinkSync(target, path.join(dir, scriptName));
+
+        assertRefused(await withSwappedPath(() => download(dir)));
+        assert.strictEqual(fs.readFileSync(target, "utf8"), SECRET);
+    });
+
+    test("download refuses a FIFO without hanging", async function () {
+        skipWithoutPosixFiles(this);
+        execFileSync("mkfifo", [path.join(dir, scriptName)]);
+
+        assertRefused(await download(dir));
+    });
+
+    test("download leaves a hard-linked outside file intact", async () => {
+        const outside = path.join(dir, "authorized_keys");
+        const scriptPath = path.join(dir, scriptName);
+        fs.writeFileSync(outside, SECRET);
+        fs.linkSync(outside, scriptPath);
+
+        assert.ok(!(await download(dir)).isError);
+
+        assert.strictEqual(fs.readFileSync(outside, "utf8"), SECRET);
+        assert.strictEqual(fs.readFileSync(scriptPath, "utf8"), "fetched\n");
+        assert.strictEqual(fs.statSync(scriptPath).nlink, 1);
+        assert.deepStrictEqual(fs.readdirSync(dir).sort(), [
+            scriptName,
+            "authorized_keys",
+        ]);
+    });
+
+    test("download retries a rename blocked on Windows", async () => {
+        const scriptPath = path.join(dir, scriptName);
+        fs.writeFileSync(scriptPath, "old\n");
+
+        const { result, attempts } = await downloadWithRenameFailures({
+            failures: 2,
+            platform: "win32",
+        });
+
+        assert.ok(!result.isError, result.content[0].text);
+        assert.strictEqual(attempts, 3);
+        assert.strictEqual(fs.readFileSync(scriptPath, "utf8"), "fetched\n");
+        assert.deepStrictEqual(fs.readdirSync(dir), [scriptName]);
+    });
+
+    test("download reports a file held open on Windows", async () => {
+        const scriptPath = path.join(dir, scriptName);
+        fs.writeFileSync(scriptPath, "old\n");
+
+        const { result, attempts } = await downloadWithRenameFailures({
+            failures: Infinity,
+            platform: "win32",
+        });
+
+        assert.ok(result.isError);
+        assert.ok(
+            result.content[0].text.includes(
+                `${scriptPath} could not be replaced (EPERM). It is probably read-only or open in another program`,
+            ),
+            result.content[0].text,
+        );
+        assert.strictEqual(attempts, 20);
+        assert.strictEqual(fs.readFileSync(scriptPath, "utf8"), "old\n");
+        assert.deepStrictEqual(fs.readdirSync(dir), [scriptName]);
+    });
+
+    test("download doesn't retry a failed rename off Windows", async () => {
+        const scriptPath = path.join(dir, scriptName);
+        fs.writeFileSync(scriptPath, "old\n");
+
+        const { result, attempts } = await downloadWithRenameFailures({
+            failures: Infinity,
+            platform: "linux",
+        });
+
+        assert.ok(result.isError);
+        assert.ok(!result.content[0].text.includes("another program"));
+        assert.strictEqual(attempts, 1);
+        assert.strictEqual(fs.readFileSync(scriptPath, "utf8"), "old\n");
+        assert.deepStrictEqual(fs.readdirSync(dir), [scriptName]);
+    });
+
+    test("download removes the temp file after a failed write", async () => {
+        const scriptPath = path.join(dir, scriptName);
+        fs.writeFileSync(scriptPath, "old\n");
+        const mutableFs = require("fs") as {
+            writeFileSync: typeof fs.writeFileSync;
+        };
+        const { writeFileSync } = mutableFs;
+        mutableFs.writeFileSync = (file, _data, options) => {
+            writeFileSync(file, "partial", options);
+            throw Object.assign(new Error("ENOSPC"), { code: "ENOSPC" });
+        };
+        try {
+            const result = await download(dir);
+
+            assert.ok(result.isError);
+            assert.ok(result.content[0].text.includes("ENOSPC"));
+        } finally {
+            mutableFs.writeFileSync = writeFileSync;
+        }
+        assert.strictEqual(fs.readFileSync(scriptPath, "utf8"), "old\n");
+        assert.deepStrictEqual(fs.readdirSync(dir), [scriptName]);
+    });
+
+    test("a failed temp cleanup doesn't hide the write error", async () => {
+        fs.writeFileSync(path.join(dir, scriptName), "old\n");
+        const mutableFs = require("fs") as { rmSync: typeof fs.rmSync };
+        const { rmSync } = mutableFs;
+        mutableFs.rmSync = () => {
+            throw Object.assign(new Error("EBUSY"), { code: "EBUSY" });
+        };
+        try {
+            const { result } = await downloadWithRenameFailures({
+                failures: Infinity,
+                platform: "linux",
+            });
+
+            assert.ok(result.isError);
+            assert.ok(result.content[0].text.includes("EPERM"));
+        } finally {
+            mutableFs.rmSync = rmSync;
+        }
     });
 });
 
