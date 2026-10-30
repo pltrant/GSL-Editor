@@ -263,6 +263,8 @@ export async function runAsProxy(
 
 export interface DaemonHandle {
     socketPath: string;
+    /** Resolves when the idle timeout is reached; the caller shuts down. */
+    idle: Promise<void>;
     /** Shut down the daemon listener and clean up. */
     close(): void;
 }
@@ -301,14 +303,15 @@ export async function startDaemonListener(
         const clients = new Set<net.Socket>();
         let idleTimer: NodeJS.Timeout | undefined;
         let ownedSocket: fs.Stats | undefined;
+        let resolveIdle!: () => void;
+        const idle = new Promise<void>((resolve) => (resolveIdle = resolve));
 
         function checkIdle() {
             clearTimeout(idleTimer);
             if (clients.size === 0) {
                 idleTimer = setTimeout(() => {
                     debugLog("Idle timeout reached, daemon exiting.");
-                    cleanup();
-                    process.exit(0);
+                    resolveIdle();
                 }, IDLE_TIMEOUT_MS);
             }
         }
@@ -401,6 +404,7 @@ export async function startDaemonListener(
 
             resolve({
                 socketPath: SOCKET_PATH,
+                idle,
                 close: cleanup,
             });
         });

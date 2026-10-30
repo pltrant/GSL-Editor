@@ -105,6 +105,18 @@ const clientTimeout = 15000;
 const taskQueueTimeout = 30000;
 const ssCheckeditTimeout = 7500;
 
+/** Harmless command that answers with one line and a prompt */
+export const KEEPALIVE_COMMAND = "time";
+/**
+ * Idle game sockets can die silently (dev has dropped between 30-minute
+ * polls). Three minutes stays under the 4-minute idle timeout of the
+ * strictest common NATs and load balancers.
+ */
+export const DEFAULT_KEEPALIVE_INTERVAL_MILLIS = 180_000;
+let keepAliveIntervalMillis = DEFAULT_KEEPALIVE_INTERVAL_MILLIS;
+/** The current partial line is nothing but a game prompt */
+const rx_prompt_only = /^(?:GN?>|>)+$/;
+
 export type InitOptions = {
     login: {
         account: string;
@@ -231,11 +243,35 @@ function throwIfAborted(signal?: AbortSignal, message?: string): void {
     }
 }
 
+function delay(millis: number, signal: AbortSignal): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+        if (signal.aborted) {
+            reject(signal.reason);
+            return;
+        }
+        const onAbort = () => {
+            clearTimeout(timer);
+            reject(signal.reason);
+        };
+        const timer = setTimeout(() => {
+            signal.removeEventListener("abort", onAbort);
+            resolve();
+        }, millis);
+        signal.addEventListener("abort", onAbort, { once: true });
+    });
+}
+
 class TaskQueueProcessor {
     /** Frequency of queue processing */
     private static FREQUENCY_MILLIS = 250;
     /** Max time a task may hold the editor client lock */
     private static TASK_TIMEOUT_MILLIS = taskQueueTimeout;
+    /** First wait before logging in again after a connection failure */
+    private static LOGIN_BACKOFF_MILLIS = 1_000;
+    /** Longest wait; leaves room for the login inside the task timeout */
+    private static MAX_LOGIN_BACKOFF_MILLIS = 8_000;
+    /** Drops further apart than this start the backoff over */
+    private static LOGIN_BACKOFF_RESET_MILLIS = 60_000;
 
     private client: EditorClient | undefined;
     private pendingClient: EditorClient | undefined;
@@ -244,6 +280,10 @@ class TaskQueueProcessor {
     private nextTaskLeaseId: number;
     private activeTaskLeaseId: number | undefined;
     private nextTick: NodeJS.Timeout | undefined;
+    private keepAliveTimer: NodeJS.Timeout | undefined;
+    private connectionFailures = 0;
+    private closed = false;
+    private lastConnectionFailureAt = 0;
 
     constructor() {
         this.taskQueue = [];
@@ -299,7 +339,7 @@ class TaskQueueProcessor {
         } catch (e: unknown) {
             const error = e instanceof Error ? e : new Error(String(e));
             if (shouldResetClient(error)) {
-                this.resetClients();
+                void this.resetClients();
             }
             reject(error);
         } finally {
@@ -308,6 +348,58 @@ class TaskQueueProcessor {
             if (this.taskQueue.length > 0) {
                 this.scheduleTick(TaskQueueProcessor.FREQUENCY_MILLIS);
             }
+            this.scheduleKeepAlive();
+        }
+    }
+
+    /** Schedule a keepalive for when the client has been idle long enough */
+    scheduleKeepAlive(delayMillis?: number): void {
+        clearTimeout(this.keepAliveTimer);
+        this.keepAliveTimer = undefined;
+        const { client } = this;
+        if (!client || this.closed || keepAliveIntervalMillis <= 0) return;
+        const wait =
+            delayMillis ??
+            client.lastCommandAt + keepAliveIntervalMillis - Date.now();
+        this.keepAliveTimer = setTimeout(
+            () => void this.keepAlive(client),
+            Math.max(0, wait),
+        );
+        // Don't keep a process alive just to keep a session alive.
+        this.keepAliveTimer.unref();
+    }
+
+    /**
+     * Sends the keepalive while holding the queue, so no task interleaves
+     * with it. Skips a busy client: a task is running or queued, or the last
+     * command has not returned to the game prompt (e.g. the script editor).
+     */
+    private async keepAlive(client: EditorClient): Promise<void> {
+        this.keepAliveTimer = undefined;
+        if (client !== this.client || this.closed) return;
+        if (
+            this.isProcessingTask ||
+            this.taskQueue.length > 0 ||
+            !client.isIdle()
+        ) {
+            this.scheduleKeepAlive(keepAliveIntervalMillis);
+            return;
+        }
+        if (Date.now() - client.lastCommandAt < keepAliveIntervalMillis) {
+            this.scheduleKeepAlive();
+            return;
+        }
+        this.isProcessingTask = true;
+        try {
+            await client.keepAlive();
+        } catch {
+            // No answer: the session is dead. Log it out so the next task
+            // signs in again instead of writing to a dead socket.
+            if (this.client === client) void this.disposeClient(client);
+        } finally {
+            this.isProcessingTask = false;
+            if (this.taskQueue.length > 0) this.scheduleTick(0);
+            this.scheduleKeepAlive();
         }
     }
 
@@ -340,6 +432,8 @@ class TaskQueueProcessor {
     }
 
     private assertTaskActive(taskExecution: TaskExecution): void {
+        // Work that resumes after shutdown started must not log in again.
+        this.throwIfClosed();
         if (!this.isTaskLeaseActive(taskExecution.leaseId)) {
             throw new StaleEditorClientTaskError();
         }
@@ -355,26 +449,44 @@ class TaskQueueProcessor {
         }
         if (this.client === client) {
             this.client = undefined;
+            clearTimeout(this.keepAliveTimer);
+            this.keepAliveTimer = undefined;
         }
     }
 
-    private disposeClient(client: EditorClient): void {
-        client.destroy();
+    private disposeClient(client: EditorClient): Promise<void> {
+        // Clear refs first so the invalidation handlers see a deliberate close.
         this.clearClientRefs(client);
+        return client.destroy();
     }
 
-    private resetClients(): void {
+    /** Logs out for good: later tasks fail instead of logging in again. */
+    close(): Promise<void> {
+        this.closed = true;
+        return this.resetClients();
+    }
+
+    private throwIfClosed(): void {
+        if (this.closed) {
+            throw createAbortError("Editor clients are shutting down.");
+        }
+    }
+
+    /** Logs out the cached sessions; resolves once their sockets close. */
+    private async resetClients(): Promise<void> {
+        const closing: Promise<void>[] = [];
         if (this.pendingClient && this.pendingClient !== this.client) {
-            this.disposeClient(this.pendingClient);
+            closing.push(this.disposeClient(this.pendingClient));
         }
         if (this.client) {
-            this.disposeClient(this.client);
+            closing.push(this.disposeClient(this.client));
         }
+        await Promise.all(closing);
     }
 
     private pruneDisconnectedClient(): void {
         if (this.client && !this.client.hasServerConnection()) {
-            this.resetClients();
+            void this.resetClients();
         }
     }
 
@@ -395,9 +507,42 @@ class TaskQueueProcessor {
     }
 
     private attachClientInvalidationHandlers(client: EditorClient): void {
-        const clearCreatedClientRefs = () => this.clearClientRefs(client);
-        client.on("error", clearCreatedClientRefs);
-        client.on("quit", clearCreatedClientRefs);
+        const invalidate = () => {
+            if (this.client === client || this.pendingClient === client) {
+                // The connection died; the server may still hold the session.
+                this.recordConnectionFailure();
+                this.clearClientRefs(client);
+            }
+        };
+        client.on("error", invalidate);
+        client.on("quit", invalidate);
+    }
+
+    /**
+     * Each new login can kick a session the server still holds, so
+     * connections that keep dropping double the wait before the next login.
+     * Deliberate resets log out first and are not counted.
+     */
+    private recordConnectionFailure(): void {
+        const now = Date.now();
+        if (
+            now - this.lastConnectionFailureAt >
+            TaskQueueProcessor.LOGIN_BACKOFF_RESET_MILLIS
+        ) {
+            this.connectionFailures = 0;
+        }
+        this.connectionFailures++;
+        this.lastConnectionFailureAt = now;
+    }
+
+    private loginBackoffMillis(): number {
+        if (this.connectionFailures === 0) return 0;
+        const backoff = Math.min(
+            TaskQueueProcessor.LOGIN_BACKOFF_MILLIS *
+                2 ** (this.connectionFailures - 1),
+            TaskQueueProcessor.MAX_LOGIN_BACKOFF_MILLIS,
+        );
+        return Math.max(0, this.lastConnectionFailureAt + backoff - Date.now());
     }
 
     private startTaskLease(): number {
@@ -432,7 +577,7 @@ class TaskQueueProcessor {
             options.console.log(
                 "[editorClient] Login changed, reconnecting with the new login",
             );
-            this.disposeClient(this.client);
+            void this.disposeClient(this.client);
         }
 
         const { login, onCreate } = options;
@@ -442,13 +587,23 @@ class TaskQueueProcessor {
             this.attachClientInvalidationHandlers(client);
             try {
                 await client.login(login, taskExecution.abortController.signal);
+                // A login that finishes after shutdown started is logged out.
                 this.assertTaskActive(taskExecution);
             } catch (e) {
-                this.disposeClient(client);
+                void this.disposeClient(client);
                 throw e;
             }
             return client;
         };
+
+        const backoffMillis = this.loginBackoffMillis();
+        if (backoffMillis > 0) {
+            options.console.log(
+                `[editorClient] Waiting ${backoffMillis}ms before logging in again after a connection failure`,
+            );
+            await delay(backoffMillis, taskExecution.abortController.signal);
+            this.assertTaskActive(taskExecution);
+        }
 
         let createdClient: EditorClient;
         try {
@@ -462,27 +617,13 @@ class TaskQueueProcessor {
                 `[editorClient] Login failed (${error.message}), retrying once...`,
             );
             this.assertTaskActive(taskExecution);
-            const { signal } = taskExecution.abortController;
-            await new Promise<void>((resolve, reject) => {
-                if (signal.aborted) {
-                    reject(signal.reason);
-                    return;
-                }
-                const onAbort = () => {
-                    clearTimeout(timer);
-                    reject(signal.reason);
-                };
-                const timer = setTimeout(() => {
-                    signal.removeEventListener("abort", onAbort);
-                    resolve();
-                }, 500);
-                signal.addEventListener("abort", onAbort, { once: true });
-            });
+            await delay(500, taskExecution.abortController.signal);
             this.assertTaskActive(taskExecution);
             createdClient = await attemptLogin();
         }
         this.clearClientRefs(createdClient);
         this.client = createdClient;
+        this.scheduleKeepAlive();
         onCreate(createdClient);
         return createdClient;
     }
@@ -513,6 +654,24 @@ export const withClientForInstance = async <T>(
     return processor.enqueueTask(initOptions, task);
 };
 
+/** Sets how long a game connection may sit idle before a keepalive; 0 disables. */
+export const setKeepAliveInterval = (millis: number): void => {
+    keepAliveIntervalMillis = millis;
+    for (const processor of processorRegistry.values()) {
+        processor.scheduleKeepAlive();
+    }
+};
+
+/**
+ * Logs out every cached game session for good and resolves once their
+ * sockets close. Only for process shutdown: later tasks fail.
+ */
+export const closeAllEditorClients = async (): Promise<void> => {
+    await Promise.all(
+        [...processorRegistry.values()].map((processor) => processor.close()),
+    );
+};
+
 /**
  * The interface of an `EditorClient` instance. This layer of indirection
  * is necessary in order to prevent export of `EditorClient`. We want
@@ -522,7 +681,18 @@ export const withClientForInstance = async <T>(
 export type EditorClientInterface = InstanceType<typeof EditorClient>;
 
 class EditorClient extends BaseGameClient {
+    /** Minimum time between in-place reconnects on reset connections */
+    private static AUTO_RECONNECT_INTERVAL_MILLIS = 60_000;
     private autoReconnectSuspended = false;
+    private destroyed = false;
+    private lastAutoReconnectAt = 0;
+    /** When the last command was sent; the server's idle clock */
+    lastCommandAt = Date.now();
+    /** A command was sent and the game prompt has not returned yet */
+    private awaitingPrompt = true;
+    private promptOutput = new OutputProcessor(() => {});
+    /** Set while a keepalive's output is being swallowed */
+    private endKeepAlive: (() => void) | undefined;
 
     matchesLogin(login: InitOptions["login"]): boolean {
         return ["account", "instance", "character"].every(
@@ -543,11 +713,91 @@ class EditorClient extends BaseGameClient {
         );
     }
 
+    destroy(): Promise<void> {
+        this.destroyed = true;
+        return super.destroy();
+    }
+
     /** Rejects with a StaleSessionError if the session no longer responds. */
     verifySession(signal: AbortSignal): Promise<void> {
         return this.withAutoReconnectSuspended(() =>
             probeSession(this, signal),
         );
+    }
+
+    /** True when connected, at the game prompt, and no keepalive is out. */
+    isIdle(): boolean {
+        return (
+            this.hasServerConnection() &&
+            !this.awaitingPrompt &&
+            !this.endKeepAlive
+        );
+    }
+
+    /**
+     * Sends the keepalive command and hides its output until the prompt
+     * returns. Rejects if the session does not answer.
+     */
+    keepAlive(timeoutMillis = clientTimeout): Promise<void> {
+        return this.withAutoReconnectSuspended(
+            () =>
+                new Promise<void>((resolve, reject) => {
+                    const settle = (error?: Error) => {
+                        clearTimeout(timeout);
+                        this.off("error", onError);
+                        this.off("quit", onQuit);
+                        this.endKeepAlive = undefined;
+                        if (error) reject(error);
+                        else resolve();
+                    };
+                    const onError = (error: Error) => settle(error);
+                    const onQuit = () =>
+                        settle(new Error("Disconnected during keepalive."));
+                    const timeout = setTimeout(
+                        () =>
+                            settle(
+                                new Error(
+                                    `Keepalive got no answer within ${timeoutMillis}ms.`,
+                                ),
+                            ),
+                        timeoutMillis,
+                    );
+                    this.on("error", onError);
+                    this.on("quit", onQuit);
+                    try {
+                        this.send(KEEPALIVE_COMMAND, false);
+                    } catch (e) {
+                        settle(e instanceof Error ? e : new Error(String(e)));
+                        return;
+                    }
+                    this.endKeepAlive = () => settle();
+                }),
+        );
+    }
+
+    send(command: string, echo: boolean = true): void {
+        super.send(command, echo);
+        this.lastCommandAt = Date.now();
+        this.awaitingPrompt = true;
+        this.promptOutput.flush();
+        // A command typed during a keepalive owns the output that follows.
+        this.endKeepAlive?.();
+    }
+
+    protected serverText(text: string): void {
+        this.promptOutput.accumulate(text);
+        // The prompt is not newline-terminated, so check the partial line.
+        // A bare prompt, not text that happens to end in ">".
+        const atPrompt = rx_prompt_only.test(
+            this.promptOutput.peek().replace(rx_ansi, ""),
+        );
+        if (atPrompt) this.awaitingPrompt = false;
+        if (this.endKeepAlive) {
+            // Hide the keepalive from terminals and response parsers.
+            if (atPrompt) this.endKeepAlive();
+            return;
+        }
+        super.serverText(text);
     }
 
     /** No auto-reconnect or command retry: a reconnect would log in a
@@ -629,12 +879,20 @@ class EditorClient extends BaseGameClient {
     }
 
     protected serverError(error: any): void {
-        if (this.autoReconnectSuspended) {
+        // A destroyed client's reconnect would log in a session nobody owns.
+        if (this.autoReconnectSuspended || this.destroyed) {
             super.serverError(error);
             return;
         }
-        // attempt to reconnect on reset connections
-        if (error.code === "ECONNRESET") {
+        // Attempt to reconnect on reset connections. A repeat reset is left
+        // to the task queue, which backs off before logging in again.
+        const now = Date.now();
+        if (
+            error.code === "ECONNRESET" &&
+            now - this.lastAutoReconnectAt >=
+                EditorClient.AUTO_RECONNECT_INTERVAL_MILLIS
+        ) {
+            this.lastAutoReconnectAt = now;
             this.cleanupServer();
             this.reconnect()
                 .then(() => {
@@ -646,7 +904,9 @@ class EditorClient extends BaseGameClient {
                 .catch(() => {
                     // Reconnect failed; emit error so the task queue
                     // resets the client on the next operation.
-                    this.emit("error", error);
+                    if (this.listenerCount("error") > 0) {
+                        this.emit("error", error);
+                    }
                 });
         } else {
             super.serverError(error);
@@ -992,6 +1252,11 @@ class EditorClient extends BaseGameClient {
             return Promise.reject(error.caught);
         }
         throwIfAborted(abortSignal, "Editor client login cancelled.");
+        // Destroyed during the play.net login, e.g. replaced by the task
+        // queue: connecting now would log in over its replacement.
+        if (this.destroyed) {
+            throw createAbortError("Editor client was destroyed.");
+        }
         this.interactive = false;
         this.connect(sal);
         return await this.isInteractive(abortSignal);

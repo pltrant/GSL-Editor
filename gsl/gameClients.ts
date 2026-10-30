@@ -84,8 +84,12 @@ export class BaseGameClient extends EventEmitter {
         if (this.console) {
             this.console.log("server socket errored", error);
         }
-        this.emit("error", error);
+        // The connection is dead either way. A destroyed client has no error
+        // listeners, and emitting without one would crash the process.
         this.cleanupServer();
+        if (this.listenerCount("error") > 0) {
+            this.emit("error", error);
+        }
     }
 
     protected serverText(text: string) {
@@ -114,9 +118,10 @@ export class BaseGameClient extends EventEmitter {
         this.initializeServer(options);
     }
 
-    quit() {
+    /** Logs out and resolves once the socket has closed. */
+    quit(): Promise<void> {
         if (!this.server) throw new Error("not connected");
-        this.server.close("quit");
+        return this.server.close("quit" + this.newLine);
     }
 
     send(command: string, echo: boolean = true) {
@@ -139,19 +144,22 @@ export class BaseGameClient extends EventEmitter {
         return true;
     }
 
-    destroy(): void {
+    /** Resolves once the socket has closed. */
+    destroy(): Promise<void> {
         if (this.logStream) {
             this.logStream.end();
             this.logStream = undefined;
         }
+        let closed = Promise.resolve();
         try {
-            this.quit();
+            closed = this.quit();
         } catch {
             // Ignore quit errors during forced reset.
         }
         // Notify attached terminals before removing listeners during a reset.
         this.emit("quit");
         this.removeAllListeners();
+        return closed;
     }
 }
 

@@ -37,6 +37,9 @@ export class ServerConnection extends EventEmitter {
     static closeGraceMillis: number = 2_000;
 
     private socket: Socket;
+    /** Resolves once the socket has closed, errored, or been destroyed. */
+    private closed: Promise<void>;
+    private resolveClosed!: () => void;
 
     private options: any;
 
@@ -68,6 +71,7 @@ export class ServerConnection extends EventEmitter {
         this.state = ServerConnectionState.Initialized;
 
         this.socket = new Socket();
+        this.closed = new Promise((resolve) => (this.resolveClosed = resolve));
 
         this.options = options;
 
@@ -148,9 +152,10 @@ export class ServerConnection extends EventEmitter {
         }
     }
 
-    close(quit?: string) {
+    /** Resolves once the socket is closed. */
+    close(quit?: string): Promise<void> {
         if (this.state === ServerConnectionState.Closed) {
-            return;
+            return this.closed;
         }
         if (typeof quit === "string") {
             this.send(quit);
@@ -161,10 +166,11 @@ export class ServerConnection extends EventEmitter {
         this.socketEnd();
         // Ending only half-closes the socket. If the server never closes its
         // side, the connection (and game session) would stay open, so force it.
-        setTimeout(
-            () => this.socket.destroy(),
-            ServerConnection.closeGraceMillis,
-        ).unref();
+        setTimeout(() => {
+            this.socket.destroy();
+            this.resolveClosed();
+        }, ServerConnection.closeGraceMillis).unref();
+        return this.closed;
     }
 
     /* private */
@@ -227,6 +233,8 @@ export class ServerConnection extends EventEmitter {
         this.socket.removeAllListeners("close");
         this.socket.removeAllListeners("data");
         this.socket.removeAllListeners("end");
+        // A late error on a dead socket must not become an uncaught exception.
+        this.socket.on("error", () => {});
     }
     private socketError(error: Error) {
         if (this.debug === true) {
@@ -235,7 +243,10 @@ export class ServerConnection extends EventEmitter {
         this.socketCleanup();
         this.socket.destroy();
         this.state = ServerConnectionState.Error;
-        this.emit("error", error);
+        this.resolveClosed();
+        if (this.listenerCount("error") > 0) {
+            this.emit("error", error);
+        }
     }
     private socketClose() {
         if (this.debug === true) {
@@ -243,6 +254,7 @@ export class ServerConnection extends EventEmitter {
         }
         this.socketCleanup();
         this.state = ServerConnectionState.Closed;
+        this.resolveClosed();
         this.emit("close");
     }
     private socketData(data: Buffer) {
