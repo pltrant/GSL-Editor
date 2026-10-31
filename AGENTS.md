@@ -38,6 +38,12 @@
   modules (for example under `gsl/commands/`) with `extension.ts`
   delegating to those modules.
 
+### MCP File Access
+
+- The MCP daemon holds secrets and sits outside the agent's sandbox, so
+  tools must access local files through `gsl/util/noSymlinkFile.ts`. A
+  planted symlink could otherwise make it read or overwrite anything.
+
 ### Type & Parameter Preferences
 
 - Inline parameter object types when they are only used in one place.

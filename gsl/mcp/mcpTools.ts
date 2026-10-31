@@ -5,8 +5,9 @@ import { AgentToolOrchestrator, GameInstance } from "../agentToolOrchestrator";
 import { TOOL_DEFINITIONS } from "./toolDefinitions";
 import {
     resolveDefaultLineEnding,
-    writeScriptFile,
+    writeScriptFileNoSymlink,
 } from "../util/lineEndingUtil";
+import { readFileNoSymlink, refuseSymlinksInPath } from "../util/noSymlinkFile";
 
 export { TOOL_DEFINITIONS };
 
@@ -525,6 +526,9 @@ export function createMcpToolHandler(
                 try {
                     const scriptNumbers = parseScriptNumbers(args);
                     const instance = parseInstance(args.instance, "dev");
+                    const dir = orchestrator.downloadLocation;
+                    refuseSymlinksInPath(dir);
+                    fs.mkdirSync(dir, { recursive: true });
                     const result: McpToolResult = { content: [] };
                     for (const scriptNumber of scriptNumbers) {
                         try {
@@ -541,10 +545,8 @@ export function createMcpToolHandler(
                                 continue;
                             }
                             const filename = `S${String(scriptNumber).padStart(5, "0")}.${instance}.mcp.gsl`;
-                            const dir = orchestrator.downloadLocation;
-                            fs.mkdirSync(dir, { recursive: true });
                             const filePath = path.join(dir, filename);
-                            writeScriptFile({
+                            writeScriptFileNoSymlink({
                                 filePath,
                                 content,
                                 fallbackEol:
@@ -588,9 +590,7 @@ export function createMcpToolHandler(
                     if (!resolvedPath.endsWith(".gsl")) {
                         throw new Error("File must have a .gsl extension.");
                     }
-                    // Trust boundary: MCP callers control file paths.
-                    // This is standard for MCP tool servers.
-                    const content = fs.readFileSync(resolvedPath, "utf8");
+                    const content = readFileNoSymlink(resolvedPath);
                     const compileResults =
                         await orchestrator.uploadAndCompileScript(content);
                     return textResult(
