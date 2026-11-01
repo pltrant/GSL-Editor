@@ -60,6 +60,8 @@ export interface LoginDetails {
     character: string;
     mode: string;
     label: string;
+    /** EAccess reported the game as DEVELOPMENT */
+    development: boolean;
 }
 
 export interface GameOptionCollection {
@@ -461,6 +463,7 @@ export class EAccessClient extends EventEmitter {
             character: this.selectedCharacterCode,
             mode: this.selectedGame.storm ? "storm" : "play",
             label: `${this.selectedCharacter.name} - ${this.selectedGame.name}`,
+            development: this.selectedGame.development,
         };
         this.close();
         this.emit(EVENT_LAUNCH, this.connectionDetails, this.loginDetails);
@@ -489,7 +492,7 @@ export class EAccessClient extends EventEmitter {
         character: string,
         mode: string,
         abortSignal?: AbortSignal,
-    ): Promise<SAL> {
+    ): Promise<{ sal: SAL; loginDetails: LoginDetails }> {
         const attempt = () =>
             this.quickLoginImpl(
                 account,
@@ -512,7 +515,7 @@ export class EAccessClient extends EventEmitter {
         character: string,
         mode: string,
         abortSignal?: AbortSignal,
-    ): Promise<SAL> {
+    ): Promise<{ sal: SAL; loginDetails: LoginDetails }> {
         const options = { debug: true, console: this.console };
         return new Promise((resolve, reject) => {
             const createQuickLoginError = (
@@ -549,7 +552,8 @@ export class EAccessClient extends EventEmitter {
                 );
             }, this.quickLoginTimeoutMillis);
             const rejectOnce = (error: Error) => settle(() => reject(error));
-            const resolveOnce = (sal: SAL) => settle(() => resolve(sal));
+            const resolveOnce = (sal: SAL, loginDetails: LoginDetails) =>
+                settle(() => resolve({ sal, loginDetails }));
             const onAbort = () => {
                 try {
                     client.close();
@@ -617,7 +621,7 @@ export class EAccessClient extends EventEmitter {
                     client.selectCharacter(resolvedCode, mode);
                 },
             );
-            client.once(EVENT_LAUNCH, (sal: SAL) => resolveOnce(sal));
+            client.once(EVENT_LAUNCH, resolveOnce);
             client.connect();
         });
     }

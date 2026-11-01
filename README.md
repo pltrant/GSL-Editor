@@ -158,3 +158,123 @@ agents sharing a pool must use the same path and configuration.
 
 If you're using GitHub Copilot in VS Code, the MCP server tools are registered
 automatically inside the extension runtime. You do not need to run an MCP server.
+
+## Dev Upload Tool
+
+A standalone command-line tool uploads scripts to the GemStone IV development
+server (`GS4D`) and compiles them there, the way the editor's upload does. It
+is for an upload that cannot wait for VS Code, and for a trusted automation
+that uploads to Dev and needs a machine-readable result. It is not an MCP tool
+and no agent tool exposes it.
+
+`npm run compile` builds it to `gsl/devUpload/devUpload.bundle.js`. The bundle
+is self-contained: copy that one file anywhere and run it with Node. It reads
+a login config file in the MCP server's format, passed as `--config` or found
+in `GSL_LOGIN_CONFIG_FILE`, and the password from `GSL_PASSWORD`. The config
+must set `devInstance` to `GS4D` and exactly one dev character. Give the tool
+a login file of its own, with a character of its own, not the MCP server's:
+the game allows one session per character, so each login kicks that
+character's other session, and a shared character would have the tool and
+the MCP daemon kicking each other mid-task.
+
+The tool only ever logs in to `GS4D`. It refuses to connect unless the login
+service reports that game as `DEVELOPMENT`. No config or environment setting
+widens that.
+
+### Commands
+
+Each command prints one JSON line on stdout, last and alone, and exits `0`
+only when the top-level `outcome` is `ok`. Every command but `version` logs
+in once. Scripts are named by their files: `S<number>.gsl`, in any case, with
+or without leading zeros. When stdin is a pipe and the other end closes, the
+run aborts: the connection is dropped without sending anything more, and the
+result reports it as a failure (`unknown` if text may already have gone out).
+A caller that gives the tool a pipe must keep it open until it has read the
+JSON line.
+
+```sh
+node devUpload.bundle.js version
+node devUpload.bundle.js metadata --config ~/.gsl/loginConfig.upload.json 12345 12346
+node devUpload.bundle.js upload --config ~/.gsl/loginConfig.upload.json --expect 12345=1761800000 --expect 12346=0 S12345.gsl S12346.gsl
+node devUpload.bundle.js frozen --config ~/.gsl/loginConfig.upload.json
+```
+
+`version` needs no config, login or connection. A caller that keeps a copy of
+the bundle runs it once to check what it has:
+`{"outcome":"ok","detail":"","tool":"gsl-dev-upload","interface":1}`. The
+interface number changes when a command or the JSON shape changes
+incompatibly. Within one interface, new fields and new `status` values may
+appear; treat an unrecognised `outcome` as `unknown`.
+
+`metadata` reads each script's `/ss <number> GS4D raw` output:
+
+```json
+{"outcome":"ok","detail":"","scripts":[
+  {"script":12345,"outcome":"ok","status":"ok","modifier":"W_ACCOUNT","epoch":1761800000,"detail":""},
+  {"script":12346,"outcome":"ok","status":"blank","modifier":null,"epoch":0,"detail":""}]}
+```
+
+`status` is `ok`, `blank` (no modifier or date recorded), `missing` (not
+created), `unavailable` (no reply, or one the tool could not read) or `verb`
+(the server redirects to the verb editor and shows no metadata). After a
+timeout the remaining scripts are not asked, so a late reply cannot be taken
+for another script's; their `outcome` is `not_attempted` with `status`
+`unavailable`, the top-level `outcome` is `unknown` and the exit code is 1.
+
+`upload` takes `--expect <number>=<epoch>` for every file, the epoch
+`metadata` returned and `0` for blank, then sends each file in order and
+stops at the first script that is not `ok`:
+
+```json
+{"outcome":"ok","detail":"","scripts":[
+  {"script":12345,"outcome":"ok","sha256":"<sent text>","readback_sha256":"<text read back>","detail":"Compile OK and the read-back matched."}]}
+```
+
+Per-script `outcome`:
+
+- `ok`: the compile succeeded and went live for that script number, and the
+  text read back from Dev matches the text sent: `readback_sha256` equals
+  `sha256`. Both hash the text with LF line endings, trailing whitespace at
+  the end of the file removed and one trailing newline, as a download
+  normalizes it.
+- `compile_failed`: the compile reported errors, listed in `detail`. The
+  editor keeps the uploaded text, confirmed by the read-back; nothing is
+  restored.
+- `refused`: nothing was written. The file, config or login was refused, the
+  script is not on Dev, or Dev's copy is not what `--expect` says.
+- `unknown`: text may have reached the editor, then something failed, and
+  the tool cannot say whether Dev's copy is the sent text or whether it went
+  live. `readback_sha256`, when not null, is the text Dev holds now.
+- `not_attempted`: an earlier script stopped the run.
+
+The top-level `outcome` is `ok` when every script is, otherwise the first
+other outcome. A run-level failure, such as a bad argument, a refused login
+or a lost connection before any script, is a top-level `refused` or
+`unknown` with every script `not_attempted`; the top-level `detail` always
+carries the reason. An audit log write that fails after an upload is a
+top-level `unknown` with the real per-script results.
+
+`--expect` is the stale check: the upload re-reads the metadata just before
+it sends and refuses the script if Dev no longer shows that epoch. It must
+name every file, once, with digits only. A script whose metadata is
+`missing`, `unavailable` or `verb`, or whose `status` is `ok` with a
+modifier but no date (`epoch` null), cannot be checked and is refused here.
+
+`upload` also refuses to run in an agent session, judged by the environment.
+An automation that drives this tool gives it a clean environment.
+
+Text is refused before login if the editor would not take it as sent: a blank
+or whitespace-only line, a line starting with `~`, a line over 118 characters,
+a character outside printable ASCII and tab, trailing whitespace on the last
+line, or more than 39,998 lines. CRLF line endings are accepted.
+
+Every write attempt is appended as a JSON line to the audit log, before the
+text is sent and again with its result. Set the path with `--audit-log`; the
+default is `dev-upload-audit.log` beside the login config. The run is refused
+if the log cannot be opened for appending. The password is never printed or
+logged.
+
+`frozen` lists the scripts the server reports as frozen or locked, with verbs
+converted to their script numbers:
+`{"outcome":"ok","detail":"","scripts":[{"script":13693,"status":"FROZEN"}]}`.
+A failed list has `"scripts":[]`.

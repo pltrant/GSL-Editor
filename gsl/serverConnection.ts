@@ -173,6 +173,11 @@ export class ServerConnection extends EventEmitter {
         return this.closed;
     }
 
+    /** Closes the socket at once, writing nothing first. */
+    drop(): void {
+        this.socket.destroy();
+    }
+
     /* private */
 
     private bufferText(text: string) {

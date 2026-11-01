@@ -1,5 +1,3 @@
-import { parse } from "csv-parse/sync";
-
 import {
     Disposable,
     StatusBarItem,
@@ -8,25 +6,12 @@ import {
     window,
 } from "vscode";
 import { GSL_LANGUAGE_ID } from "../const";
+import { ResourceEntryMap, fetchFrozenResources } from "../frozenResources";
 import { getScriptNumber } from "../util/scriptUtil";
 import { GSLExtension, VSCodeIntegration } from "../../extension";
 
 const POLLING_FREQUENCY = 1_800_000; // 30 minutes
 const WARNING_CLICKED_COMMAND = "internal.frozen_script.warning_clicked";
-
-interface ResourceEntry {
-    type: string;
-    id: number;
-    status: "FROZEN";
-    gm: string;
-    access: number;
-}
-
-type ResourceEntryMap = {
-    [type: string]: {
-        [id: number]: ResourceEntry;
-    };
-};
 
 /**
  * Manages the status bar item that informs the user whether the current
@@ -118,12 +103,7 @@ export class FrozenScriptWarningManager {
 
         await this.withEditorClient(async (client) => {
             try {
-                const lines = await client.executeCommand("/freeze list csv", {
-                    captureStart: /CSV dump of frozen resources/,
-                    captureEnd: /\d+ frozen resource\(s\)\./,
-                    timeoutMillis: 15_000,
-                });
-                this.latestData = this.readCsvTable(lines);
+                this.latestData = await fetchFrozenResources(client);
                 this.render();
             } catch (e) {
                 console.error(e);
@@ -134,45 +114,5 @@ export class FrozenScriptWarningManager {
             this.refreshData.bind(this),
             POLLING_FREQUENCY,
         );
-    }
-
-    private readCsvTable(lines: string[]): ResourceEntryMap {
-        // Example Data:
-        // type,id,status,gm,access
-        // script,17323,FROZEN,"W_GS4-AKAYDAR",4
-        // verb,age,FROZEN,"W_GS4-FAZLI",4
-        // verb_script,13693,FROZEN,"W_GS4-FAZLI",4    <----- appended for verbs
-        // segment,501,FROZEN,"W_GS4-KYNLEE",4
-        const entries: ResourceEntry[] = parse(lines.join("\n"), {
-            columns: true,
-            skip_empty_lines: true,
-        });
-        const result: ResourceEntryMap = {};
-
-        for (let i = 0; i < entries.length; i++) {
-            // Convert verbs to scripts
-            let entry = entries[i];
-            if (entry.type === "verb") {
-                const verb_script_entry = entries[i + 1];
-                entry = {
-                    ...entry,
-                    type: "script",
-                    id: verb_script_entry.id,
-                };
-                i++;
-            }
-            if (!entry.id) {
-                // Skip data integrity issues, e.g.
-                // verb,curtsey,FROZEN,"W_GS4-XXX",5
-                // verb_script,0,FROZEN,"W_GS4-XXXX",5
-                continue;
-            }
-
-            // Add to result
-            result[entry.type] = result[entry.type] || {};
-            result[entry.type][entry.id] = entry;
-        }
-
-        return result;
     }
 }

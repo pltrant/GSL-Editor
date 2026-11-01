@@ -9,7 +9,8 @@ import {
     TextLine,
     WorkspaceEdit,
 } from "vscode";
-import { LINE_TOO_LONG, MAX_LINE_LENGTH } from "./diagnostics";
+import { MAX_LINE_LENGTH } from "./const";
+import { LINE_TOO_LONG } from "./diagnostics";
 import {
     fixLineTooLong,
     collapseMultiline,

@@ -579,7 +579,10 @@ suite("Editor client connections", () => {
         });
         EAccessClient.quickLogin = (async () => {
             await loginHeld;
-            return { gamehost: "127.0.0.1", gameport: gamePort, key: "key" };
+            return {
+                sal: { gamehost: "127.0.0.1", gameport: gamePort, key: "key" },
+                loginDetails: {},
+            };
         }) as any;
         stubReconnect = false;
         try {

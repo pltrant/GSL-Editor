@@ -1,5 +1,5 @@
 import { Range, TextDocument, TextLine } from "vscode";
-import { MAX_LINE_LENGTH } from "../diagnostics";
+import { MAX_LINE_LENGTH } from "../const";
 
 export const QUOTE_CONTINUATION = `" +\\\n`;
 export const WRAPPED_TEXT_LINE_REGEX = /"\s*\+\s*\\$/;

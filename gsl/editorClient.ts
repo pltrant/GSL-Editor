@@ -32,6 +32,19 @@ export type ShowScriptOutput = Pick<
     "lastModifiedDate" | "name" | "desc" | "owner" | "modifier"
 >;
 
+/**
+ * Output of `/ss N <game> raw`; captured by `showScriptRaw()`. `blank` is a
+ * script with no modifier or epoch recorded, `missing` one the server says has
+ * not been created, and `verb` one it answers with the verb redirect, which
+ * shows no metadata.
+ */
+export interface ScriptMetadata {
+    status: "ok" | "blank" | "missing" | "verb";
+    modifier?: string;
+    /** `Last modified:` in seconds since 1970 UTC; 0 when blank */
+    epoch?: number;
+}
+
 export interface ScriptCompileResults {
     status: ScriptCompileStatus;
     script: number;
@@ -41,6 +54,8 @@ export interface ScriptCompileResults {
     errors: number;
     warnings: number;
     errorList: Array<ScriptError>;
+    /** The server closed with `Compile ok.`: the new code replaced the old. */
+    live?: boolean;
 }
 
 export interface ScriptError {
@@ -62,8 +77,9 @@ const rx_login_complete =
 
 const rx_quest_status = /QUEST STATUS/;
 const rx_aborted = /(?:Script edit|Modification) aborted\./;
+/** Followed only for the requested script, and only ever with `/mv` */
 const rx_getverb =
-    /Error: Script #(?<script>\d+) is a verb\. Please use (?<command>.*?) instead\./;
+    /Error: Script #(?<script>\d+) is a verb\. Please use \/mv (?<verb>.+?) instead\./;
 const rx_noscript = /Error\: Script \#\d+ has not been created yet\./;
 const rx_noverb = /Verb not found\./;
 const rx_ss_check = /\s\s+\d+\s\s+.*?\s\s+.*?\s\s+.*?/;
@@ -83,6 +99,9 @@ const rx_compiled = /Compile ok\./;
 
 const rx_modified =
     /On\s(?<dow>\w+)\s(?<month>\w+) \s?(?<day>\d+) (?<hh>\d+)\:(?<mm>\d+)\:(?<ss>\d+) (?<year>\d+)$/;
+/** Only the raw form of `/ss` prints this; the `On ...` line is in server time */
+const rx_epoch = /^Last modified:\s*(?<epoch>\d*)\s*$/;
+const rx_modifier_line = /^Last modified by:/;
 const rx_details =
     /(?:^Name\: (?<name>.*?)$)|(?:^Desc\: (?<desc>.*?)$)|(?:^Owned by: (?<owner>.*?)$)|(?:^Last modified by: (?<modifier>.*?)$)|(?:^(New)? ?File\: (?<path>.*?)(?:, (?<lines>\d+) lines?)?\.$)/;
 
@@ -117,12 +136,17 @@ let keepAliveIntervalMillis = DEFAULT_KEEPALIVE_INTERVAL_MILLIS;
 /** The current partial line is nothing but a game prompt */
 const rx_prompt_only = /^(?:GN?>|>)+$/;
 
+/**
+ * A login with this set is refused unless EAccess reports the game as
+ * DEVELOPMENT, before any game connection is made.
+ */
 export type InitOptions = {
     login: {
         account: string;
         instance: string;
         character: string;
         password: string;
+        requireDevelopment?: boolean;
     };
     console: { log: (...args: any[]) => void };
     downloadLocation: string;
@@ -654,6 +678,21 @@ export const withClientForInstance = async <T>(
     return processor.enqueueTask(initOptions, task);
 };
 
+/**
+ * Runs `task` on its own login, outside the task queues, for a process that
+ * does one job and exits. Only a Dev login is taken: `requireDevelopment` is
+ * checked before the game is connected. Nothing logs, retries or reconnects.
+ * The session logs out after the task resolves, unless the task left the script
+ * editor open, in which case the socket is dropped instead: `quit` there would
+ * write the buffer. If the task rejects, the connection drops or `signal`
+ * aborts, the socket is dropped without logging out: see `EditorClient.drop`.
+ */
+export const withOneShotEditorClient = <T>(
+    login: InitOptions["login"] & { requireDevelopment: true },
+    task: ClientTask<Promise<T>>,
+    signal?: AbortSignal,
+): Promise<T> => new EditorClient({}).runOneShot(login, task, signal);
+
 /** Sets how long a game connection may sit idle before a keepalive; 0 disables. */
 export const setKeepAliveInterval = (millis: number): void => {
     keepAliveIntervalMillis = millis;
@@ -693,6 +732,8 @@ class EditorClient extends BaseGameClient {
     private promptOutput = new OutputProcessor(() => {});
     /** Set while a keepalive's output is being swallowed */
     private endKeepAlive: (() => void) | undefined;
+    /** Set while the script editor is open, where `quit` writes the buffer */
+    private editorOpen = false;
 
     matchesLogin(login: InitOptions["login"]): boolean {
         return ["account", "instance", "character"].every(
@@ -716,6 +757,47 @@ class EditorClient extends BaseGameClient {
     destroy(): Promise<void> {
         this.destroyed = true;
         return super.destroy();
+    }
+
+    /**
+     * Closes the connection without logging out. The script editor reads only
+     * a command's first letter, so `quit` there acts as `Q` and writes the
+     * buffer.
+     */
+    drop(): void {
+        this.destroyed = true;
+        this.server?.drop();
+    }
+
+    /** @see withOneShotEditorClient */
+    runOneShot<T>(
+        login: InitOptions["login"] & { requireDevelopment: true },
+        task: ClientTask<Promise<T>>,
+        signal?: AbortSignal,
+    ): Promise<T> {
+        return this.withAutoReconnectSuspended(async () => {
+            try {
+                await this.login(login, signal);
+                const dropped = new Promise<never>((_, reject) => {
+                    this.once("quit", () =>
+                        reject(new Error("The connection dropped.")),
+                    );
+                    this.once("error", reject);
+                    signal?.addEventListener(
+                        "abort",
+                        () => reject(signal.reason),
+                        { once: true },
+                    );
+                });
+                const result = await Promise.race([task(this), dropped]);
+                if (this.editorOpen) this.drop();
+                else await this.destroy();
+                return result;
+            } catch (e) {
+                this.drop();
+                throw e;
+            }
+        });
     }
 
     /** Rejects with a StaleSessionError if the session no longer responds. */
@@ -806,11 +888,12 @@ class EditorClient extends BaseGameClient {
         operation: () => Promise<T>,
     ): Promise<T> {
         this.retryCommand = "";
+        const wasSuspended = this.autoReconnectSuspended;
         this.autoReconnectSuspended = true;
         try {
             return await operation();
         } finally {
-            this.autoReconnectSuspended = false;
+            this.autoReconnectSuspended = wasSuspended;
         }
     }
     private interactive: boolean;
@@ -956,6 +1039,86 @@ class EditorClient extends BaseGameClient {
         });
     }
 
+    /**
+     * Reads a script's modifier and epoch with `/ss N <game> raw`, without
+     * opening the editor. Rejects on a timeout or an error line, such as a
+     * verb's.
+     */
+    showScriptRaw(script: number): Promise<ScriptMetadata> {
+        const result: ScriptMetadata = { status: "ok" };
+        let seenModifierLine = false;
+        let settled = false;
+        return new Promise((resolve, reject) => {
+            const finish = (settle: () => void) => {
+                settled = true;
+                this.off("text", processText);
+                clearTimeout(timeout);
+                settle();
+            };
+            const done = () => {
+                if (
+                    result.status === "ok" &&
+                    !result.modifier &&
+                    !result.epoch
+                ) {
+                    result.status = "blank";
+                }
+                finish(() => resolve(result));
+            };
+            const output = new OutputProcessor((line: string) => {
+                let match: RegExpMatchArray | null;
+                if (rx_noscript.test(line)) {
+                    result.status = "missing";
+                    return done();
+                }
+                match = line.match(rx_getverb);
+                if (match?.groups && Number(match.groups.script) === script) {
+                    result.status = "verb";
+                    return finish(() => resolve(result));
+                }
+                if (match || rx_noverb.test(line)) {
+                    return finish(() => reject(new Error(line.trim())));
+                }
+                match = line.match(rx_epoch);
+                if (match && match.groups) {
+                    result.epoch = Number(match.groups.epoch || 0);
+                    return;
+                }
+                if (
+                    rx_modified.test(line) ||
+                    line.startsWith("Unspecified Date")
+                ) {
+                    return done();
+                }
+                if (rx_modifier_line.test(line)) {
+                    seenModifierLine = true;
+                }
+                match = line.match(rx_details);
+                if (match?.groups?.modifier?.trim()) {
+                    result.modifier = match.groups.modifier.trim();
+                }
+            });
+            const processText = (text: string) => {
+                output.accumulate(text);
+                // Blank metadata may end with the prompt instead of a date line.
+                if (!settled && seenModifierLine && output.peek(1) === ">") {
+                    done();
+                }
+            };
+            const timeout = setTimeout(() => {
+                this.off("text", processText);
+                reject(
+                    createNamedError(
+                        "ScriptCheckTimeoutError",
+                        "Script check timed out.",
+                    ),
+                );
+            }, clientTimeout);
+            this.on("text", processText);
+            this.trySend(`/ss ${script} ${this.loginDetails.instance} raw`);
+        });
+    }
+
     showScriptCheckStatus(script: number): Promise<string> {
         return new Promise((resolve, reject) => {
             const output = new OutputProcessor((line) => {
@@ -1005,12 +1168,9 @@ class EditorClient extends BaseGameClient {
                     );
                 }
                 match = line.match(rx_getverb);
-                if (match && match.groups) {
-                    scriptProperties.verb = match.groups.command
-                        .split(" ")
-                        .slice(1)
-                        .join(" ");
-                    this.send(match.groups.command, true);
+                if (match?.groups && Number(match.groups.script) === script) {
+                    scriptProperties.verb = match.groups.verb;
+                    this.send(`/mv ${match.groups.verb}`, true);
                     return;
                 }
                 match = line.match(rx_modified);
@@ -1057,6 +1217,7 @@ class EditorClient extends BaseGameClient {
                 }
                 if (done) {
                     clearTimeout(timeout);
+                    this.editorOpen = true;
                     if (!keepalive) {
                         try {
                             await this.exitModifyScript();
@@ -1090,6 +1251,7 @@ class EditorClient extends BaseGameClient {
                 }
                 this.off("text", processText);
                 clearTimeout(timeout);
+                this.editorOpen = false;
                 resolve();
             });
             this.on("text", processText);
@@ -1134,6 +1296,7 @@ class EditorClient extends BaseGameClient {
     sendScript(
         lines: Array<string>,
         newScript: boolean,
+        timeoutMillis = clientTimeout,
     ): Promise<ScriptCompileResults> {
         return new Promise((resolve, reject) => {
             const compileResults: ScriptCompileResults = {
@@ -1153,13 +1316,15 @@ class EditorClient extends BaseGameClient {
             };
             const timeout = setTimeout(
                 () => sendFailed("Script upload timed out."),
-                clientTimeout,
+                timeoutMillis,
             );
             const output = new OutputProcessor((line: string) => {
                 let match: RegExpMatchArray | null;
                 if (rx_aborted.test(line) || rx_compiled.test(line)) {
                     clearTimeout(timeout);
                     this.off("text", processText);
+                    this.editorOpen = false;
+                    compileResults.live = rx_compiled.test(line);
                     resolve(compileResults);
                     return;
                 }
@@ -1239,8 +1404,9 @@ class EditorClient extends BaseGameClient {
         const error: any = (e: Error) => {
             error.caught = e;
         };
-        const { account, password, instance, character } = this.loginDetails;
-        const sal = await EAccessClient.quickLogin(
+        const { account, password, instance, character, requireDevelopment } =
+            this.loginDetails;
+        const launch = await EAccessClient.quickLogin(
             account,
             password,
             instance,
@@ -1250,6 +1416,12 @@ class EditorClient extends BaseGameClient {
         ).catch(error);
         if (error.caught) {
             return Promise.reject(error.caught);
+        }
+        const { sal } = launch;
+        if (requireDevelopment && !launch.loginDetails.development) {
+            throw new Error(
+                `Refusing to connect: EAccess does not report ${instance} as DEVELOPMENT.`,
+            );
         }
         throwIfAborted(abortSignal, "Editor client login cancelled.");
         // Destroyed during the play.net login, e.g. replaced by the task

@@ -1,8 +1,7 @@
 import * as vscode from "vscode";
-import { GSL_LANGUAGE_ID } from "./const";
+import { GSL_LANGUAGE_ID, MAX_LINE_LENGTH } from "./const";
 
 export const LINE_TOO_LONG = "line-too-long";
-export const MAX_LINE_LENGTH = 118;
 
 export function subscribeToDocumentChanges(
     context: vscode.ExtensionContext,

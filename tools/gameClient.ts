@@ -33,13 +33,13 @@ async function main() {
 
     let sal;
     try {
-        sal = await EAccessClient.quickLogin(
+        ({ sal } = await EAccessClient.quickLogin(
             account,
             password,
             instance,
             character,
             "storm",
-        );
+        ));
     } catch (e) {
         console.error("Login failed:", e);
         process.exit(1);
