@@ -573,8 +573,10 @@ async function readBack(
 
 /**
  * Uploads the files in order on one login, stopping at the first script that
- * is not `ok`. Before each upload `/ss` must still show the epoch `expected`
- * gives for it, and `/ms` must agree with `/ss`. With `confirm` instead, the
+ * is not `ok`. Before each upload `/freeze` must not list the script, `/ss`
+ * must still show the epoch `expected` gives for it, and `/ms` must agree
+ * with `/ss`. A `/freeze` read that fails stops the run there, unwritten,
+ * since an unknown freeze is treated as one. With `confirm` instead, the
  * metadata is read first and the session waits, still open, for it to return
  * what each upload must match, or nothing to decline them all.
  *
@@ -648,6 +650,17 @@ export async function uploadSession({
                 for (let i = 0; i < files.length; i++) {
                     current = i;
                     const file = files[i];
+                    // Read again for each script: the earlier uploads' time
+                    // would otherwise be a gap a freeze could land in.
+                    const frozen = (await fetchFrozenResources(client))
+                        .script?.[file.script];
+                    if (frozen) {
+                        refused(
+                            i,
+                            `Nothing was uploaded: Dev reports the script as ${frozen.status}.`,
+                        );
+                        break;
+                    }
                     const dev = await client.showScriptRaw(file.script);
                     const reason = refusal(required[i], dev);
                     if (reason) {

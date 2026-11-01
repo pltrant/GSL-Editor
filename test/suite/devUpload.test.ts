@@ -106,6 +106,10 @@ class FakeGame {
     /** `/ss` shows the modifier but no `Last modified:` line */
     ssNoEpochLine = false;
     frozenCsv = "type,id,status,gm,access\n";
+    /** `/freeze list csv` never answers */
+    freezeSilent = false;
+    /** This script joins the frozen list once any script has compiled */
+    freezeAfterUpload: number | undefined;
     /** Accepts connections but never shows a prompt */
     silent = false;
 
@@ -226,6 +230,9 @@ class FakeGame {
                     write(buffer.map((l) => `${l}\r\n`).join("") + "Edt:");
                 } else if (letter === "g") {
                     editorWrite();
+                    if (this.freezeAfterUpload !== undefined) {
+                        this.frozenCsv += `script,${this.freezeAfterUpload},FROZEN,"W_GS4-B",4\n`;
+                    }
                     if (this.hangAfterGo && connection === 1) return;
                     const number =
                         this.compileNumber ??
@@ -279,6 +286,7 @@ class FakeGame {
             } else if (command === "/mv age") {
                 openEditor(this.scripts[VERB_SCRIPT], VERB_SCRIPT);
             } else if (command === "/freeze list csv") {
+                if (this.freezeSilent) return;
                 write(
                     "CSV dump of frozen resources\r\n" +
                         this.frozenCsv.replace(/\n/g, "\r\n") +
@@ -302,6 +310,7 @@ class FakeGame {
 }
 
 const okUploadCommands = (script: number, text: string) => [
+    "/freeze list csv",
     `/ss ${script} GS4D raw`,
     `/ms ${script}`,
     "Z",
@@ -711,6 +720,7 @@ suite("Dev upload tool", function () {
             );
             assert.strictEqual(game.scripts[SCRIPT].text, DEV_TEXT);
             assert.deepStrictEqual(game.connections[0], [
+                "/freeze list csv",
                 `/ss ${SCRIPT} GS4D raw`,
                 `/ms ${SCRIPT}`,
                 "Z",
@@ -755,6 +765,7 @@ suite("Dev upload tool", function () {
             );
             assert.match(result.scripts[0].detail, /Dev holds the sent text/);
             assert.deepStrictEqual(game.connections[0], [
+                "/freeze list csv",
                 `/ss ${SCRIPT} GS4D raw`,
                 `/ms ${SCRIPT}`,
                 "Z",
@@ -863,6 +874,83 @@ suite("Dev upload tool", function () {
             assertRefusedBeforeLogin(await upload([]), /at least one/);
         });
 
+        test("a frozen script is refused with nothing sent", async () => {
+            game.frozenCsv += `script,${SCRIPT},FROZEN,"W_GS4-A",4\n`;
+
+            const { result, code } = await upload([filePath, filePath2]);
+
+            assert.strictEqual(result.outcome, "refused");
+            assert.strictEqual(result.scripts[0].outcome, "refused");
+            assert.strictEqual(
+                result.scripts[0].detail,
+                "Nothing was uploaded: Dev reports the script as FROZEN.",
+            );
+            assert.strictEqual(result.scripts[1].outcome, "not_attempted");
+            assert.strictEqual(code, 1);
+            assert.strictEqual(game.scripts[SCRIPT].text, DEV_TEXT);
+            assert.deepStrictEqual(game.connections, [
+                ["/freeze list csv", "quit"],
+            ]);
+            assert.deepStrictEqual(
+                auditEvents().map(({ event }) => event),
+                ["start", "end"],
+            );
+        });
+
+        test("a locked script, and one frozen through its verb, are refused", async () => {
+            game.frozenCsv +=
+                `script,${SCRIPT},LOCKED,"W_GS4-C",5\n` +
+                'verb,age,FROZEN,"W_GS4-B",4\n' +
+                `verb_script,${SCRIPT2},FROZEN,"W_GS4-B",4\n`;
+
+            const { result } = await upload([filePath, filePath2]);
+            const { result: viaVerb } = await upload([filePath2]);
+
+            assert.strictEqual(result.scripts[0].outcome, "refused");
+            assert.match(result.scripts[0].detail, /as LOCKED\./);
+            assert.strictEqual(result.scripts[1].outcome, "not_attempted");
+            assert.strictEqual(viaVerb.scripts[0].outcome, "refused");
+            assert.match(viaVerb.scripts[0].detail, /as FROZEN\./);
+            assert.strictEqual(game.scripts[SCRIPT].text, DEV_TEXT);
+            assert.strictEqual(game.scripts[SCRIPT2].text, "x\n");
+        });
+
+        test("a script frozen after an earlier upload is refused when its turn comes", async () => {
+            game.freezeAfterUpload = SCRIPT2;
+
+            const { result, code } = await upload([filePath, filePath2]);
+
+            assert.strictEqual(result.outcome, "refused");
+            assert.strictEqual(result.scripts[0].outcome, "ok");
+            assert.strictEqual(result.scripts[1].outcome, "refused");
+            assert.match(result.scripts[1].detail, /as FROZEN\./);
+            assert.strictEqual(code, 1);
+            assert.strictEqual(game.scripts[SCRIPT].text, NEW_TEXT);
+            assert.strictEqual(game.scripts[SCRIPT2].text, "x\n");
+            assert.deepStrictEqual(game.connections, [
+                [
+                    ...okUploadCommands(SCRIPT, NEW_TEXT),
+                    "/freeze list csv",
+                    "quit",
+                ],
+            ]);
+        });
+
+        test("a /freeze read that fails refuses the script unwritten", async () => {
+            game.freezeSilent = true;
+
+            const { result, code } = await upload([filePath, filePath2]);
+
+            assert.strictEqual(result.outcome, "refused");
+            assert.strictEqual(result.scripts[0].outcome, "refused");
+            assert.match(result.scripts[0].detail, /^Nothing was uploaded: /);
+            assert.match(result.scripts[0].detail, /timed out/);
+            assert.strictEqual(result.scripts[1].outcome, "not_attempted");
+            assert.strictEqual(code, 1);
+            assert.strictEqual(game.scripts[SCRIPT].text, DEV_TEXT);
+            assert.deepStrictEqual(game.connections, [["/freeze list csv"]]);
+        });
+
         test("a script missing on Dev is refused with nothing sent", async () => {
             game.scripts[SCRIPT].state = "missing";
 
@@ -872,7 +960,7 @@ suite("Dev upload tool", function () {
             assert.match(result.scripts[0].detail, /reports it as missing/);
             assert.strictEqual(result.scripts[1].outcome, "not_attempted");
             assert.deepStrictEqual(game.connections, [
-                [`/ss ${SCRIPT} GS4D raw`, "quit"],
+                ["/freeze list csv", `/ss ${SCRIPT} GS4D raw`, "quit"],
             ]);
         });
 
@@ -883,7 +971,7 @@ suite("Dev upload tool", function () {
 
             assert.strictEqual(result.scripts[0].outcome, "refused");
             assert.deepStrictEqual(game.connections, [
-                [`/ss ${SCRIPT} GS4D raw`, "quit"],
+                ["/freeze list csv", `/ss ${SCRIPT} GS4D raw`, "quit"],
             ]);
             assert.strictEqual(game.scripts[SCRIPT].state, "new");
         });
@@ -896,7 +984,12 @@ suite("Dev upload tool", function () {
             assert.strictEqual(result.scripts[0].outcome, "refused");
             assert.match(result.scripts[0].detail, /disagrees/);
             assert.deepStrictEqual(game.connections, [
-                [`/ss ${SCRIPT} GS4D raw`, `/ms ${SCRIPT}`, ""],
+                [
+                    "/freeze list csv",
+                    `/ss ${SCRIPT} GS4D raw`,
+                    `/ms ${SCRIPT}`,
+                    "",
+                ],
             ]);
             assert.strictEqual(game.scripts[SCRIPT].text, DEV_TEXT);
         });
@@ -979,7 +1072,7 @@ suite("Dev upload tool", function () {
                     JSON.stringify(result),
                 );
                 assert.deepStrictEqual(game.connections, [
-                    [`/ss ${script} GS4D raw`, "quit"],
+                    ["/freeze list csv", `/ss ${script} GS4D raw`, "quit"],
                 ]);
             });
         }
@@ -1021,7 +1114,7 @@ suite("Dev upload tool", function () {
                 );
                 assert.doesNotMatch(result.scripts[0].detail, /changed/);
                 assert.deepStrictEqual(game.connections, [
-                    [`/ss ${SCRIPT} GS4D raw`, "quit"],
+                    ["/freeze list csv", `/ss ${SCRIPT} GS4D raw`, "quit"],
                 ]);
             }
         });
@@ -1101,7 +1194,7 @@ suite("Dev upload tool", function () {
             assert.strictEqual(scripts[1].outcome, "not_attempted");
             assert.match(detail, /Audit log write failed/);
             assert.deepStrictEqual(game.connections, [
-                [`/ss ${SCRIPT} GS4D raw`, "quit"],
+                ["/freeze list csv", `/ss ${SCRIPT} GS4D raw`, "quit"],
             ]);
             assert.strictEqual(game.scripts[SCRIPT].text, DEV_TEXT);
         });
@@ -1817,6 +1910,26 @@ suite("Dev upload tool", function () {
             ]);
         });
 
+        test("a frozen script is refused after the phrase, with no warning list override", async () => {
+            game.frozenCsv += `script,${SCRIPT},FROZEN,"W_GS4-A",4\n`;
+
+            const { code, stdout } = await interactive([filePath], (prompt) =>
+                phrasePrompt.test(prompt) ? "upload 1 to dev" : undefined,
+            );
+
+            assert.strictEqual(code, 1);
+            assert.match(
+                stdout,
+                new RegExp(
+                    `${SCRIPT}  refused  Nothing was uploaded: Dev reports the script as FROZEN\\.`,
+                ),
+            );
+            assert.strictEqual(game.scripts[SCRIPT].text, DEV_TEXT);
+            assert.deepStrictEqual(game.connections, [
+                [`/ss ${SCRIPT} GS4D raw`, "/freeze list csv", "quit"],
+            ]);
+        });
+
         test("a wrong phrase uploads nothing", async () => {
             const { code, stderr } = await interactive([filePath], (prompt) =>
                 phrasePrompt.test(prompt) ? "upload 1 to prime" : undefined,
@@ -1851,8 +1964,9 @@ suite("Dev upload tool", function () {
                 /WARNING: Dev metadata for script 777 is a verb/,
             );
             assert.strictEqual(game.scripts[VERB_SCRIPT].text, NEW_TEXT);
-            assert.deepStrictEqual(game.connections[0].slice(0, 5), [
+            assert.deepStrictEqual(game.connections[0].slice(0, 6), [
                 `/ss ${VERB_SCRIPT} GS4D raw`,
+                "/freeze list csv",
                 `/ss ${VERB_SCRIPT} GS4D raw`,
                 `/ms ${VERB_SCRIPT}`,
                 "/mv age",
@@ -1911,8 +2025,9 @@ suite("Dev upload tool", function () {
                 ),
             );
             assert.strictEqual(game.scripts[SCRIPT].text, NEW_TEXT);
-            assert.deepStrictEqual(game.connections[0].slice(0, 6), [
+            assert.deepStrictEqual(game.connections[0].slice(0, 7), [
                 `/ss ${SCRIPT} GS4D raw`,
+                "/freeze list csv",
                 `/ss ${SCRIPT} GS4D raw`,
                 `/ms ${SCRIPT}`,
                 "",

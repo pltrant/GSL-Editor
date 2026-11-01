@@ -241,7 +241,8 @@ Per-script `outcome`:
   editor keeps the uploaded text, confirmed by the read-back; nothing is
   restored.
 - `refused`: nothing was written. The file, config or login was refused, the
-  script is not on Dev, or Dev's copy is not what `--expect` says.
+  script is not on Dev, Dev reports it as frozen or locked, or Dev's copy is
+  not what `--expect` says.
 - `unknown`: text may have reached the editor, then something failed, and
   the tool cannot say whether Dev's copy is the sent text or whether it went
   live. `readback_sha256`, when not null, is the text Dev holds now.
@@ -253,6 +254,12 @@ or a lost connection before any script, is a top-level `refused` or
 `unknown` with every script `not_attempted`; the top-level `detail` always
 carries the reason. An audit log write that fails after an upload is a
 top-level `unknown` with the real per-script results.
+
+Directly before each script is sent, the upload reads `/freeze list csv` on
+the same login and refuses the script if Dev lists it as frozen or locked,
+so a freeze that lands after a separate `frozen` run still stops the upload.
+A `/freeze` read that fails refuses the script too, since the answer is
+unknown. The run stops there as it does for any refusal.
 
 `--expect` is the stale check: the upload re-reads the metadata just before
 it sends and refuses the script if Dev no longer shows that epoch. It must
@@ -295,6 +302,7 @@ modified by someone else, changed on Dev after the local file was saved, or
 has blank or unreadable metadata. One typed `upload <count> to dev` confirms
 them all; anything else uploads nothing. The list, its warnings and your
 answer go to the audit log. The uploads then run on the same login, each
-checked against what the list showed. The session sends nothing while you
-read the list, so if the server drops an idle connection in that time the run
-fails with nothing uploaded; run it again.
+checked against what the list showed and against `/freeze list csv`; a frozen
+or locked script is refused. The session sends nothing while you read the
+list, so if the server drops an idle connection in that time the run fails
+with nothing uploaded; run it again.
