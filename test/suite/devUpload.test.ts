@@ -5,6 +5,7 @@ import * as fs from "fs";
 import * as net from "net";
 import * as os from "os";
 import * as path from "path";
+import { PassThrough } from "stream";
 
 import {
     AuditLog,
@@ -14,6 +15,11 @@ import {
     scriptNumber,
     uploadSession,
 } from "../../gsl/devUpload/devUpload";
+import {
+    guardReason,
+    processAncestors,
+    runInteractive,
+} from "../../gsl/devUpload/devUploadInteractive";
 import { EAccessClient } from "../../gsl/eaccessClient";
 import { withOneShotEditorClient } from "../../gsl/editorClient";
 
@@ -95,6 +101,8 @@ class FakeGame {
     tokenFileLost = false;
     /** `/ss` for these scripts never answers */
     ssSilent = new Set<number>();
+    /** `/ms` answers the verb redirect for another script number */
+    verbRedirectWrongScript = false;
     /** `/ss` shows the modifier but no `Last modified:` line */
     ssNoEpochLine = false;
     frozenCsv = "type,id,status,gm,access\n";
@@ -259,12 +267,17 @@ class FakeGame {
                         `Error: Script #${number} has not been created yet.\r\n>`,
                     );
                 } else if (script.state === "verb") {
+                    const shown = this.verbRedirectWrongScript
+                        ? number + 1
+                        : number;
                     write(
-                        `Error: Script #${number} is a verb. Please use /mv age instead.\r\n`,
+                        `Error: Script #${shown} is a verb. Please use /mv age instead.\r\n`,
                     );
                 } else {
                     openEditor(script, number);
                 }
+            } else if (command === "/mv age") {
+                openEditor(this.scripts[VERB_SCRIPT], VERB_SCRIPT);
             } else if (command === "/freeze list csv") {
                 write(
                     "CSV dump of frozen resources\r\n" +
@@ -1602,6 +1615,353 @@ suite("Dev upload tool", function () {
             // Under the upload tool's 30s, so this is the 15s default.
             const elapsed = performance.now() - started;
             assert.ok(elapsed >= 15_000 && elapsed < 30_000, `${elapsed}ms`);
+        });
+    });
+
+    suite("interactive", () => {
+        const tty = () => Object.assign(new PassThrough(), { isTTY: true });
+        const io = (
+            overrides: Partial<Parameters<typeof guardReason>[0]> = {},
+        ) => ({
+            env: { GSL_PASSWORD: "test-secret" } as NodeJS.ProcessEnv,
+            stdin: tty() as unknown as NodeJS.ReadStream,
+            stdout: tty(),
+            stderr: new PassThrough(),
+            ancestors: [] as string[],
+            ...overrides,
+        });
+
+        /** The bundle without a terminal; the fake game is never reached. */
+        const spawned = (args: string[]) =>
+            new Promise<{
+                code: number | null;
+                stdout: string;
+                stderr: string;
+            }>((resolve) => {
+                const child = spawn(
+                    process.execPath,
+                    [BUNDLE, "interactive", ...args],
+                    {
+                        env: { ...plainEnv(), GSL_PASSWORD: "test-secret" },
+                        stdio: ["ignore", "pipe", "pipe"],
+                    },
+                );
+                let stdout = "";
+                let stderr = "";
+                child.stdout.on("data", (data) => (stdout += data));
+                child.stderr.on("data", (data) => (stderr += data));
+                child.on("close", (code) => resolve({ code, stdout, stderr }));
+            });
+
+        test("an argument error is REFUSED on stderr, not a JSON line", async () => {
+            for (const args of [
+                ["--expect", "1=2", filePath],
+                ["--conifg", configPath, filePath],
+            ]) {
+                const { code, stdout, stderr } = await spawned(args);
+
+                assert.strictEqual(code, 1, args.join(" "));
+                assert.strictEqual(stdout, "", stdout);
+                assert.match(
+                    stderr,
+                    args[0] === "--expect"
+                        ? /^REFUSED: --expect is only for upload\.\n$/
+                        : /^REFUSED: Unknown option '--conifg'/,
+                );
+            }
+            assert.strictEqual(game.connections.length, 0);
+        });
+
+        test("refuses without a terminal, from the spawned bundle", async () => {
+            const { code, stdout, stderr } = await spawned([
+                "--config",
+                configPath,
+                filePath,
+            ]);
+
+            assert.strictEqual(code, 1);
+            assert.strictEqual(stdout, "", stdout);
+            assert.match(
+                stderr,
+                /REFUSED: stdin and stdout must both be an interactive terminal/,
+            );
+            assert.strictEqual(game.connections.length, 0);
+        });
+
+        test("refuses an agent session by environment or parent process", () => {
+            const ancestors = processAncestors();
+            assert.ok(Array.isArray(ancestors));
+            if (process.platform === "linux") assert.ok(ancestors.length > 0);
+            assert.strictEqual(guardReason(io()), undefined);
+            assert.match(
+                guardReason(io({ stdout: new PassThrough() }))!,
+                /interactive terminal/,
+            );
+            assert.match(
+                guardReason(
+                    io({ env: { CLAUDECODE: "1", GSL_PASSWORD: "x" } }),
+                )!,
+                /environment variables are present \(CLAUDECODE\)/,
+            );
+            assert.match(
+                guardReason(io({ env: { CLAUDE_CODE_FOO: "1" } }))!,
+                /CLAUDE_CODE_FOO/,
+            );
+            assert.match(
+                guardReason(io({ env: { CODEX_THREAD_ID: "1" } }))!,
+                /CODEX_THREAD_ID/,
+            );
+            assert.match(
+                guardReason(io({ ancestors: ["bash", "/usr/bin/claude"] }))!,
+                /under an agent process/,
+            );
+            assert.match(
+                guardReason(
+                    io({
+                        ancestors: [
+                            "node",
+                            "/x/@anthropic-ai/claude-code/cli.js",
+                        ],
+                    }),
+                )!,
+                /agent process/,
+            );
+            assert.match(
+                guardReason(io({ ancestors: ["codex"] }))!,
+                /agent process/,
+            );
+            assert.strictEqual(
+                guardReason(io({ ancestors: ["bash", "tmux", "sshd"] })),
+                undefined,
+            );
+        });
+
+        /** Runs the interactive command in-process against the fake game. */
+        const interactive = async (
+            files: string[],
+            answer: (prompt: string) => string | undefined,
+            overrides: Parameters<typeof io>[0] = {},
+        ) => {
+            const streams = io(overrides);
+            let stdout = "";
+            let stderr = "";
+            streams.stdout.on("data", (data) => {
+                stdout += data;
+                const prompt = stdout.split("\n").pop()!;
+                const reply = answer(prompt);
+                if (reply !== undefined) {
+                    stdout += "\n";
+                    (streams.stdin as unknown as PassThrough).write(
+                        `${reply}\n`,
+                    );
+                }
+            });
+            streams.stderr.on("data", (data) => (stderr += data));
+            const code = await withFakeLogin(() =>
+                runInteractive(
+                    files,
+                    { config: configPath, "audit-log": auditPath },
+                    streams,
+                ),
+            );
+            return { code, stdout, stderr };
+        };
+        const phrasePrompt = /^Type 'upload (\d) to dev'/;
+
+        test("lists Dev's metadata with warnings, then uploads on the same login", async () => {
+            game.scripts[SCRIPT].modifier = "W_OTHER";
+            game.scripts[SCRIPT2].epoch = Math.floor(Date.now() / 1000) + 3600;
+
+            const { code, stdout } = await interactive(
+                [filePath, filePath2],
+                (prompt) =>
+                    phrasePrompt.test(prompt) ? "upload 2 to dev" : undefined,
+            );
+
+            assert.strictEqual(code, 0, stdout);
+            assert.match(stdout, /last modified by W_OTHER/);
+            assert.match(
+                stdout,
+                new RegExp(
+                    `WARNING: script ${SCRIPT} was last modified on Dev by someone else: W_OTHER`,
+                ),
+            );
+            assert.match(
+                stdout,
+                new RegExp(
+                    `WARNING: Dev's copy of script ${SCRIPT2} changed .* after the local file was saved`,
+                ),
+            );
+            assert.match(stdout, /WARNINGS: 2 warning\(s\)/);
+            assert.match(stdout, new RegExp(`  ${SCRIPT}  ok  Compile OK`));
+            const preflight = auditEvents().find(
+                ({ event }) => event === "preflight",
+            );
+            assert.strictEqual(preflight.confirmed, true);
+            assert.strictEqual(preflight.scripts[0].dev.modifier, "W_OTHER");
+            assert.match(
+                preflight.scripts[0].warnings[0],
+                /last modified on Dev by someone else/,
+            );
+            assert.match(preflight.scripts[1].warnings[0], /may be stale/);
+            assert.strictEqual(game.scripts[SCRIPT].text, NEW_TEXT);
+            assert.strictEqual(game.scripts[SCRIPT2].text, TEXT2);
+            assert.deepStrictEqual(game.connections, [
+                [
+                    `/ss ${SCRIPT} GS4D raw`,
+                    `/ss ${SCRIPT2} GS4D raw`,
+                    ...okUploadCommands(SCRIPT, NEW_TEXT),
+                    ...okUploadCommands(SCRIPT2, TEXT2),
+                    "quit",
+                ],
+            ]);
+        });
+
+        test("a wrong phrase uploads nothing", async () => {
+            const { code, stderr } = await interactive([filePath], (prompt) =>
+                phrasePrompt.test(prompt) ? "upload 1 to prime" : undefined,
+            );
+
+            assert.strictEqual(code, 1);
+            assert.match(stderr, /REFUSED: confirmation phrase did not match/);
+            assert.strictEqual(game.scripts[SCRIPT].text, DEV_TEXT);
+            assert.deepStrictEqual(game.connections, [
+                [`/ss ${SCRIPT} GS4D raw`, "quit"],
+            ]);
+            const events = auditEvents();
+            assert.strictEqual(
+                events.find(({ event }) => event === "preflight").confirmed,
+                false,
+            );
+            const end = events.find(({ event }) => event === "end");
+            assert.strictEqual(end.scripts[0].outcome, "refused");
+        });
+
+        test("a verb script is warned about, then follows the redirect for its own number only", async () => {
+            const verbFile = path.join(home, `S${VERB_SCRIPT}.gsl`);
+            fs.writeFileSync(verbFile, NEW_TEXT);
+
+            const { code, stdout } = await interactive([verbFile], (prompt) =>
+                phrasePrompt.test(prompt) ? "upload 1 to dev" : undefined,
+            );
+
+            assert.strictEqual(code, 0, stdout);
+            assert.match(
+                stdout,
+                /WARNING: Dev metadata for script 777 is a verb/,
+            );
+            assert.strictEqual(game.scripts[VERB_SCRIPT].text, NEW_TEXT);
+            assert.deepStrictEqual(game.connections[0].slice(0, 5), [
+                `/ss ${VERB_SCRIPT} GS4D raw`,
+                `/ss ${VERB_SCRIPT} GS4D raw`,
+                `/ms ${VERB_SCRIPT}`,
+                "/mv age",
+                "Z",
+            ]);
+        });
+
+        test("a verb redirect for another script number is not followed", async () => {
+            const verbFile = path.join(home, `S${VERB_SCRIPT}.gsl`);
+            fs.writeFileSync(verbFile, NEW_TEXT);
+            game.verbRedirectWrongScript = true;
+
+            const { code, stdout } = await interactive([verbFile], (prompt) =>
+                phrasePrompt.test(prompt) ? "upload 1 to dev" : undefined,
+            );
+
+            assert.strictEqual(code, 1);
+            assert.match(
+                stdout,
+                new RegExp(`  ${VERB_SCRIPT}  refused  .*timed out`),
+            );
+            assert.ok(!game.connections[0].includes("/mv age"));
+            assert.strictEqual(game.scripts[VERB_SCRIPT].text, "verb\n");
+        });
+
+        test("a script with a modifier and no date uploads unchecked after its warning", async () => {
+            game.scripts[SCRIPT].epoch = 0;
+
+            const { code, stdout } = await interactive([filePath], (prompt) =>
+                phrasePrompt.test(prompt) ? "upload 1 to dev" : undefined,
+            );
+
+            assert.strictEqual(code, 0, stdout);
+            assert.match(stdout, /last modified by W_test, date unknown/);
+            assert.match(
+                stdout,
+                new RegExp(
+                    `WARNING: couldn't read when script ${SCRIPT} was last modified on Dev`,
+                ),
+            );
+            assert.strictEqual(game.scripts[SCRIPT].text, NEW_TEXT);
+        });
+
+        test("creates a missing script only after its warning", async () => {
+            game.scripts[SCRIPT].state = "new";
+
+            const { code, stdout } = await interactive([filePath], (prompt) =>
+                phrasePrompt.test(prompt) ? "upload 1 to dev" : undefined,
+            );
+
+            assert.strictEqual(code, 0, stdout);
+            assert.match(
+                stdout,
+                new RegExp(
+                    `WARNING: script ${SCRIPT} is not on Dev yet: uploading would create it`,
+                ),
+            );
+            assert.strictEqual(game.scripts[SCRIPT].text, NEW_TEXT);
+            assert.deepStrictEqual(game.connections[0].slice(0, 6), [
+                `/ss ${SCRIPT} GS4D raw`,
+                `/ss ${SCRIPT} GS4D raw`,
+                `/ms ${SCRIPT}`,
+                "",
+                "",
+                "C",
+            ]);
+        });
+
+        test("stops when Dev changed after the list", async () => {
+            let listed = false;
+            const { code, stdout } = await interactive(
+                [filePath, filePath2],
+                (prompt) => {
+                    if (!phrasePrompt.test(prompt)) return undefined;
+                    if (!listed) {
+                        listed = true;
+                        game.scripts[SCRIPT].epoch = EPOCH + 1;
+                        return "upload 2 to dev";
+                    }
+                    return undefined;
+                },
+            );
+
+            assert.strictEqual(code, 1);
+            assert.match(
+                stdout,
+                new RegExp(
+                    `  ${SCRIPT}  refused  Nothing was uploaded: Dev's copy changed`,
+                ),
+            );
+            assert.match(stdout, new RegExp(`  ${SCRIPT2}  not_attempted`));
+            assert.strictEqual(game.scripts[SCRIPT].text, DEV_TEXT);
+            assert.ok(!game.connections[0].includes(`/ms ${SCRIPT}`));
+        });
+
+        test("asks for the password when GSL_PASSWORD is unset", async () => {
+            const { code, stdout } = await interactive(
+                [filePath],
+                (prompt) =>
+                    prompt.startsWith("Play.net password")
+                        ? "test-secret"
+                        : phrasePrompt.test(prompt)
+                          ? "upload 1 to dev"
+                          : undefined,
+                { env: {} },
+            );
+
+            assert.strictEqual(code, 0, stdout);
+            assert.ok(!stdout.includes("test-secret"));
         });
     });
 });

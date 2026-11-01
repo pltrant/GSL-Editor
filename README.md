@@ -258,7 +258,8 @@ top-level `unknown` with the real per-script results.
 it sends and refuses the script if Dev no longer shows that epoch. It must
 name every file, once, with digits only. A script whose metadata is
 `missing`, `unavailable` or `verb`, or whose `status` is `ok` with a
-modifier but no date (`epoch` null), cannot be checked and is refused here.
+modifier but no date (`epoch` null), cannot be checked and is refused here;
+the interactive command handles those after a warning.
 
 `upload` also refuses to run in an agent session, judged by the environment.
 An automation that drives this tool gives it a clean environment.
@@ -278,3 +279,22 @@ logged.
 converted to their script numbers:
 `{"outcome":"ok","detail":"","scripts":[{"script":13693,"status":"FROZEN"}]}`.
 A failed list has `"scripts":[]`.
+
+### Interactive upload
+
+```sh
+node gsl/devUpload/devUpload.bundle.js interactive --config ~/.gsl/loginConfig.upload.json S12345.gsl S12346.gsl
+```
+
+This is the only way to create a script. It needs a terminal on stdin and
+stdout, and refuses to run inside an agent session, judged by the environment
+and, where `/proc` exists, by the parent processes. It asks for the password
+if `GSL_PASSWORD` is not set, logs in once, lists every file with Dev's last
+modifier and date, and warns for each script that would be created, was last
+modified by someone else, changed on Dev after the local file was saved, or
+has blank or unreadable metadata. One typed `upload <count> to dev` confirms
+them all; anything else uploads nothing. The list, its warnings and your
+answer go to the audit log. The uploads then run on the same login, each
+checked against what the list showed. The session sends nothing while you
+read the list, so if the server drops an idle connection in that time the run
+fails with nothing uploaded; run it again.

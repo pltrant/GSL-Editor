@@ -21,7 +21,7 @@ import { readFileNoSymlink } from "../util/noSymlinkFile";
  * a config would let that config pass its own check. DR follows by adding its
  * own entry here.
  */
-const DEV_INSTANCE = "GS4D";
+export const DEV_INSTANCE = "GS4D";
 /** The server's editor stops taking text one line short of its limit */
 const MAX_SCRIPT_LINES = 39_998;
 /** A file can have a problem on every line; the caller doesn't need them all */
@@ -36,7 +36,7 @@ export const scriptNumber = (filePath: string) =>
 /** From the login config; `withDevClient` adds the Dev gate */
 export type DevLogin = Omit<InitOptions["login"], "requireDevelopment">;
 
-interface ScriptFile {
+export interface ScriptFile {
     script: number;
     path: string;
     text: string;
@@ -54,7 +54,7 @@ export interface UploadResult {
     detail: string;
 }
 
-interface MetadataResult {
+export interface MetadataResult {
     outcome: "ok" | "unknown" | "not_attempted";
     script: number;
     /** `unavailable`: `/ss` timed out, errored or went unparsed */
@@ -64,8 +64,11 @@ interface MetadataResult {
     detail: string;
 }
 
-/** What Dev must still show for a script before its upload is sent */
-type Expected = { epoch: number };
+/**
+ * What Dev must still show for a script before its upload is sent. Only the
+ * interactive command's `confirm` may answer `missing`, which allows creation.
+ */
+export type Expected = { epoch: number } | { missing: true };
 
 export const errorMessage = (e: unknown) =>
     e instanceof Error ? e.message : `${e}`;
@@ -73,7 +76,8 @@ export const errorMessage = (e: unknown) =>
 const sha256 = (text: string) =>
     createHash("sha256").update(text).digest("hex");
 
-const scriptLines = (text: string) => text.replace(/\n$/, "").split("\n");
+export const scriptLines = (text: string) =>
+    text.replace(/\n$/, "").split("\n");
 
 export const notAttempted = (script: number, sha256 = ""): UploadResult => ({
     outcome: "not_attempted",
@@ -261,7 +265,7 @@ export function parseExpected(
 // ---------------------------------------------------------------------------
 
 /** `--config`, else the environment the MCP server already uses */
-export const loginConfigPath = (
+const loginConfigPath = (
     configPath: string | undefined,
     env: NodeJS.ProcessEnv,
 ) => configPath ?? env.GSL_LOGIN_CONFIG_FILE;
@@ -382,8 +386,20 @@ export class AuditLog {
 
 const dirname = (filePath: string) => path.dirname(path.resolve(filePath));
 
-export const defaultAuditPath = (configPath: string) =>
-    path.join(dirname(configPath), "dev-upload-audit.log");
+/** Opens the audit log at `--audit-log`, else beside the login config */
+export const openAuditLog = (
+    options: { config?: string; "audit-log"?: string },
+    env: NodeJS.ProcessEnv,
+    scrub: (text: string) => string,
+) =>
+    new AuditLog(
+        options["audit-log"] ??
+            path.join(
+                dirname(loginConfigPath(options.config, env)!),
+                "dev-upload-audit.log",
+            ),
+        scrub,
+    );
 
 // ---------------------------------------------------------------------------
 // Session
@@ -437,8 +453,25 @@ export const frozenSession = async (login: DevLogin, signal?: AbortSignal) =>
         (await withDevClient(login, fetchFrozenResources, signal)).script ?? {},
     ).map(({ id, status }) => ({ script: Number(id), status }));
 
-/** Why Dev's script may not be written over, or nothing */
-function refusal(expected: Expected, dev: ScriptMetadata): string | undefined {
+/**
+ * Why Dev's script may not be written over, or nothing. Without an
+ * expectation, only a missing script is refused: a verb's metadata can't be
+ * read, so it is uploaded unchecked.
+ */
+function refusal(
+    expected: Expected | undefined,
+    dev: ScriptMetadata,
+): string | undefined {
+    if (!expected) {
+        return dev.status === "missing"
+            ? "the script is not on Dev, and only the interactive command creates one"
+            : undefined;
+    }
+    if ("missing" in expected) {
+        return dev.status === "missing"
+            ? undefined
+            : "it exists on Dev now, but was missing when listed";
+    }
     if (dev.status === "missing") {
         return "Dev now reports it as missing, but it existed when listed";
     }
@@ -541,7 +574,9 @@ async function readBack(
 /**
  * Uploads the files in order on one login, stopping at the first script that
  * is not `ok`. Before each upload `/ss` must still show the epoch `expected`
- * gives for it, and `/ms` must agree with `/ss`.
+ * gives for it, and `/ms` must agree with `/ss`. With `confirm` instead, the
+ * metadata is read first and the session waits, still open, for it to return
+ * what each upload must match, or nothing to decline them all.
  *
  * Once text may have gone out, any failure drops the connection rather than
  * typing `Q` or `quit` at `Edt:`, which would write the buffer, and reads Dev
@@ -553,19 +588,27 @@ async function readBack(
 export async function uploadSession({
     login,
     files,
-    expected,
     audit,
     signal,
+    ...mode
 }: {
     login: DevLogin;
     files: ScriptFile[];
-    expected: Expected[];
     audit: AuditLog;
     signal?: AbortSignal;
-}): Promise<{ detail: string; scripts: UploadResult[] }> {
+} & (
+    | { expected: { epoch: number }[] }
+    | {
+          confirm: (
+              metadata: MetadataResult[],
+          ) => Promise<(Expected | undefined)[] | undefined>;
+      }
+)): Promise<{ detail: string; scripts: UploadResult[] }> {
     const scripts = files.map(({ script, sha256 }) =>
         notAttempted(script, sha256),
     );
+    let required: (Expected | undefined)[] =
+        "expected" in mode ? mode.expected : [];
     const refused = (index: number, detail: string) => {
         scripts[index] = { ...scripts[index], outcome: "refused", detail };
     };
@@ -588,11 +631,25 @@ export async function uploadSession({
         await withDevClient(
             login,
             async (client) => {
+                if ("confirm" in mode) {
+                    const shown = await readMetadata(
+                        client,
+                        files.map(({ script }) => script),
+                    );
+                    const confirmed = await mode.confirm(shown);
+                    if (!confirmed) {
+                        files.forEach((_, i) =>
+                            refused(i, "Not confirmed; nothing was uploaded."),
+                        );
+                        return;
+                    }
+                    required = confirmed;
+                }
                 for (let i = 0; i < files.length; i++) {
                     current = i;
                     const file = files[i];
                     const dev = await client.showScriptRaw(file.script);
-                    const reason = refusal(expected[i], dev);
+                    const reason = refusal(required[i], dev);
                     if (reason) {
                         refused(i, `Nothing was uploaded: ${reason}.`);
                         break;

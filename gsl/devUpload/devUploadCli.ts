@@ -8,29 +8,30 @@
  *   upload [--config <loginConfig.json>] [--audit-log <path>]
  *          --expect <number>=<epoch>... <S<number>.gsl>...
  *   frozen [--config <loginConfig.json>]
+ *   interactive [--config <loginConfig.json>] [--audit-log <path>]
+ *          [--] <S<number>.gsl>...
  *
- * Each command but `version` logs in once. Every command prints one JSON line
- * and exits 0 only when the outcome is `ok`. GSL_PASSWORD comes from the
- * environment. Debug logging never turns on here, since it would record the
- * login.
+ * Each command but `version` logs in once. Every command but `interactive`
+ * prints one JSON line and exits 0 only when the outcome is `ok`;
+ * `interactive` prints text for a person and exits 0 only when every script
+ * uploaded. GSL_PASSWORD comes from the environment. Debug logging never
+ * turns on here, since it would record the login.
  */
 
 import * as fs from "fs";
 import { parseArgs } from "util";
 import {
-    AuditLog,
     DevLogin,
     agentEnvMarkers,
-    defaultAuditPath,
     devLogin,
     errorMessage,
     frozenSession,
     loadScriptFiles,
-    loginConfigPath,
     makeScrub,
     metadataSession,
     notAttempted,
     notAttemptedMetadata,
+    openAuditLog,
     parseExpected,
     parseScriptNumbers,
     runOutcome,
@@ -38,11 +39,12 @@ import {
     scrubDeep,
     uploadSession,
 } from "./devUpload";
+import { processAncestors, runInteractive } from "./devUploadInteractive";
 
 const USAGE =
     "Usage: version | metadata [--config <file>] <script number>... | " +
     "upload [--config <file>] [--audit-log <path>] --expect <number>=<epoch>... <S<number>.gsl>... | " +
-    "frozen [--config <file>]; see the README.";
+    "frozen [--config <file>] | interactive [--config <file>] [--audit-log <path>] <S<number>.gsl>...; see the README.";
 
 /** Bumped when the JSON shape or a command changes incompatibly */
 const INTERFACE_VERSION = 1;
@@ -88,9 +90,9 @@ async function upload(paths: string[], options: Options): Promise<Report> {
         const scripts = files.map(({ script }) => script);
         const expected = parseExpected(options.expect ?? [], scripts);
         const login = devLogin(options.config, process.env);
-        const audit = new AuditLog(
-            options["audit-log"] ??
-                defaultAuditPath(loginConfigPath(options.config, process.env)!),
+        const audit = openAuditLog(
+            options,
+            process.env,
             makeScrub(login.password),
         );
         try {
@@ -163,20 +165,38 @@ async function frozen(options: Options): Promise<Report> {
     }
 }
 
+const OPTIONS = {
+    config: { type: "string" },
+    "audit-log": { type: "string" },
+    expect: { type: "string", multiple: true },
+} as const;
+
 async function main(): Promise<void> {
+    const args = process.argv.slice(2);
+    // Known before the parse, so that an argument error is reported the way
+    // the command reports: `interactive` speaks to a person.
+    const command = args[0];
     let report: Report;
     try {
         const { values, positionals } = parseArgs({
+            args,
+            options: OPTIONS,
             allowPositionals: true,
-            options: {
-                config: { type: "string" },
-                "audit-log": { type: "string" },
-                expect: { type: "string", multiple: true },
-            },
         });
-        const [command, ...rest] = positionals;
+        const rest = positionals.slice(1);
         if (values.expect && command !== "upload") {
             throw new Error("--expect is only for upload.");
+        }
+        if (command === "interactive") {
+            process.exit(
+                await runInteractive(rest, values, {
+                    env: process.env,
+                    stdin: process.stdin,
+                    stdout: process.stdout,
+                    stderr: process.stderr,
+                    ancestors: processAncestors(),
+                }),
+            );
         }
         if (command === "version" && rest.length === 0) {
             report = {
@@ -191,6 +211,10 @@ async function main(): Promise<void> {
             report = await frozen(values);
         else throw new Error(USAGE);
     } catch (e) {
+        if (command === "interactive") {
+            process.stderr.write(`REFUSED: ${errorMessage(e)}\n`);
+            process.exit(1);
+        }
         report = { outcome: "refused", detail: errorMessage(e), scripts: [] };
     }
     const scrubbed = scrubDeep(report, makeScrub(process.env.GSL_PASSWORD));

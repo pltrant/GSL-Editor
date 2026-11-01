@@ -10,8 +10,10 @@ All notable changes to the GSL Editor extension will be documented in this file.
   by `npm run compile`. It uploads `S<number>.gsl` files to `GS4D` and
   compiles them on one login, reads scripts' Dev metadata, lists frozen
   scripts and reports its interface version, printing one JSON line per
-  run. See the README section "Dev Upload Tool". It is not an MCP tool and
-  the extension does not use it.
+  run. The `interactive` command is for a person at a terminal: it
+  lists each script's Dev metadata with warnings and uploads after one
+  typed confirmation. See the README section "Dev Upload Tool". It is not
+  an MCP tool and the extension does not use it.
 
 ### Changed
 
