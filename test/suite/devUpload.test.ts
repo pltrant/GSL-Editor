@@ -1765,10 +1765,14 @@ suite("Dev upload tool", function () {
             assert.strictEqual(game.connections.length, 0);
         });
 
-        test("refuses without a terminal, from the spawned bundle", async () => {
+        test("refuses without a terminal, from the spawned bundle, with `--` before the files", async () => {
+            // Past `--`, --expect is a file name, so the argument check does
+            // not fire and the terminal guard answers instead.
             const { code, stdout, stderr } = await spawned([
                 "--config",
                 configPath,
+                "--",
+                "--expect",
                 filePath,
             ]);
 
@@ -1778,6 +1782,7 @@ suite("Dev upload tool", function () {
                 stderr,
                 /REFUSED: stdin and stdout must both be an interactive terminal/,
             );
+            assert.doesNotMatch(stderr, /--expect is only for upload/);
             assert.strictEqual(game.connections.length, 0);
         });
 
