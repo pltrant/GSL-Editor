@@ -63,14 +63,13 @@ export function loadLoginConfig(env: NodeJS.ProcessEnv = process.env): {
     if (fs.existsSync(loginConfigPath)) {
         try {
             file = JSON.parse(fs.readFileSync(loginConfigPath, "utf8"));
-        } catch (e) {
+        } catch {
             return {
                 credentials: new Map(),
                 author: undefined,
                 downloadPath: os.tmpdir(),
-                configError:
-                    `Failed to parse login config file at ${loginConfigPath}: ` +
-                    `${e instanceof Error ? e.message : e}`,
+                // Without the parser's text, which can quote the account.
+                configError: `Login config file at ${loginConfigPath} is not valid JSON.`,
             };
         }
     } else {
@@ -94,7 +93,7 @@ export function loadLoginConfig(env: NodeJS.ProcessEnv = process.env): {
             downloadPath: os.tmpdir(),
             configError:
                 "GSL_PASSWORD environment variable is not set. " +
-                "The MCP server requires GSL_PASSWORD to authenticate with the game server.",
+                "It holds the play.net password.",
         };
     }
 

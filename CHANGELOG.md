@@ -4,8 +4,24 @@ All notable changes to the GSL Editor extension will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- A standalone Dev upload tool, built to `gsl/devUpload/devUpload.bundle.js`
+  by `npm run compile`. It uploads `S<number>.gsl` files to `GS4D` and
+  compiles them on one login, reads scripts' Dev metadata, lists frozen
+  scripts and reports its interface version, printing one JSON line per
+  run. Directly before each script is sent it reads `/freeze list csv` on
+  the same login and refuses a frozen or locked script with nothing
+  written. The `interactive` command is for a person at a terminal: it
+  lists each script's Dev metadata with warnings and uploads after one
+  typed confirmation. See the README section "Dev Upload Tool". It is not
+  an MCP tool and the extension does not use it.
+
 ### Changed
 
+- The MCP server's login-config parse error no longer quotes the JSON
+  parser's text, which could echo the account, and its missing
+  `GSL_PASSWORD` error no longer names the MCP server.
 - `gsl_compile_check` and `gsl_download_script` now refuse a path with a
   symlink anywhere in it, or one that is not a regular file. Use the real
   path instead. If your download location is reached through a symlink, point

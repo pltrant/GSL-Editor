@@ -1,6 +1,6 @@
-// Preloaded into a spawned daemon: answers the play.net login in-process
-// and sends the game connection to FAKE_GAME_PORT, so no test reaches a
-// live server.
+// Preloaded into a spawned daemon or CLI: answers the play.net login
+// in-process and sends the game connection to FAKE_GAME_PORT, so no test
+// reaches a live server. FAKE_GAME_TYPE replaces DEVELOPMENT in the N reply.
 import * as fs from "fs";
 import * as path from "path";
 import tls = require("tls");
@@ -27,7 +27,7 @@ function reply(command: string): string {
         case "G":
             return "G\tGemStone IV Development\t0\n";
         case "N":
-            return "N\tDEVELOPMENT\n";
+            return `N\t${process.env.FAKE_GAME_TYPE ?? "DEVELOPMENT"}\n`;
         case "C":
             return "C\t1\t1\t0\t0\tW_TEST_000\tTestChar\n";
         case "L":
@@ -38,6 +38,7 @@ function reply(command: string): string {
 }
 
 (tls as any).connect = (...args: unknown[]) => {
+    console.error("fake play.net connect");
     const socket = new Duplex({
         read() {},
         write(chunk, _encoding, callback) {

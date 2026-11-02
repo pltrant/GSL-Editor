@@ -16,6 +16,7 @@ export interface DownloadScriptResult {
 }
 
 export const GSL_LANGUAGE_ID = "gsl";
+export const MAX_LINE_LENGTH = 118;
 export const GSLX_DEV_PASSWORD = "developmentPassword";
 export const GSLX_NEW_INSTALL_FLAG = "gslExtNewInstallFlag";
 export const GSLX_SAVED_VERSION = "savedVersion";
