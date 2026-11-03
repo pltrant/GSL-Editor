@@ -612,6 +612,60 @@ async function confirmConflicts(
     return choice === KEEP_MY_CHANGES_LABEL ? "keep" : undefined;
 }
 
+function clearReadOnlyAttributes(rootDir: string) {
+    let entries: fs.Dirent[];
+    try {
+        entries = fs.readdirSync(rootDir, { withFileTypes: true });
+    } catch {
+        return;
+    }
+    for (const entry of entries) {
+        const fullPath = path.join(rootDir, entry.name);
+        try {
+            if (entry.isDirectory()) {
+                fs.chmodSync(fullPath, 0o777);
+                clearReadOnlyAttributes(fullPath);
+            } else {
+                fs.chmodSync(fullPath, 0o666);
+            }
+        } catch {
+            // Best effort only; the delete below reports anything that still fails.
+        }
+    }
+}
+
+/**
+ * Removes a temporary directory without ever throwing.
+ *
+ * The temp directory holds a git clone, and git marks its pack files
+ * read-only. On Windows, fs.rmSync refuses read-only files with EPERM, and
+ * a throw from a finally block would escape the command's own error
+ * handling and surface as a raw VS Code error dialog. Retry with the
+ * read-only bits cleared, and log rather than throw if cleanup still fails.
+ */
+export function removeTempDirectory(tempRootPath: string): void {
+    try {
+        fs.rmSync(tempRootPath, { recursive: true, force: true });
+        return;
+    } catch {
+        // Fall through and retry with read-only attributes cleared.
+    }
+    try {
+        clearReadOnlyAttributes(tempRootPath);
+        fs.rmSync(tempRootPath, {
+            recursive: true,
+            force: true,
+            maxRetries: 5,
+            retryDelay: 100,
+        });
+    } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        console.warn(
+            `GSL: could not remove temporary directory ${tempRootPath}: ${detail}`,
+        );
+    }
+}
+
 function removeEmptyParentDirectories(filePath: string, rootDir: string) {
     let directory = path.dirname(filePath);
     while (
@@ -708,7 +762,7 @@ export async function runStartupAgentFilesUpdateCheck({
         return;
     } finally {
         if (tempRootPath) {
-            fs.rmSync(tempRootPath, { recursive: true, force: true });
+            removeTempDirectory(tempRootPath);
         }
     }
 
@@ -822,7 +876,7 @@ export async function runInstallAgentFilesCommand({
         );
     } finally {
         if (tempRootPath) {
-            fs.rmSync(tempRootPath, { recursive: true, force: true });
+            removeTempDirectory(tempRootPath);
         }
     }
 }
