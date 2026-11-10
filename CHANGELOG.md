@@ -16,6 +16,9 @@ All notable changes to the GSL Editor extension will be documented in this file.
   lists each script's Dev metadata with warnings and uploads after one
   typed confirmation. See the README section "Dev Upload Tool". It is not
   an MCP tool and the extension does not use it.
+- Uploading a script (Ctrl+U) now asks first when its git repository (GS or
+  DR in the remote's name) is for a different game than the Dev instance you
+  are logged in to. Enter does not upload.
 
 ### Changed
 
