@@ -63,6 +63,7 @@ import {
     writeScriptFile,
 } from "./gsl/util/lineEndingUtil";
 import { runDiffWithLiveServerCommand } from "./gsl/commands/diffWithLiveServer";
+import { confirmUploadGame } from "./gsl/commands/gameMismatch";
 import {
     runInstallAgentFilesCommand,
     runStartupAgentFilesUpdateCheck,
@@ -728,6 +729,14 @@ export class VSCodeIntegration {
             scriptNum = Number(input);
         } else {
             scriptNum = Number(inferredScriptNum);
+        }
+        if (
+            !(await confirmUploadGame(
+                document.fileName,
+                GSLExtension.getDevInstance(),
+            ))
+        ) {
+            return;
         }
         const uploadMessage = window.setStatusBarMessage(
             `Uploading Script...`,
